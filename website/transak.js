@@ -13,7 +13,7 @@
   "use strict";
 
   var CONFIG = {
-    apiKey: "",                 // <<< yahan apni Transak key daalo (khali = demo)
+    apiKey: "0db7ba13-dd4c-4497-b1a2-3cd68bde25ab", // Transak STAGING (test) key
     environment: "STAGING",     // "STAGING" (test) ya "PRODUCTION" (live)
     fiatCurrency: "INR",
     defaultWalletAddress: "",   // real me per-user embedded wallet address

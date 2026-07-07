@@ -13,8 +13,8 @@
  */
 
 export const TRANSAK_CONFIG = {
-  // <<< yahan apni key daalo. Khali = demo mode >>>
-  apiKey: "",
+  // Transak STAGING (test) key
+  apiKey: "0db7ba13-dd4c-4497-b1a2-3cd68bde25ab",
   // "STAGING" (test) ya "PRODUCTION" (live)
   environment: "STAGING" as "STAGING" | "PRODUCTION",
   fiatCurrency: "INR",
