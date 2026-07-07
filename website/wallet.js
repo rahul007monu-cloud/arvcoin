@@ -16,6 +16,10 @@
 (function () {
   "use strict";
 
+  // Agar REAL Web3Auth bundle (wallet-bundle.js) pehle load ho chuka hai,
+  // to demo wallet mat lagao — real ko rehne do.
+  if (window.ARVWallet && window.ARVWallet.version === "w3a-real-bundle") return;
+
   var CONFIG = {
     // MetaMask Embedded Wallets (Web3Auth) Client ID — Sapphire Devnet project "arvtoken"
     // (Website pe abhi use nahi ho raha; MOBILE APP (Expo) me real wallet ke liye yehi Client ID lagega.)

@@ -1,0 +1,17 @@
+{
+  "name": "arvcoin-wallet-build",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Web3Auth (MetaMask Embedded Wallets) ko ek single wallet-bundle.js me bundle karta hai, jo arvcoin website (static) me load hota hai.",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@web3auth/modal": "^10"
+  },
+  "devDependencies": {
+    "vite": "^5",
+    "vite-plugin-node-polyfills": "^0.22.0"
+  }
+}
