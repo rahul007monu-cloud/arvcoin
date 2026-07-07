@@ -123,7 +123,7 @@ export default function Home() {
         <View style={styles.trust}>
           <Ionicons name="shield-checkmark" size={16} color={colors.mint} />
           <Text style={styles.trustTxt}>
-            Powered by regulated partners · Onramp.money · Razorpay · smallcase
+            Powered by Transak · FIU-registered · Non-custodial · Razorpay
           </Text>
         </View>
       </ScrollView>

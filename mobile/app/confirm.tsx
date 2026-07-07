@@ -2,11 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import { AssetIcon, GlassCard, PrimaryButton, Screen } from "@/components";
 import { Header } from "./pay";
 import { formatInr, formatUnits, getAsset } from "@/mockData";
 import { useStore } from "@/store";
 import { colors } from "@/theme";
+import { buildTransakUrl, isTransakEnabled } from "@/transak";
 
 export default function Confirm() {
   const router = useRouter();
@@ -24,16 +26,36 @@ export default function Confirm() {
   const investable = amt - fee;
   const units = investable / asset.priceInr;
 
-  const handlePay = () => {
+  const finishInvest = () => {
+    const txn = invest(assetId, investable, method as "UPI" | "QR");
+    router.replace({
+      pathname: "/success",
+      params: { assetId, amount: String(investable), units: String(txn.units), method },
+    });
+  };
+
+  const handlePay = async () => {
     setLoading(true);
-    // simulate payment + partner order placement
+
+    // REAL MODE: Transak API key set hai -> asli widget kholo
+    if (isTransakEnabled() && asset.type === "crypto") {
+      try {
+        const url = buildTransakUrl({ assetId, fiatAmount: amt, product: "BUY" });
+        await WebBrowser.openBrowserAsync(url);
+        // Note: production me order status webhook/API se confirm hota hai.
+        // Demo ke liye return hone pe optimistically record kar lete hain.
+        setLoading(false);
+        finishInvest();
+      } catch (e) {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // DEMO MODE: mock payment + invest
     setTimeout(() => {
-      const txn = invest(assetId, investable, method as "UPI" | "QR");
       setLoading(false);
-      router.replace({
-        pathname: "/success",
-        params: { assetId, amount: String(investable), units: String(txn.units), method },
-      });
+      finishInvest();
     }, 1600);
   };
 
@@ -66,7 +88,7 @@ export default function Confirm() {
           <Ionicons name="lock-closed" size={14} color={colors.mint} />
           <Text style={styles.noteTxt}>
             {asset.type === "crypto"
-              ? "Crypto seedha tumhare wallet me jaayega (non-custodial, via Onramp.money)."
+              ? "Crypto seedha tumhare wallet me jaayega (non-custodial, via Transak · FIU-registered)."
               : "Order tumhare demat/folio me place hoga (via broker/smallcase partner)."}
           </Text>
         </View>

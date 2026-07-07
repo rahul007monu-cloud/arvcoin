@@ -326,25 +326,43 @@
     gotoStep(3);
   });
 
+  function completeInvest() {
+    var a = byId[invest.assetId];
+    var fee = Math.max(0, Math.round(invest.amount * 0.005));
+    var investable = invest.amount - fee;
+    var u = investable / a.price;
+    var h = holdings.filter(function (x) { return x.id === a.id; })[0];
+    if (h) { h.units += u; h.invested += investable; }
+    else holdings.push({ id: a.id, units: u, invested: investable });
+    activity.unshift({ id: a.id, amt: investable, method: invest.method, at: Date.now() });
+    $("#success-text").textContent = inr(investable) + " invested in " + a.name + " via " + invest.method + ".";
+    gotoStep(4);
+    renderAll();
+  }
+
   $("#do-pay").addEventListener("click", function () {
     var btn = $("#do-pay");
+    var a = byId[invest.assetId];
+
+    // REAL MODE: Transak configured + crypto asset -> asli widget kholo
+    if (window.ARVTransak && window.ARVTransak.isEnabled() && a && a.type === "crypto") {
+      window.ARVTransak.open({
+        assetId: invest.assetId,
+        fiatAmount: invest.amount,
+        product: "BUY",
+        onSuccess: function () { btn.disabled = false; btn.textContent = "Pay"; completeInvest(); },
+        onClose: function () { btn.disabled = false; btn.textContent = "Pay " + inr(invest.amount); },
+      });
+      return;
+    }
+
+    // DEMO MODE: mock payment
     btn.textContent = "Processing\u2026";
     btn.disabled = true;
     setTimeout(function () {
-      var a = byId[invest.assetId];
-      var fee = Math.max(0, Math.round(invest.amount * 0.005));
-      var investable = invest.amount - fee;
-      var u = investable / a.price;
-      // update state
-      var h = holdings.filter(function (x) { return x.id === a.id; })[0];
-      if (h) { h.units += u; h.invested += investable; }
-      else holdings.push({ id: a.id, units: u, invested: investable });
-      activity.unshift({ id: a.id, amt: investable, method: invest.method, at: Date.now() });
-      $("#success-text").textContent = inr(investable) + " invested in " + a.name + " via " + invest.method + ".";
       btn.disabled = false;
       btn.textContent = "Pay";
-      gotoStep(4);
-      renderAll();
+      completeInvest();
     }, 1500);
   });
   $("#success-done").addEventListener("click", function () { closeModal(); switchView("home"); toast("Portfolio updated \u2705"); });

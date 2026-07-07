@@ -94,10 +94,31 @@ Sab mock functions ek jagah hain, easily swappable:
 
 | Kaam | Abhi (mock) | Real (Phase 2) |
 |------|-------------|----------------|
-| Payments | `store.invest()` simulate | **Razorpay** order + webhook |
-| Crypto buy | mock units calc | **Onramp.money** API → user wallet (ya CoinDCX referral) |
+| Crypto buy+sell | mock units calc | **Transak** widget (on/off-ramp, KYC included) → user embedded wallet |
+| Wallet | mock | Embedded wallet (Web3Auth / Privy / Turnkey) |
 | Stocks/MF | locked "coming soon" | **smallcase Gateway** / broker API (Zerodha/Angel/Upstox) |
 | Prices | `mockData.jitterPrice()` | CoinGecko / exchange feeds |
+
+### 🟣 Transak integration (already wired, demo-safe)
+
+Crypto model = **Transak + embedded wallet (Option A)** → sab arvcoin ke andar
+(buy, hold, live portfolio, sell). Transak khud **KYC + payment + compliance**
+handle karta hai (FIU-registered), tujhe apni crypto license nahi chahiye.
+
+**Config files:**
+- Website: `website/transak.js` → `CONFIG.apiKey` set karo (khali = demo)
+- Mobile: `mobile/src/transak.ts` → `TRANSAK_CONFIG.apiKey` set karo
+
+Jab tak key khali hai → **DEMO mode** (mock invest). Key daalte hi → asli Transak
+widget khulta hai (`STAGING` test key turant, `PRODUCTION` KYB ke baad).
+
+**arvcoin ki kamai:** Transak dashboard me **partner fee (up to 5%)** set karo →
+har buy/sell pe automatically milega. Alag referral link ki zaroorat nahi.
+
+### 🎁 ARV Rewards (Phase 4, optional)
+Loyalty points ("ARV") — invest/refer/login pe earn, redeem: fee discount /
+bonus crypto. Start **off-chain points** se (legal-safe); real on-chain token
+bahut baad me (India VDA rules dhyaan se).
 
 **Files to touch:** `mobile/src/mockData.ts` (data) aur `mobile/src/store.tsx` (`invest`).
 
