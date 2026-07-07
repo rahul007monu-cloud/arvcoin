@@ -473,9 +473,9 @@
     if ($(".view[data-view=markets]").classList.contains("active")) renderMarkets();
   }, 3500);
 
-  // real crypto rates: turant + har 45s
+  // real crypto rates: turant + har 20s (CoinGecko free limit ke andar safe)
   fetchLiveRates();
-  setInterval(fetchLiveRates, 45000);
+  setInterval(fetchLiveRates, 20000);
 
   /* ---------------- notifications ---------------- */
   var notifs = [
