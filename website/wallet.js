@@ -18,7 +18,12 @@
 
   var CONFIG = {
     // MetaMask Embedded Wallets (Web3Auth) Client ID — Sapphire Devnet project "arvtoken"
+    // (Website pe abhi use nahi ho raha; MOBILE APP (Expo) me real wallet ke liye yehi Client ID lagega.)
     clientId: "BPsU7LXM_uX6sfO81PYM5NXb4gDkoxZc0UE47PSftpKrgLDzAX31c1kaf7hCs3NpktdxVuqLAtLf25nP2yQV6t8",
+    // Web3Auth SDK bundler ke bina static site pe reliably load nahi hota.
+    // Isliye WEBSITE pe embedded wallet OFF (instant demo address). Real wallet mobile app me aayega.
+    // Jab website ka proper build (Vite) banega, ise true kar denge.
+    webEmbeddedEnabled: false,
     network: "sapphire_devnet",             // test. Live pe: "sapphire_mainnet" (naya Mainnet project)
     // No-bundler CDN builds — order me try honge (jsDelivr pehle: loglevel interop sahi handle karta hai).
     // esm.sh ?bundle deps ko inline karta hai (loglevel 'levels' export bug se bachne ke liye).
@@ -29,7 +34,7 @@
     ]
   };
 
-  var VERSION = "w3a-5"; // file version marker (cache diagnose ke liye)
+  var VERSION = "w3a-6"; // file version marker (cache diagnose ke liye)
 
   function isEnabled() { return String(CONFIG.clientId || "").trim().length > 0; }
 
@@ -96,8 +101,9 @@
   }
 
   function connect() {
-    if (!isEnabled()) {
-      return Promise.resolve({ address: demoAddress(), name: "", email: "", demo: true, enabled: false, error: "clientId khaali (purani cached file?)" });
+    // Website pe embedded wallet band -> turant clean demo address (koi wait nahi)
+    if (!CONFIG.webEmbeddedEnabled || !isEnabled()) {
+      return Promise.resolve({ address: demoAddress(), name: "", email: "", demo: true, enabled: false });
     }
     return withTimeout(loadInstance(), 7000).then(function (w) {
       var p = w.connected ? Promise.resolve(w.provider) : w.connect();
