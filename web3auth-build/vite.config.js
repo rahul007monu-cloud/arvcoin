@@ -6,8 +6,13 @@ import { fileURLToPath, URL } from "node:url";
 // seedha /website folder me daal deta hai. node polyfills (Buffer/process/crypto)
 // vite-plugin-node-polyfills apne aap handle karta hai.
 export default defineConfig({
-  plugins: [nodePolyfills()],
-  define: { global: "globalThis" },
+  // Buffer/global/process sab polyfill karo (Web3Auth ke liye zaroori)
+  plugins: [
+    nodePolyfills({
+      globals: { Buffer: true, global: true, process: true },
+      protocolImports: true
+    })
+  ],
   build: {
     lib: {
       entry: fileURLToPath(new URL("./src/main.js", import.meta.url)),

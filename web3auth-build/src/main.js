@@ -7,6 +7,7 @@
 
    Same Google login = same wallet (web + mobile dono pe).
    ========================================================= */
+import "./polyfill.js"; // SABSE PEHLE — process.nextTick etc. fix (warna wallet provider crash)
 import { Web3Auth, WEB3AUTH_NETWORK } from "@web3auth/modal";
 
 // Sapphire Devnet project "arvtoken" ki Client ID (public — safe)
