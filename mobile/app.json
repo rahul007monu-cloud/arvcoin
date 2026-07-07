@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "arvcoin",
+    "slug": "arvcoin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "arvcoin",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#05060f",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.arvcoin.app"
+    },
+    "android": {
+      "package": "com.arvcoin.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#05060f"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-router", "expo-font"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
