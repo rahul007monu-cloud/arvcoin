@@ -15,7 +15,7 @@ export default defineConfig({
       formats: ["iife"],
       fileName: () => "wallet-bundle.js"
     },
-    outDir: fileURLToPath(new URL("../website", import.meta.url)),
-    emptyOutDir: false // baaki website files delete na ho
+    outDir: fileURLToPath(new URL("..", import.meta.url)), // repo root (site ab root pe hai)
+    emptyOutDir: false // baaki site files delete na ho
   }
 });
