@@ -127,11 +127,20 @@
 
         // REAL MODE: agar Web3Auth (embedded wallet) ready hai to usse social login
         if (window.ARVWallet && typeof window.ARVWallet.socialLogin === "function") {
+          // Real bundle load hai ya sirf demo? (real = asli wallet)
+          var isReal = window.ARVWallet.version === "w3a-real-bundle";
+          btn.disabled = true;
           showMsg("ok", label + " se connect kar rahe hain\u2026");
+
           window.ARVWallet.socialLogin(provider)
             .then(function (u) {
               u = u || {};
-              // Real Web3Auth mila to uska data, warna smooth demo fallback.
+              // REAL mode me agar address nahi mila = user ne cancel kiya -> login mat karo, page pe raho
+              if (isReal && !u.address) {
+                btn.disabled = false;
+                showMsg("", "Login cancel ho gaya. Dobara " + label + " se try karo.");
+                return;
+              }
               var email = u.email || (label.toLowerCase() + "@arvcoin.demo");
               var user = { name: u.name || label + " User", email: email, mobile: "", at: Date.now() };
               try {
@@ -141,7 +150,13 @@
               window.location.href = "dashboard.html";
             })
             .catch(function () {
-              // kuch bhi ho jaye, demo se login karado (site na ruke)
+              btn.disabled = false;
+              // REAL mode: cancel/fail hua -> login page pe hi raho (demo se login MAT karo)
+              if (isReal) {
+                showMsg("", "Login cancel/fail ho gaya. Dobara " + label + " se try karo.");
+                return;
+              }
+              // Sirf DEMO mode (real bundle nahi) me smooth fallback login
               try {
                 localStorage.setItem("arvcoin_user", JSON.stringify({ name: label + " User", email: label.toLowerCase() + "@arvcoin.demo", mobile: "", at: Date.now() }));
                 localStorage.setItem("arvcoin_session", JSON.stringify({ user: label.toLowerCase() + "@arvcoin.demo", at: Date.now() }));
