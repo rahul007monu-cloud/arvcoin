@@ -61,11 +61,11 @@
       setInvalid("f-pass", !pwOk);
       if (!emailOk || !pwOk) return;
 
-      showMsg("ok", "\uD83D\uDD13 Login successful! Redirecting to your portfolio…");
+      showMsg("ok", "\uD83D\uDD13 Login successful! Redirecting to your dashboard…");
       try {
         localStorage.setItem("arvcoin_session", JSON.stringify({ user: email, at: Date.now() }));
       } catch (err) {}
-      setTimeout(function () { window.location.href = "index.html"; }, 1400);
+      setTimeout(function () { window.location.href = "dashboard.html"; }, 1400);
     });
   }
 
@@ -96,12 +96,12 @@
         return;
       }
 
-      showMsg("ok", "\uD83C\uDF89 Account created! Welcome to arvcoin, " + name.split(" ")[0] + ".");
+      showMsg("ok", "\uD83C\uDF89 Account created! Ab number verify karte hain, " + name.split(" ")[0] + ".");
       try {
         localStorage.setItem("arvcoin_user", JSON.stringify({ name: name, email: email, mobile: mobile, at: Date.now() }));
         localStorage.setItem("arvcoin_session", JSON.stringify({ user: email, at: Date.now() }));
       } catch (err) {}
-      setTimeout(function () { window.location.href = "index.html"; }, 1600);
+      setTimeout(function () { window.location.href = "verify.html"; }, 1500);
     });
 
     // live clear-invalid as user types

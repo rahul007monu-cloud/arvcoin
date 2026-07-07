@@ -34,6 +34,23 @@ python3 -m http.server 8080
 # phir kholo: http://localhost:8080
 ```
 
+### Website pages & flow
+| Page | File | Kya hai |
+|------|------|---------|
+| Landing | `index.html` | Hero 3D coin, features, live ticker, testimonials, FAQ, waitlist |
+| Sign up | `signup.html` | Account create → OTP verify pe jaata hai |
+| OTP verify | `verify.html` | 6-box auto-advance code → KYC pe jaata hai |
+| KYC | `kyc.html` | PAN → Aadhaar → selfie stepper → dashboard |
+| Log in | `login.html` | Login → dashboard |
+| Dashboard | `dashboard.html` | Portfolio, live chart, holdings, invest modal, markets, rewards |
+| Legal | `legal.html` | Privacy / Terms / Risk disclosure |
+
+**Full flow:** `signup → verify → kyc → dashboard`  ·  `login → dashboard`
+
+**World-class extras:** PWA (installable, offline via `sw.js` + `manifest.json`),
+SEO + Open Graph + JSON-LD, `sitemap.xml`, `robots.txt`, cookie consent banner,
+animated counters, FAQ accordion. Sab demo-mode (localStorage) — real backend Phase 2.
+
 ### Hostinger pe deploy (arvcoin.com)
 1. **hPanel → Files → File Manager** kholo.
 2. `arvcoin.com` ke `public_html` folder me jao.

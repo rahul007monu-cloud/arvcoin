@@ -294,3 +294,53 @@ body::before{ /* ambient top glow */
   *{animation:none!important;transition:none!important}
   .reveal{opacity:1;transform:none}
 }
+
+
+/* =========================================================
+   Homepage additions: stats band, testimonials, FAQ
+   ========================================================= */
+.stats-band{max-width:1100px;margin:10px auto 20px;padding:28px 24px;display:grid;grid-template-columns:repeat(4,1fr);gap:20px;
+  border-radius:24px;background:linear-gradient(120deg,rgba(124,92,255,.14),rgba(0,224,255,.05));border:1px solid var(--stroke-strong)}
+.sb-item{text-align:center}
+.sb-num{display:block;font-family:var(--font-alt);font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.02em;
+  background:var(--grad2);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sb-item small{color:var(--muted);font-size:13px}
+
+.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.testi-card{padding:28px;border-radius:var(--radius);background:var(--panel);border:1px solid var(--stroke);backdrop-filter:blur(12px);transition:transform .35s,border-color .35s}
+.testi-card:hover{transform:translateY(-6px);border-color:var(--stroke-strong)}
+.testi-card .stars{color:#ffd76a;font-size:15px;letter-spacing:2px;margin-bottom:12px}
+.testi-card p{color:var(--txt);font-size:15px;line-height:1.6;opacity:.92}
+.testi-user{display:flex;align-items:center;gap:12px;margin-top:18px}
+.tu-av{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#050614;font-size:16px}
+.testi-user b{font-size:14px;display:block}
+.testi-user small{color:var(--muted-2);font-size:12px}
+
+.faq-list{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.faq-item{border-radius:16px;background:var(--panel);border:1px solid var(--stroke);overflow:hidden;transition:border-color .3s}
+.faq-item.open{border-color:var(--stroke-strong)}
+.faq-q{width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 22px;background:none;border:0;color:var(--txt);font-family:var(--font);font-size:16px;font-weight:600;text-align:left;cursor:pointer}
+.faq-ic{flex-shrink:0;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--panel-2);border:1px solid var(--stroke);font-size:18px;color:var(--cyan);transition:transform .3s}
+.faq-item.open .faq-ic{transform:rotate(45deg)}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .35s ease}
+.faq-a p{padding:0 22px 20px;color:var(--muted);font-size:14.5px;line-height:1.7}
+.faq-a p b{color:var(--txt)}
+
+@media(max-width:900px){
+  .stats-band{grid-template-columns:repeat(2,1fr);gap:26px 16px}
+  .testi-grid{grid-template-columns:1fr}
+}
+
+/* =========================================================
+   Cookie consent banner
+   ========================================================= */
+.cookie{position:fixed;bottom:20px;left:20px;right:20px;max-width:560px;margin:0 auto;z-index:250;
+  display:flex;align-items:center;gap:16px;padding:16px 20px;border-radius:18px;
+  background:rgba(12,14,30,.92);backdrop-filter:blur(16px);border:1px solid var(--stroke-strong);
+  box-shadow:var(--shadow);transform:translateY(160px);opacity:0;transition:transform .4s cubic-bezier(.2,.9,.3,1),opacity .4s}
+.cookie.show{transform:none;opacity:1}
+.cookie p{color:var(--muted);font-size:13px;flex:1;line-height:1.5}
+.cookie p a{color:var(--cyan)}
+.cookie .c-btns{display:flex;gap:8px}
+.cookie .btn{padding:9px 18px;font-size:13px;height:auto}
+@media(max-width:560px){.cookie{flex-direction:column;align-items:stretch;text-align:center}.cookie .c-btns{justify-content:center}}

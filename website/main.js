@@ -138,3 +138,81 @@
     });
   });
 })();
+
+
+/* =========================================================
+   FAQ accordion + animated counters (homepage additions)
+   ========================================================= */
+(function () {
+  "use strict";
+
+  /* ---- FAQ accordion ---- */
+  var faqItems = document.querySelectorAll(".faq-item");
+  faqItems.forEach(function (item) {
+    var q = item.querySelector(".faq-q");
+    var a = item.querySelector(".faq-a");
+    if (!q || !a) return;
+    q.addEventListener("click", function () {
+      var isOpen = item.classList.contains("open");
+      // close all
+      faqItems.forEach(function (it) {
+        it.classList.remove("open");
+        var ans = it.querySelector(".faq-a");
+        if (ans) ans.style.maxHeight = null;
+      });
+      if (!isOpen) {
+        item.classList.add("open");
+        a.style.maxHeight = a.scrollHeight + "px";
+      }
+    });
+  });
+
+  /* ---- animated counters ---- */
+  var counters = document.querySelectorAll(".sb-num[data-to]");
+  function animate(el) {
+    var to = parseFloat(el.getAttribute("data-to"));
+    var dec = parseInt(el.getAttribute("data-decimal") || "0", 10);
+    var prefix = el.getAttribute("data-prefix") || "";
+    var suffix = el.getAttribute("data-suffix") || "";
+    var start = performance.now();
+    var dur = 1600;
+    function fmt(v) {
+      var n = dec ? v.toFixed(dec) : Math.round(v).toLocaleString("en-IN");
+      return prefix + n + suffix;
+    }
+    function tick(now) {
+      var p = Math.min((now - start) / dur, 1);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmt(to * eased);
+      if (p < 1) requestAnimationFrame(tick);
+      else el.textContent = fmt(to);
+    }
+    requestAnimationFrame(tick);
+  }
+  if ("IntersectionObserver" in window && counters.length) {
+    var cio = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { animate(e.target); cio.unobserve(e.target); }
+      });
+    }, { threshold: 0.4 });
+    counters.forEach(function (c) { cio.observe(c); });
+  } else {
+    counters.forEach(animate);
+  }
+
+  /* ---- cookie consent (injected, shows on all pages that load main.js) ---- */
+  try {
+    if (!localStorage.getItem("arvcoin_cookie")) {
+      var bar = document.createElement("div");
+      bar.className = "cookie";
+      bar.innerHTML =
+        '<p>Hum cookies use karte hain behtar experience ke liye. <a href="legal.html#privacy">Privacy policy</a>.</p>' +
+        '<div class="c-btns"><button class="btn btn-ghost" id="ck-no">Decline</button><button class="btn btn-primary" id="ck-yes">Accept</button></div>';
+      document.body.appendChild(bar);
+      setTimeout(function () { bar.classList.add("show"); }, 800);
+      function close(v) { try { localStorage.setItem("arvcoin_cookie", v); } catch (e) {} bar.classList.remove("show"); setTimeout(function () { bar.remove(); }, 400); }
+      bar.querySelector("#ck-yes").addEventListener("click", function () { close("accepted"); });
+      bar.querySelector("#ck-no").addEventListener("click", function () { close("declined"); });
+    }
+  } catch (e) {}
+})();

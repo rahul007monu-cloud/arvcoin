@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#05060f" />
+  <title>Verify — arvcoin</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="auth.css" />
+  <style>
+    .otp-boxes{display:flex;gap:10px;justify-content:center;margin:26px 0 6px}
+    .otp-boxes input{width:52px;height:60px;text-align:center;font-size:26px;font-weight:700;
+      border-radius:14px;background:rgba(5,6,15,.6);border:1px solid var(--stroke-strong);color:var(--txt);outline:none;transition:.2s;font-family:var(--font-alt)}
+    .otp-boxes input:focus{border-color:var(--cyan);box-shadow:var(--glow-c)}
+    .otp-boxes input.filled{border-color:var(--mint)}
+    .otp-center{text-align:center}
+    .otp-center .a-sub{margin-top:6px}
+    .otp-center .dest{color:var(--txt);font-weight:700}
+    .resend{margin-top:18px;color:var(--muted);font-size:14px;text-align:center}
+    .resend a{color:var(--cyan);font-weight:600;cursor:pointer}
+    .resend a.disabled{color:var(--muted-2);pointer-events:none}
+    .demo-hint{text-align:center;margin-top:14px;font-size:12px;color:var(--muted-2)}
+    @media(max-width:560px){.otp-boxes input{width:44px;height:54px;font-size:22px}}
+  </style>
+</head>
+<body>
+  <canvas id="bg-canvas"></canvas>
+  <div class="grid-overlay"></div>
+  <div class="noise-overlay"></div>
+
+  <div class="auth-wrap">
+    <aside class="auth-brand">
+      <div class="ab-glow"></div>
+      <div class="ab-top">
+        <a href="index.html" class="brand">
+          <span class="brand-mark">
+            <svg viewBox="0 0 40 40" width="34" height="34">
+              <defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#7c5cff"/><stop offset="0.5" stop-color="#00e0ff"/><stop offset="1" stop-color="#00ffa3"/>
+              </linearGradient></defs>
+              <circle cx="20" cy="20" r="18" fill="none" stroke="url(#lg1)" stroke-width="2.5"/>
+              <path d="M13 26 L20 12 L27 26 M15.6 21 H24.4" fill="none" stroke="url(#lg1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span class="brand-name">arv<span>coin</span></span>
+        </a>
+      </div>
+      <div class="auth-coin">
+        <svg viewBox="0 0 40 40" width="96" height="96"><path d="M13 27 L20 11 L27 27 M15 21.5 H25" fill="none" stroke="#00ffc2" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="auth-tag">
+        <h2>Ek <span class="grad">quick verification</span> aur bas!</h2>
+        <p>Security ke liye hum tumhare number pe ek 6-digit code bhejte hain.</p>
+      </div>
+    </aside>
+
+    <main class="auth-form-side">
+      <div class="auth-card otp-center">
+        <a href="signup.html" class="back-home">← Back</a>
+        <div class="a-brand"><h1>Verify your number</h1></div>
+        <p class="a-sub">Code bheja gaya <span class="dest" id="dest">+91 ●●●●● ●●●●●</span> par</p>
+
+        <form id="otp-form">
+          <div class="otp-boxes" id="otp-boxes">
+            <input type="tel" maxlength="1" inputmode="numeric" aria-label="Digit 1" />
+            <input type="tel" maxlength="1" inputmode="numeric" aria-label="Digit 2" />
+            <input type="tel" maxlength="1" inputmode="numeric" aria-label="Digit 3" />
+            <input type="tel" maxlength="1" inputmode="numeric" aria-label="Digit 4" />
+            <input type="tel" maxlength="1" inputmode="numeric" aria-label="Digit 5" />
+            <input type="tel" maxlength="1" inputmode="numeric" aria-label="Digit 6" />
+          </div>
+          <button type="submit" class="btn btn-primary btn-lg full" style="margin-top:22px">Verify & continue</button>
+          <div class="a-msg" id="msg"></div>
+        </form>
+
+        <p class="resend">Code nahi mila? <a id="resend" class="disabled">Resend in <span id="timer">30</span>s</a></p>
+        <p class="demo-hint">Demo: koi bhi 6 digits daalo (ya <b>123456</b>) — verify ho jayega.</p>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="3d.js" defer></script>
+  <script>
+    (function () {
+      // show destination number from signup
+      try {
+        var u = JSON.parse(localStorage.getItem("arvcoin_user") || "null");
+        if (u && u.mobile) {
+          var m = String(u.mobile);
+          document.getElementById("dest").textContent = "+91 " + m.slice(0, 2) + "●●● ●●" + m.slice(-3);
+        }
+      } catch (e) {}
+
+      var boxes = Array.prototype.slice.call(document.querySelectorAll("#otp-boxes input"));
+      boxes[0].focus();
+      boxes.forEach(function (box, i) {
+        box.addEventListener("input", function () {
+          box.value = box.value.replace(/\D/g, "");
+          box.classList.toggle("filled", !!box.value);
+          if (box.value && i < boxes.length - 1) boxes[i + 1].focus();
+        });
+        box.addEventListener("keydown", function (e) {
+          if (e.key === "Backspace" && !box.value && i > 0) boxes[i - 1].focus();
+        });
+        box.addEventListener("paste", function (e) {
+          e.preventDefault();
+          var data = (e.clipboardData.getData("text") || "").replace(/\D/g, "").slice(0, 6);
+          data.split("").forEach(function (d, j) { if (boxes[j]) { boxes[j].value = d; boxes[j].classList.add("filled"); } });
+          if (boxes[Math.min(data.length, 5)]) boxes[Math.min(data.length, 5)].focus();
+        });
+      });
+
+      // resend timer
+      var t = 30, timerEl = document.getElementById("timer"), resend = document.getElementById("resend");
+      var iv = setInterval(function () {
+        t--; timerEl.textContent = t;
+        if (t <= 0) { clearInterval(iv); resend.classList.remove("disabled"); resend.textContent = "Resend code"; }
+      }, 1000);
+      resend.addEventListener("click", function () {
+        if (resend.classList.contains("disabled")) return;
+        resend.classList.add("disabled"); resend.innerHTML = 'Resend in <span id="timer">30</span>s';
+        t = 30; timerEl = document.getElementById("timer");
+        iv = setInterval(function () { t--; timerEl.textContent = t; if (t <= 0) { clearInterval(iv); resend.classList.remove("disabled"); resend.textContent = "Resend code"; } }, 1000);
+      });
+
+      document.getElementById("otp-form").addEventListener("submit", function (e) {
+        e.preventDefault();
+        var code = boxes.map(function (b) { return b.value; }).join("");
+        var msg = document.getElementById("msg");
+        if (code.length < 6) { msg.className = "a-msg bad"; msg.textContent = "Poora 6-digit code daalo."; return; }
+        msg.className = "a-msg ok"; msg.textContent = "\u2705 Verified! Ab KYC complete karte hain\u2026";
+        setTimeout(function () { window.location.href = "kyc.html"; }, 1200);
+      });
+    })();
+  </script>
+</body>
+</html>

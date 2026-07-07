@@ -1,0 +1,25 @@
+{
+  "name": "arvcoin — Micro-investment super app",
+  "short_name": "arvcoin",
+  "description": "Pay via UPI, auto-invest into crypto & Indian stocks. Chhoti UPI payment, bada future.",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#05060f",
+  "theme_color": "#05060f",
+  "orientation": "portrait",
+  "categories": ["finance", "productivity"],
+  "lang": "en-IN",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Dashboard", "url": "dashboard.html" },
+    { "name": "Log in", "url": "login.html" },
+    { "name": "Sign up", "url": "signup.html" }
+  ]
+}

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#05060f" />
+  <title>Legal — arvcoin</title>
+  <meta name="description" content="arvcoin legal — Privacy Policy, Terms of Service, and Risk Disclosure." />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .legal-wrap{max-width:920px;margin:0 auto;padding:110px 24px 80px;position:relative;z-index:1}
+    .legal-head{text-align:center;margin-bottom:40px}
+    .legal-head h1{font-size:clamp(30px,5vw,48px);font-weight:800;letter-spacing:-.02em}
+    .legal-head p{color:var(--muted);margin-top:10px}
+    .legal-tabs{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:36px}
+    .legal-tabs button{padding:11px 22px;border-radius:999px;background:var(--panel);border:1px solid var(--stroke);color:var(--muted);font-family:var(--font);font-weight:600;font-size:14px;cursor:pointer;transition:.2s}
+    .legal-tabs button.active{background:linear-gradient(100deg,rgba(124,92,255,.22),rgba(0,224,255,.1));color:var(--txt);border-color:var(--stroke-strong)}
+    .legal-doc{display:none;animation:fadeUp .4s ease}
+    .legal-doc.active{display:block}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+    .legal-doc h2{font-size:24px;font-weight:800;margin-bottom:6px}
+    .legal-doc .updated{color:var(--muted-2);font-size:13px;margin-bottom:24px}
+    .legal-doc h3{font-size:17px;font-weight:700;margin:26px 0 8px;color:var(--txt)}
+    .legal-doc p,.legal-doc li{color:var(--muted);font-size:15px;line-height:1.75}
+    .legal-doc ul{padding-left:22px;margin:8px 0}
+    .legal-doc li{margin:4px 0}
+    .risk-note{padding:18px 20px;border-radius:16px;background:rgba(255,176,32,.1);border:1px solid rgba(255,176,32,.3);color:var(--txt);margin:18px 0;font-size:14.5px;line-height:1.7}
+    .back-link{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:14px;margin-bottom:26px}
+    .back-link:hover{color:var(--txt)}
+  </style>
+</head>
+<body>
+  <canvas id="bg-canvas"></canvas>
+  <div class="grid-overlay"></div>
+
+  <!-- simple nav -->
+  <header class="nav scrolled" id="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 40 40" width="30" height="30">
+            <defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#7c5cff"/><stop offset="0.5" stop-color="#00e0ff"/><stop offset="1" stop-color="#00ffa3"/>
+            </linearGradient></defs>
+            <circle cx="20" cy="20" r="18" fill="none" stroke="url(#lg1)" stroke-width="2.5"/>
+            <path d="M13 26 L20 12 L27 26 M15.6 21 H24.4" fill="none" stroke="url(#lg1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="brand-name">arv<span>coin</span></span>
+      </a>
+      <div class="nav-cta">
+        <a href="index.html" class="btn btn-ghost">Home</a>
+        <a href="signup.html" class="btn btn-primary">Get started</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="legal-wrap">
+    <div class="legal-head">
+      <h1>Legal & Policies</h1>
+      <p>Transparency first. Yahan sab kuch clearly likha hai.</p>
+    </div>
+
+    <div class="legal-tabs">
+      <button class="active" data-doc="privacy">Privacy Policy</button>
+      <button data-doc="terms">Terms of Service</button>
+      <button data-doc="risk">Risk Disclosure</button>
+    </div>
+
+    <!-- PRIVACY -->
+    <article class="legal-doc active" id="privacy">
+      <h2>Privacy Policy</h2>
+      <p class="updated">Last updated: demo version</p>
+      <p>arvcoin ("hum") tumhari privacy ko seriously leta hai. Yeh policy batati hai ki hum kaunsa data collect karte hain aur kaise use karte hain.</p>
+      <h3>1. Data hum collect karte hain</h3>
+      <ul>
+        <li>Account info: naam, email, mobile number</li>
+        <li>KYC data: PAN, Aadhaar (partner KYC ke liye, encrypted)</li>
+        <li>Transaction data: investment amount, assets, timestamps</li>
+        <li>Device & usage data: app performance behtar karne ke liye</li>
+      </ul>
+      <h3>2. Data ka use</h3>
+      <p>Sirf service dene ke liye — account setup, KYC verification (partners ke through), transactions process karna, aur legal compliance. Hum tumhara data <b>bechte nahi</b>.</p>
+      <h3>3. Sharing</h3>
+      <p>Data sirf regulated partners (Razorpay, Onramp.money, CoinDCX, smallcase/brokers) ke saath share hota hai jitna transaction ke liye zaroori ho.</p>
+      <h3>4. Security</h3>
+      <p>256-bit encryption at rest & in transit. Access strictly controlled.</p>
+      <h3>5. Tumhare rights</h3>
+      <p>Tum apna data access, correct ya delete karwa sakte ho — support se contact karke.</p>
+    </article>
+
+    <!-- TERMS -->
+    <article class="legal-doc" id="terms">
+      <h2>Terms of Service</h2>
+      <p class="updated">Last updated: demo version</p>
+      <p>arvcoin use karke tum in terms se agree karte ho. Dhyaan se padho.</p>
+      <h3>1. Service kya hai</h3>
+      <p>arvcoin ek technology platform hai jo tumhe regulated partners ke through crypto aur stocks/MF me invest karne me madad karta hai. Hum khud broker, exchange ya custodian <b>nahi</b> hain.</p>
+      <h3>2. Eligibility</h3>
+      <p>Tumhari umar 18+ honi chahiye aur valid KYC (PAN/Aadhaar) hona chahiye.</p>
+      <h3>3. Investments</h3>
+      <p>Sab investments partner platforms pe execute hote hain. Crypto tumhare wallet me, stocks tumhare demat/folio me jaate hain. arvcoin tumhara paisa hold nahi karta.</p>
+      <h3>4. Fees</h3>
+      <p>Ek transparent partner fee lagti hai (~0.5%), jo transaction se pehle dikhayi jaati hai.</p>
+      <h3>5. Liability</h3>
+      <p>Market losses ke liye arvcoin zimmedar nahi hai. Investments market risk ke adheen hain.</p>
+      <h3>6. Changes</h3>
+      <p>Hum terms update kar sakte hain; major changes pe notify karenge.</p>
+    </article>
+
+    <!-- RISK -->
+    <article class="legal-doc" id="risk">
+      <h2>Risk Disclosure</h2>
+      <p class="updated">Last updated: demo version</p>
+      <div class="risk-note">⚠️ <b>Investments are subject to market risk.</b> Crypto aur stocks dono me paisa ghat bhi sakta hai. Sirf utna invest karo jitna afford kar sako.</div>
+      <h3>Crypto risk</h3>
+      <p>Crypto assets highly volatile hote hain. Prices short time me bahut upar-neeche ja sakti hain. Crypto India me evolving regulation ke under hai.</p>
+      <h3>Stock & MF risk</h3>
+      <p>Equity aur mutual funds market performance pe depend karte hain. Past returns future returns guarantee nahi karte.</p>
+      <h3>No guaranteed returns</h3>
+      <p>arvcoin koi fixed ya guaranteed return promise nahi karta. Sabhi decisions tumhari apni samajh se lo.</p>
+      <h3>Do your own research</h3>
+      <p>Invest karne se pehle apni research karo ya certified financial advisor se salah lo.</p>
+    </article>
+
+    <a href="index.html" class="back-link" style="margin-top:30px">← Back to home</a>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="3d.js" defer></script>
+  <script>
+    (function () {
+      var tabs = document.querySelectorAll(".legal-tabs button");
+      var docs = document.querySelectorAll(".legal-doc");
+      function show(id) {
+        docs.forEach(function (d) { d.classList.toggle("active", d.id === id); });
+        tabs.forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-doc") === id); });
+      }
+      tabs.forEach(function (t) { t.addEventListener("click", function () { show(t.getAttribute("data-doc")); }); });
+      // open specific doc from hash (#privacy/#terms/#risk)
+      var h = (location.hash || "").replace("#", "");
+      if (h && document.getElementById(h)) show(h);
+    })();
+  </script>
+</body>
+</html>
