@@ -23,6 +23,8 @@
     sdkUrl: "https://esm.sh/@web3auth/modal@10" // no-bundler CDN build
   };
 
+  var VERSION = "w3a-3"; // file version marker (cache diagnose ke liye)
+
   function isEnabled() { return String(CONFIG.clientId || "").trim().length > 0; }
 
   /* ---------- DEMO fallback address ---------- */
@@ -62,7 +64,7 @@
   // Social/email login -> opens Web3Auth modal, returns { address, name, email }
   function connect() {
     if (!isEnabled()) {
-      return Promise.resolve({ address: demoAddress(), name: "", email: "", demo: true });
+      return Promise.resolve({ address: demoAddress(), name: "", email: "", demo: true, enabled: false, error: "clientId khaali (purani cached file?)" });
     }
     return loadInstance().then(function (w) {
       var p = w.connected ? Promise.resolve(w.provider) : w.connect();
@@ -85,7 +87,7 @@
     }).catch(function (err) {
       // koi bhi dikkat -> demo pe safe fallback (site tooti nahi)
       try { console.warn("[ARVWallet] real connect fail, demo fallback:", err); } catch (e) {}
-      return { address: demoAddress(), name: "", email: "", demo: true };
+      return { address: demoAddress(), name: "", email: "", demo: true, enabled: true, error: String((err && err.message) || err) };
     });
   }
 
@@ -113,6 +115,7 @@
     logout: logout,
     getAddress: getAddress,
     isConnected: function () { return _connected; },
+    version: VERSION,
     config: CONFIG
   };
 })();
