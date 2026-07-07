@@ -20,10 +20,16 @@
     // MetaMask Embedded Wallets (Web3Auth) Client ID — Sapphire Devnet project "arvtoken"
     clientId: "BPsU7LXM_uX6sfO81PYM5NXb4gDkoxZc0UE47PSftpKrgLDzAX31c1kaf7hCs3NpktdxVuqLAtLf25nP2yQV6t8",
     network: "sapphire_devnet",             // test. Live pe: "sapphire_mainnet" (naya Mainnet project)
-    sdkUrl: "https://esm.sh/@web3auth/modal@10" // no-bundler CDN build
+    // No-bundler CDN builds — order me try honge (jsDelivr pehle: loglevel interop sahi handle karta hai).
+    // esm.sh ?bundle deps ko inline karta hai (loglevel 'levels' export bug se bachne ke liye).
+    sdkUrls: [
+      "https://cdn.jsdelivr.net/npm/@web3auth/modal@10/+esm",
+      "https://esm.sh/@web3auth/modal@10?bundle",
+      "https://esm.sh/@web3auth/modal@9?bundle"
+    ]
   };
 
-  var VERSION = "w3a-3"; // file version marker (cache diagnose ke liye)
+  var VERSION = "w3a-4"; // file version marker (cache diagnose ke liye)
 
   function isEnabled() { return String(CONFIG.clientId || "").trim().length > 0; }
 
@@ -44,21 +50,39 @@
   var _w3a = null;       // web3auth instance
   var _connected = false;
 
+  function buildAndInit(Web3Auth) {
+    _w3a = new Web3Auth({
+      clientId: CONFIG.clientId,
+      web3AuthNetwork: CONFIG.network,
+      uiConfig: { appName: "Arvcoin", mode: "dark" }
+    });
+    // v10 = init(); older = initModal(). Jo mile use karo.
+    var initFn = _w3a.init ? _w3a.init.bind(_w3a) : _w3a.initModal.bind(_w3a);
+    return Promise.resolve(initFn()).then(function () { return _w3a; });
+  }
+
   function loadInstance() {
     if (_w3a) return Promise.resolve(_w3a);
-    // dynamic import works in modern browsers without any build tool
-    return import(CONFIG.sdkUrl).then(function (mod) {
-      var Web3Auth = mod.Web3Auth || (mod.default && mod.default.Web3Auth);
-      if (!Web3Auth) throw new Error("Web3Auth export not found");
-      _w3a = new Web3Auth({
-        clientId: CONFIG.clientId,
-        web3AuthNetwork: CONFIG.network,
-        uiConfig: { appName: "Arvcoin", mode: "dark" }
+    // dynamic import works in modern browsers without any build tool.
+    // Multiple CDNs try karo (ek fail ho to agla), taaki interop bugs se bache.
+    var urls = CONFIG.sdkUrls || [];
+    var i = 0;
+    function tryNext(lastErr) {
+      if (i >= urls.length) {
+        return Promise.reject(lastErr || new Error("Koi CDN se SDK load nahi hua"));
+      }
+      var url = urls[i++];
+      return import(url).then(function (mod) {
+        var Web3Auth = mod.Web3Auth || (mod.default && mod.default.Web3Auth);
+        if (!Web3Auth) throw new Error("Web3Auth export nahi mila: " + url);
+        return buildAndInit(Web3Auth);
+      }).catch(function (e) {
+        try { console.warn("[ARVWallet] CDN fail:", url, e && e.message); } catch (x) {}
+        _w3a = null;
+        return tryNext(e);
       });
-      // v10 = init(); older = initModal(). Jo mile use karo.
-      var initFn = _w3a.init ? _w3a.init.bind(_w3a) : _w3a.initModal.bind(_w3a);
-      return Promise.resolve(initFn()).then(function () { return _w3a; });
-    });
+    }
+    return tryNext(null);
   }
 
   // Social/email login -> opens Web3Auth modal, returns { address, name, email }
