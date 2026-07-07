@@ -113,6 +113,50 @@
     });
   }
 
+  /* ---- SOCIAL LOGIN (Google / Apple) ----
+     DEMO: abhi real OAuth nahi hai. Google button click hone pe demo user
+     bana ke session set hota hai aur dashboard/verify pe le jata hai.
+     REAL: Web3Auth (window.ARVWallet.socialLogin) ya Google Identity Services
+     ka Client ID milne ke baad yahan asli OAuth call laga denge. */
+  var socialBtns = document.querySelectorAll(".social-btn[data-provider]");
+  if (socialBtns.length) {
+    socialBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var provider = btn.getAttribute("data-provider");
+        var label = provider === "google" ? "Google" : "Apple";
+
+        // REAL MODE: agar Web3Auth (embedded wallet) ready hai to usse social login
+        if (window.ARVWallet && typeof window.ARVWallet.socialLogin === "function") {
+          showMsg("ok", label + " se connect kar rahe hain\u2026");
+          window.ARVWallet.socialLogin(provider)
+            .then(function (u) {
+              var user = { name: (u && u.name) || label + " User", email: (u && u.email) || "", mobile: "", at: Date.now() };
+              try {
+                localStorage.setItem("arvcoin_user", JSON.stringify(user));
+                localStorage.setItem("arvcoin_session", JSON.stringify({ user: user.email || label.toLowerCase(), at: Date.now() }));
+              } catch (e) {}
+              window.location.href = "dashboard.html";
+            })
+            .catch(function () { showMsg("bad", label + " login cancel/fail ho gaya."); });
+          return;
+        }
+
+        // DEMO MODE
+        btn.disabled = true;
+        var old = btn.innerHTML;
+        showMsg("ok", label + " se sign in ho raha hai (demo)\u2026");
+        try {
+          localStorage.setItem("arvcoin_user", JSON.stringify({ name: label + " User", email: label.toLowerCase() + "@arvcoin.demo", mobile: "", at: Date.now() }));
+          localStorage.setItem("arvcoin_session", JSON.stringify({ user: label.toLowerCase() + "@arvcoin.demo", at: Date.now() }));
+        } catch (e) {}
+        setTimeout(function () {
+          btn.disabled = false; btn.innerHTML = old;
+          window.location.href = "dashboard.html";
+        }, 1200);
+      });
+    });
+  }
+
   /* ---- mobile: digits only ---- */
   var mob = document.getElementById("mobile");
   if (mob) {

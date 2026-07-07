@@ -428,9 +428,41 @@
     if (localStorage.getItem("arvcoin_kyc") === "done") $("#kyc-banner").style.display = "none";
   } catch (e) {}
 
-  /* ---------------- live price ticks ---------------- */
+  /* ---------------- REAL live crypto rates (CoinGecko, free, no key) ----------------
+     BTC/ETH/SOL ka asli INR price + 24h change fetch hota hai.
+     Stocks (Nifty/Reliance/Gold) abhi "coming soon" locked hain -> simulated.
+     Real stocks baad me broker/smallcase API se aayenge. */
+  var CG_IDS = { btc: "bitcoin", eth: "ethereum", sol: "solana" };
+  var cryptoLive = false;
+  function fetchLiveRates() {
+    var ids = [];
+    for (var k in CG_IDS) ids.push(CG_IDS[k]);
+    var url = "https://api.coingecko.com/api/v3/simple/price?ids=" + ids.join(",") + "&vs_currencies=inr&include_24hr_change=true";
+    fetch(url)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) return;
+        Object.keys(CG_IDS).forEach(function (id) {
+          var d = data[CG_IDS[id]];
+          if (d && byId[id]) {
+            if (typeof d.inr === "number") byId[id].price = Math.round(d.inr);
+            if (typeof d.inr_24h_change === "number") byId[id].chg = Math.round(d.inr_24h_change * 10) / 10;
+          }
+        });
+        cryptoLive = true;
+        renderBalance();
+        renderHoldings();
+        renderAllocation();
+        if ($(".view[data-view=markets]").classList.contains("active")) renderMarkets();
+      })
+      .catch(function () { /* offline/rate-limit -> purana price rehne do */ });
+  }
+
+  /* ---------------- price ticks ----------------
+     crypto -> real (CoinGecko). stocks -> halka simulated drift (abhi locked). */
   setInterval(function () {
     ASSETS.forEach(function (a) {
+      if (a.type !== "stock") return; // crypto real hai, chhedna nahi
       var drift = (Math.random() - 0.48) * 0.6;
       a.chg = Math.max(-9, Math.min(9, a.chg + drift));
       a.price = Math.max(1, Math.round(a.price * (1 + drift / 100)));
@@ -440,6 +472,10 @@
     renderAllocation();
     if ($(".view[data-view=markets]").classList.contains("active")) renderMarkets();
   }, 3500);
+
+  // real crypto rates: turant + har 45s
+  fetchLiveRates();
+  setInterval(fetchLiveRates, 45000);
 
   /* ---------------- notifications ---------------- */
   var notifs = [
