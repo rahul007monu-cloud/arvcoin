@@ -91,6 +91,9 @@
             <a href="#">Forgot password?</a>
           </div>
 
+          <!-- Cloudflare Turnstile (free captcha). Demo test key = always passes. -->
+          <div class="cf-turnstile" data-sitekey="1x00000000000000000000AA" data-theme="dark"></div>
+
           <button type="submit" class="btn btn-primary btn-lg full">Log in</button>
           <div class="a-msg" id="msg"></div>
         </form>
@@ -112,6 +115,7 @@
     </main>
   </div>
 
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="3d.js" defer></script>
   <script src="auth.js" defer></script>

@@ -522,14 +522,18 @@
   });
 
   /* ---------------- wallet ---------------- */
-  // Demo embedded wallet address (real me WaaS provider se per-user generate hoga)
+  // Embedded wallet address — via ARVWallet (Web3Auth-ready; demo = mock)
   var walletAddr;
-  try { walletAddr = localStorage.getItem("arvcoin_wallet"); } catch (e) {}
-  if (!walletAddr) {
-    var hex = "0123456789abcdef";
-    walletAddr = "0x";
-    for (var i = 0; i < 40; i++) walletAddr += hex[Math.floor(Math.random() * 16)];
-    try { localStorage.setItem("arvcoin_wallet", walletAddr); } catch (e) {}
+  if (window.ARVWallet) {
+    walletAddr = window.ARVWallet.getAddress();
+  } else {
+    try { walletAddr = localStorage.getItem("arvcoin_wallet"); } catch (e) {}
+    if (!walletAddr) {
+      var hex = "0123456789abcdef";
+      walletAddr = "0x";
+      for (var i = 0; i < 40; i++) walletAddr += hex[Math.floor(Math.random() * 16)];
+      try { localStorage.setItem("arvcoin_wallet", walletAddr); } catch (e) {}
+    }
   }
   function renderWallet() {
     if ($("#wc-addr")) $("#wc-addr").textContent = walletAddr.slice(0, 6) + "…" + walletAddr.slice(-6) + "  (tap copy for full)";

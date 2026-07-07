@@ -15,6 +15,7 @@ var ASSETS = [
   "dashboard.css",
   "dashboard.js",
   "transak.js",
+  "wallet.js",
   "pricing.html",
   "about.html",
   "legal.html",

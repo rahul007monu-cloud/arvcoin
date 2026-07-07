@@ -100,3 +100,7 @@
   .auth-wrap{grid-template-columns:1fr}
   .auth-brand{display:none}
 }
+
+
+/* Cloudflare Turnstile captcha spacing */
+.cf-turnstile{margin:18px 0 4px;display:flex;justify-content:center}
