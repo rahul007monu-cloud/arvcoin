@@ -134,24 +134,49 @@
   }
 
   /* ---------------- holdings ---------------- */
-  function holdRowHTML(h) {
+  function holdRowHTML(h, withActions) {
     var a = byId[h.id];
     var val = h.units * a.price;
     var up = a.chg >= 0;
+    var right = withActions
+      ? '<div class="hr-actions"><div style="text-align:right"><div class="hr-val">' + inr(val) + '</div>' +
+        '<div class="hr-chg" style="color:' + (up ? "#2fe08a" : "#ff5d6c") + '">' + (up ? "+" : "") + a.chg.toFixed(1) + "%</div></div>" +
+        '<button class="mini-btn sell" data-sell="' + h.id + '">Sell</button></div>'
+      : '<div class="hr-right"><div class="hr-val">' + inr(val) + '</div>' +
+        '<div class="hr-chg" style="color:' + (up ? "#2fe08a" : "#ff5d6c") + '">' + (up ? "+" : "") + a.chg.toFixed(1) + "%</div></div>";
     return (
       '<div class="hold-row">' +
       '<span class="asset-ic" style="background:' + a.color + '22;color:' + a.color + '">' + a.glyph + "</span>" +
       '<div><div class="hr-name">' + a.name + '</div><div class="hr-sub">' + units(h.units) + " " + a.sym + "</div></div>" +
-      sparkSVG(up) +
-      '<div class="hr-right"><div class="hr-val">' + inr(val) + '</div>' +
-      '<div class="hr-chg" style="color:' + (up ? "#2fe08a" : "#ff5d6c") + '">' + (up ? "+" : "") + a.chg.toFixed(1) + "%</div></div>" +
+      sparkSVG(up) + right +
       "</div>"
     );
   }
+  function wireSellButtons(ctx) {
+    $all("[data-sell]", ctx).forEach(function (b) {
+      b.addEventListener("click", function (e) {
+        e.stopPropagation();
+        openSell(b.getAttribute("data-sell"));
+      });
+    });
+  }
   function renderHoldings() {
-    var html = holdings.map(holdRowHTML).join("");
-    $("#hold-list").innerHTML = html;
-    $("#hold-list-full").innerHTML = html;
+    if (!holdings.length) {
+      var empty = '<div class="sip-empty">Abhi koi holding nahi. Pehla investment karo! 🚀</div>';
+      $("#hold-list").innerHTML = empty;
+      $("#hold-list-full").innerHTML = empty;
+      if ($("#wallet-balances")) $("#wallet-balances").innerHTML = empty;
+      return;
+    }
+    $("#hold-list").innerHTML = holdings.map(function (h) { return holdRowHTML(h, false); }).join("");
+    $("#hold-list-full").innerHTML = holdings.map(function (h) { return holdRowHTML(h, true); }).join("");
+    wireSellButtons($("#hold-list-full"));
+    if ($("#wallet-balances")) {
+      $("#wallet-balances").innerHTML = holdings
+        .filter(function (h) { return byId[h.id].type === "crypto"; })
+        .map(function (h) { return holdRowHTML(h, true); }).join("") || '<div class="sip-empty">Wallet empty. Add crypto! 🪙</div>';
+      wireSellButtons($("#wallet-balances"));
+    }
   }
 
   /* ---------------- allocation ---------------- */
@@ -416,6 +441,202 @@
     if ($(".view[data-view=markets]").classList.contains("active")) renderMarkets();
   }, 3500);
 
+  /* ---------------- notifications ---------------- */
+  var notifs = [
+    { title: "Welcome to arvcoin! 🎉", body: "Chalo pehla investment karte hain. ₹10 se bhi shuru kar sakte ho.", ago: "just now", read: false },
+    { title: "BTC up 2.4% 📈", body: "Tumhara Bitcoin aaj upar hai. Portfolio check karo.", ago: "2h", read: false },
+    { title: "Complete your KYC 🛡️", body: "Investing ke liye ek baar KYC zaroori hai (Transak, 2 min).", ago: "1d", read: true },
+  ];
+  function renderNotifs() {
+    var unread = notifs.filter(function (n) { return !n.read; }).length;
+    var badge = $("#notif-btn .dot-badge");
+    if (badge) badge.style.display = unread ? "block" : "none";
+    $("#np-list").innerHTML = notifs.map(function (n) {
+      return '<div class="np-item ' + (n.read ? "read" : "") + '"><span class="np-dot"></span>' +
+        '<div><b>' + n.title + "</b><p>" + n.body + '</p><small>' + n.ago + "</small></div></div>";
+    }).join("");
+  }
+  $("#notif-btn").addEventListener("click", function (e) {
+    e.stopPropagation();
+    $("#notif-panel").classList.toggle("open");
+  });
+  document.addEventListener("click", function (e) {
+    if (!$("#notif-panel").contains(e.target) && e.target !== $("#notif-btn")) $("#notif-panel").classList.remove("open");
+  });
+  $("#np-clear").addEventListener("click", function () {
+    notifs.forEach(function (n) { n.read = true; });
+    renderNotifs();
+    toast("Sab notifications read \u2705");
+  });
+
+  /* ---------------- SIP / auto-invest ---------------- */
+  var sips = [];
+  var sipDraft = { assetId: "btc", amount: 500, freq: "Weekly" };
+  function renderSipAssets() {
+    $("#sip-assets").innerHTML = ASSETS.filter(function (a) { return a.type === "crypto"; }).map(function (a) {
+      var sel = sipDraft.assetId === a.id;
+      return '<div class="sip-asset-chip ' + (sel ? "sel" : "") + '" data-sa="' + a.id + '">' +
+        '<span class="asset-ic" style="width:26px;height:26px;border-radius:8px;background:' + a.color + '22;color:' + a.color + '">' + a.glyph + "</span>" + a.sym + "</div>";
+    }).join("");
+    $all("#sip-assets .sip-asset-chip").forEach(function (c) {
+      c.addEventListener("click", function () {
+        sipDraft.assetId = c.getAttribute("data-sa");
+        renderSipAssets();
+      });
+    });
+  }
+  function renderSips() {
+    if (!sips.length) { $("#sip-list").innerHTML = '<div class="sip-empty">Koi active SIP nahi. Left me ek banao! ↺</div>'; return; }
+    $("#sip-list").innerHTML = sips.map(function (s, i) {
+      var a = byId[s.assetId];
+      return '<div class="sip-item"><span class="asset-ic" style="background:' + a.color + '22;color:' + a.color + '">' + a.glyph + "</span>" +
+        '<div class="si-info"><b>' + inr(s.amount) + " · " + s.freq + '</b><p>' + a.name + " · next: " + s.next + "</p></div>" +
+        '<button class="si-cancel" data-sip="' + i + '">Cancel</button></div>';
+    }).join("");
+    $all("#sip-list [data-sip]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        sips.splice(parseInt(b.getAttribute("data-sip"), 10), 1);
+        renderSips(); toast("SIP cancelled");
+      });
+    });
+  }
+  $all("#sip-amts button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      sipDraft.amount = parseInt(b.getAttribute("data-a"), 10);
+      $all("#sip-amts button").forEach(function (x) { x.classList.remove("active"); });
+      b.classList.add("active");
+    });
+  });
+  $all("#sip-freq button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      sipDraft.freq = b.getAttribute("data-f");
+      $all("#sip-freq button").forEach(function (x) { x.classList.remove("active"); });
+      b.classList.add("active");
+    });
+  });
+  $("#create-sip").addEventListener("click", function () {
+    var nextMap = { Daily: "kal", Weekly: "agle hafte", Monthly: "agle mahine" };
+    sips.push({ assetId: sipDraft.assetId, amount: sipDraft.amount, freq: sipDraft.freq, next: nextMap[sipDraft.freq] });
+    renderSips();
+    toast("SIP shuru! " + inr(sipDraft.amount) + " " + sipDraft.freq + " \uD83D\uDD01");
+  });
+
+  /* ---------------- wallet ---------------- */
+  // Demo embedded wallet address (real me WaaS provider se per-user generate hoga)
+  var walletAddr;
+  try { walletAddr = localStorage.getItem("arvcoin_wallet"); } catch (e) {}
+  if (!walletAddr) {
+    var hex = "0123456789abcdef";
+    walletAddr = "0x";
+    for (var i = 0; i < 40; i++) walletAddr += hex[Math.floor(Math.random() * 16)];
+    try { localStorage.setItem("arvcoin_wallet", walletAddr); } catch (e) {}
+  }
+  function renderWallet() {
+    if ($("#wc-addr")) $("#wc-addr").textContent = walletAddr.slice(0, 6) + "…" + walletAddr.slice(-6) + "  (tap copy for full)";
+  }
+  $("#copy-addr").addEventListener("click", function () {
+    if (navigator.clipboard) navigator.clipboard.writeText(walletAddr);
+    toast("Wallet address copied! 📋");
+  });
+  $("#open-invest3").addEventListener("click", openModal);
+
+  /* ---------------- settings ---------------- */
+  function renderSettings() {
+    var full = "Investor", email = "investor@arvcoin.com", mobile = "—";
+    try {
+      var u = JSON.parse(localStorage.getItem("arvcoin_user") || "null");
+      if (u) { full = u.name || full; email = u.email || email; mobile = u.mobile || mobile; }
+    } catch (e) {}
+    if ($("#set-name")) $("#set-name").textContent = full;
+    if ($("#set-email")) $("#set-email").textContent = email;
+    if ($("#set-name2")) $("#set-name2").textContent = full;
+    if ($("#set-mobile")) $("#set-mobile").textContent = mobile;
+    if ($("#set-avatar")) $("#set-avatar").textContent = full.charAt(0).toUpperCase();
+    var kyc = $("#set-kyc");
+    var done = false;
+    try { done = localStorage.getItem("arvcoin_kyc") === "done"; } catch (e) {}
+    if (kyc) { kyc.textContent = done ? "Verified" : "Pending"; kyc.className = "kyc-pill " + (done ? "done" : "pending"); }
+  }
+  $("#logout2").addEventListener("click", function () {
+    try { localStorage.removeItem("arvcoin_session"); } catch (e) {}
+    window.location.href = "login.html";
+  });
+
+  /* ---------------- sell (Transak off-ramp) ---------------- */
+  var sellModal = $("#sell-modal");
+  var sellState = { assetId: null, amount: 0 };
+  function openSell(assetId) {
+    var a = byId[assetId];
+    var h = holdings.filter(function (x) { return x.id === assetId; })[0];
+    if (!h) return;
+    var maxVal = Math.round(h.units * a.price);
+    sellState = { assetId: assetId, amount: 0, maxVal: maxVal };
+    $("#sell-asset").innerHTML =
+      '<span class="asset-ic" style="background:' + a.color + '22;color:' + a.color + '">' + a.glyph + "</span>" +
+      '<div style="flex:1"><div class="hr-name">' + a.name + '</div><div class="hr-sub">Balance: ' + inr(maxVal) + "</div></div>";
+    $("#sell-amt").textContent = "0";
+    $("#sell-review").innerHTML = "";
+    $all(".mstep", sellModal).forEach(function (el) { el.classList.toggle("active", el.getAttribute("data-sstep") === "1"); });
+    sellModal.classList.add("open");
+  }
+  function renderSellReview() {
+    var a = byId[sellState.assetId];
+    var fee = Math.max(0, Math.round(sellState.amount * 0.005));
+    var net = sellState.amount - fee;
+    $("#sell-review").innerHTML =
+      '<div class="rev-row"><span>Sell value</span><b>' + inr(sellState.amount) + "</b></div>" +
+      '<div class="rev-row"><span>Fee (0.5%)</span><b>' + inr(fee) + "</b></div>" +
+      '<div class="rev-row"><span>You get (bank)</span><b>' + inr(net) + "</b></div>" +
+      '<div class="rev-row"><span>Via</span><b>Transak off-ramp</b></div>';
+  }
+  function setSellAmt(n) { sellState.amount = Math.min(n, sellState.maxVal); $("#sell-amt").textContent = sellState.amount.toLocaleString("en-IN"); renderSellReview(); }
+  $all("#sell-quick button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      if (b.getAttribute("data-a")) setSellAmt(parseInt(b.getAttribute("data-a"), 10));
+      else setSellAmt(Math.round(sellState.maxVal * parseInt(b.getAttribute("data-p"), 10) / 100));
+    });
+  });
+  $("#sell-close").addEventListener("click", function () { sellModal.classList.remove("open"); });
+  sellModal.addEventListener("click", function (e) { if (e.target === sellModal) sellModal.classList.remove("open"); });
+  $("#do-sell").addEventListener("click", function () {
+    if (sellState.amount < 10) { toast("Kam se kam \u20B910 sell karo"); return; }
+    var btn = $("#do-sell");
+    function finishSell() {
+      var a = byId[sellState.assetId];
+      var h = holdings.filter(function (x) { return x.id === sellState.assetId; })[0];
+      if (h) {
+        var sellUnits = sellState.amount / a.price;
+        h.units = Math.max(0, h.units - sellUnits);
+        h.invested = Math.max(0, h.invested - sellState.amount);
+        if (h.units < 0.0000001) holdings = holdings.filter(function (x) { return x.id !== h.id; });
+      }
+      activity.unshift({ id: sellState.assetId, amt: -sellState.amount, method: "SELL", at: Date.now() });
+      $("#sell-success-text").textContent = inr(sellState.amount - Math.round(sellState.amount * 0.005)) + " tumhare bank account me aa jayega (minutes me).";
+      $all(".mstep", sellModal).forEach(function (el) { el.classList.toggle("active", el.getAttribute("data-sstep") === "2"); });
+      renderAll();
+    }
+    if (window.ARVTransak && window.ARVTransak.isEnabled()) {
+      window.ARVTransak.open({ assetId: sellState.assetId, fiatAmount: sellState.amount, product: "SELL", onSuccess: finishSell, onClose: function () {} });
+      return;
+    }
+    btn.textContent = "Processing…"; btn.disabled = true;
+    setTimeout(function () { btn.disabled = false; btn.textContent = "Sell & withdraw to bank"; finishSell(); }, 1400);
+  });
+  $("#sell-done").addEventListener("click", function () { sellModal.classList.remove("open"); switchView("home"); toast("Sell request placed 💸"); });
+
+  // update activity render to handle SELL (negative amt)
+  var _actRowHTML = actRowHTML;
+  actRowHTML = function (x) {
+    var a = byId[x.id];
+    if (x.method === "SELL") {
+      return '<div class="act-row"><span class="act-ic" style="background:rgba(255,93,108,.14);color:#ff5d6c">\u2198</span>' +
+        '<div><div class="act-name">Sold ' + a.name + '</div><div class="act-sub">Withdraw \u00B7 ' +
+        new Date(x.at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + "</div></div>" +
+        '<span class="act-amt" style="color:#ff5d6c">' + inr(Math.abs(x.amt)) + "</span></div>";
+    }
+    return _actRowHTML(x);
+  };
+
   /* ---------------- init ---------------- */
   function renderAll() {
     renderBalance();
@@ -423,8 +644,13 @@
     renderAllocation();
     renderActivity();
     renderMarkets();
+    renderSips();
+    renderWallet();
+    renderSettings();
     drawChart();
   }
+  renderNotifs();
+  renderSipAssets();
   renderAll();
   window.addEventListener("resize", drawChart);
 })();

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#05060f" />
+  <title>Page not found — arvcoin</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .nf{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 24px}
+    .nf-code{font-family:var(--font-alt);font-size:clamp(90px,20vw,180px);font-weight:800;line-height:1;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:-.04em}
+    .nf h1{font-size:26px;font-weight:800;margin-top:10px}
+    .nf p{color:var(--muted);margin:12px 0 28px;max-width:400px}
+    .nf-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+    .nf-coin{width:120px;height:120px;border-radius:50%;display:grid;place-items:center;margin-bottom:20px;
+      background:radial-gradient(circle at 35% 30%,rgba(0,224,255,.35),rgba(124,92,255,.15) 60%,rgba(5,6,15,.9));
+      border:1px solid var(--stroke-strong);box-shadow:inset 0 0 40px rgba(0,224,255,.25),0 0 60px rgba(124,92,255,.3);animation:spin 12s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <canvas id="bg-canvas"></canvas>
+  <div class="grid-overlay"></div>
+  <div class="noise-overlay"></div>
+
+  <div class="nf">
+    <div class="nf-coin">
+      <svg viewBox="0 0 40 40" width="60" height="60"><path d="M13 27 L20 11 L27 27 M15 21.5 H25" fill="none" stroke="#00ffc2" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="nf-code">404</div>
+    <h1>Yeh page kho gaya 🧭</h1>
+    <p>Jis page ko dhoond rahe ho wo yahan nahi hai. Chinta mat karo — tumhara portfolio safe hai!</p>
+    <div class="nf-actions">
+      <a href="index.html" class="btn btn-primary btn-lg">Home pe wapas</a>
+      <a href="dashboard.html" class="btn btn-ghost btn-lg">Dashboard</a>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="3d.js" defer></script>
+</body>
+</html>

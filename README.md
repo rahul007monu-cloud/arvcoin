@@ -42,8 +42,12 @@ python3 -m http.server 8080
 | OTP verify | `verify.html` | 6-box auto-advance code → KYC pe jaata hai |
 | KYC | `kyc.html` | PAN → Aadhaar → selfie stepper → dashboard |
 | Log in | `login.html` | Login → dashboard |
-| Dashboard | `dashboard.html` | Portfolio, live chart, holdings, invest modal, markets, rewards |
+| Dashboard | `dashboard.html` | Portfolio, live chart, holdings, invest+**sell** modal, **SIP auto-invest**, **wallet**, **settings**, notifications, markets, rewards |
+| Pricing | `pricing.html` | Transparent fees & plans |
+| About | `about.html` | Mission / story / values |
 | Legal | `legal.html` | Privacy / Terms / Risk disclosure |
+| 404 | `404.html` | Not-found page |
+| KYB guide | `docs/KYB-GUIDE.md` | Step-by-step Transak go-live guide |
 
 **Full flow:** `signup → verify → kyc → dashboard`  ·  `login → dashboard`
 

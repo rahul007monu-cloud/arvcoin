@@ -179,3 +179,91 @@
   .bal-value{font-size:36px}
   .reward-stats{grid-template-columns:1fr}
 }
+
+
+/* =========================================================
+   SaaS additions: SIP, Wallet, Settings, Notifications, Sell
+   ========================================================= */
+.view-sub{color:var(--muted);font-size:14px;margin:-8px 0 22px;max-width:640px}
+.fld-label{display:block;color:var(--muted);font-size:12px;font-weight:600;margin:16px 0 8px;text-transform:uppercase;letter-spacing:.06em}
+
+/* ---- notifications ---- */
+.notif-wrap{position:relative}
+.notif-panel{position:absolute;top:52px;right:0;width:320px;max-width:86vw;background:linear-gradient(180deg,#0d1024,#080a16);border:1px solid var(--stroke-strong);border-radius:18px;box-shadow:var(--shadow);opacity:0;visibility:hidden;transform:translateY(-8px);transition:.25s;z-index:120;overflow:hidden}
+.notif-panel.open{opacity:1;visibility:visible;transform:none}
+.np-head{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--stroke)}
+.np-head a{color:var(--cyan);font-size:12px;cursor:pointer}
+.np-list{max-height:340px;overflow-y:auto}
+.np-item{display:flex;gap:12px;padding:14px 18px;border-bottom:1px solid var(--stroke);transition:.2s}
+.np-item:hover{background:var(--panel)}
+.np-item .np-dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);margin-top:6px;flex-shrink:0}
+.np-item.read .np-dot{background:var(--muted-2)}
+.np-item b{font-size:13.5px}
+.np-item p{color:var(--muted);font-size:12px;margin-top:2px}
+.np-item small{color:var(--muted-2);font-size:11px}
+
+/* ---- SIP ---- */
+.sip-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.sip-setup,.sip-active{padding:24px;border-radius:22px;background:var(--panel);border:1px solid var(--stroke)}
+.sip-setup h3,.sip-active h3{font-size:17px;margin-bottom:4px}
+.sip-assets{display:flex;gap:8px;flex-wrap:wrap}
+.sip-asset-chip{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;background:var(--panel-2);border:1px solid var(--stroke);cursor:pointer;transition:.2s;font-size:13px;font-weight:600}
+.sip-asset-chip.sel{border-color:var(--cyan);box-shadow:var(--glow-c)}
+.sip-amts,.sip-freq{display:flex;gap:8px;flex-wrap:wrap}
+.sip-amts button,.sip-freq button{flex:1;min-width:70px;padding:11px 0;border-radius:12px;background:var(--panel-2);border:1px solid var(--stroke);color:var(--txt);font-weight:700;font-size:13px;cursor:pointer;transition:.2s}
+.sip-amts button.active,.sip-freq button.active{border-color:var(--cyan);color:var(--cyan)}
+.sip-note{color:var(--muted-2);font-size:12px;margin-top:12px;text-align:center}
+.sip-item{display:flex;align-items:center;gap:12px;padding:14px;border-radius:14px;background:var(--panel-2);border:1px solid var(--stroke);margin-top:12px}
+.sip-item .si-info{flex:1}
+.sip-item .si-info b{font-size:14px}
+.sip-item .si-info p{color:var(--muted);font-size:12px;margin-top:2px}
+.sip-item .si-cancel{background:none;border:1px solid var(--stroke-strong);color:var(--down);border-radius:10px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer}
+.sip-empty{color:var(--muted-2);font-size:14px;text-align:center;padding:30px 10px}
+
+/* ---- Wallet ---- */
+.wallet-card{position:relative;overflow:hidden;padding:28px;border-radius:24px;background:linear-gradient(160deg,rgba(124,92,255,.2),rgba(0,224,255,.07));border:1px solid var(--stroke-strong);margin-bottom:10px}
+.wc-glow{position:absolute;inset:0;background:radial-gradient(50% 70% at 80% 0,rgba(0,224,255,.25),transparent 70%);pointer-events:none}
+.wc-label{position:relative;color:var(--muted);font-size:13px}
+.wc-addr{position:relative;font-family:var(--font-alt);font-size:18px;font-weight:700;margin:10px 0 20px;word-break:break-all;letter-spacing:.5px}
+.wc-actions{position:relative;display:flex;gap:12px;flex-wrap:wrap}
+.wc-actions .btn{flex:1;min-width:140px;justify-content:center}
+.wc-secure{position:relative;color:var(--muted-2);font-size:12px;margin-top:18px}
+
+/* ---- Settings ---- */
+.set-card{padding:20px;border-radius:20px;background:linear-gradient(160deg,rgba(124,92,255,.14),rgba(0,224,255,.05));border:1px solid var(--stroke-strong);margin-bottom:18px}
+.set-profile{display:flex;align-items:center;gap:16px}
+.set-avatar{width:60px;height:60px;border-radius:50%;background:var(--grad);color:#050614;font-weight:800;font-size:24px;display:grid;place-items:center}
+.set-profile b{font-size:18px}
+.set-profile p{color:var(--muted);font-size:13px;margin-top:2px}
+.set-group{background:var(--panel);border:1px solid var(--stroke);border-radius:18px;padding:8px 18px;margin-bottom:16px}
+.set-group h4{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-2);padding:14px 0 6px}
+.set-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-top:1px solid var(--stroke);font-size:14px;color:var(--muted)}
+.set-row:first-of-type{border-top:0}
+.set-row b{color:var(--txt);font-weight:600}
+.set-row.link{cursor:pointer;text-decoration:none}
+.set-row.link i{font-style:normal;color:var(--muted-2)}
+.set-row.link:hover b,.set-row.link:hover span{color:var(--cyan)}
+.kyc-pill{padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700}
+.kyc-pill.pending{background:rgba(255,176,32,.16);color:#ffb020}
+.kyc-pill.done{background:rgba(47,224,138,.16);color:var(--up)}
+.logout-btn{margin-top:6px;color:var(--down)!important;border-color:rgba(255,93,108,.4)!important}
+.app-ver{text-align:center;color:var(--muted-2);font-size:12px;margin-top:16px}
+
+/* toggle switch */
+.switch{position:relative;display:inline-block;width:44px;height:26px}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:var(--panel-2);border:1px solid var(--stroke);border-radius:999px;cursor:pointer;transition:.25s}
+.slider::before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:var(--muted);border-radius:50%;transition:.25s}
+.switch input:checked + .slider{background:linear-gradient(90deg,#7c5cff,#00e0ff);border-color:transparent}
+.switch input:checked + .slider::before{transform:translateX(18px);background:#fff}
+
+/* ---- Sell ---- */
+.sell-asset{display:flex;align-items:center;gap:12px;padding:14px;border-radius:14px;background:var(--panel);border:1px solid var(--stroke);margin-bottom:8px}
+.hr-actions{display:flex;gap:8px;margin-left:auto;align-items:center}
+.mini-btn{padding:7px 14px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--stroke-strong);background:var(--panel-2);color:var(--txt);transition:.2s}
+.mini-btn.sell{color:var(--down);border-color:rgba(255,93,108,.35)}
+.mini-btn:hover{border-color:var(--cyan)}
+
+@media(max-width:900px){
+  .sip-grid{grid-template-columns:1fr}
+}
