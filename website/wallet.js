@@ -29,7 +29,7 @@
     ]
   };
 
-  var VERSION = "w3a-4"; // file version marker (cache diagnose ke liye)
+  var VERSION = "w3a-5"; // file version marker (cache diagnose ke liye)
 
   function isEnabled() { return String(CONFIG.clientId || "").trim().length > 0; }
 
@@ -86,11 +86,20 @@
   }
 
   // Social/email login -> opens Web3Auth modal, returns { address, name, email }
+  // agar SDK 7s me load na ho to demo pe gir jao (hang na ho)
+  function withTimeout(promise, ms) {
+    return new Promise(function (resolve, reject) {
+      var t = setTimeout(function () { reject(new Error("SDK load timeout")); }, ms);
+      promise.then(function (v) { clearTimeout(t); resolve(v); },
+                   function (e) { clearTimeout(t); reject(e); });
+    });
+  }
+
   function connect() {
     if (!isEnabled()) {
       return Promise.resolve({ address: demoAddress(), name: "", email: "", demo: true, enabled: false, error: "clientId khaali (purani cached file?)" });
     }
-    return loadInstance().then(function (w) {
+    return withTimeout(loadInstance(), 7000).then(function (w) {
       var p = w.connected ? Promise.resolve(w.provider) : w.connect();
       return Promise.resolve(p).then(function (provider) {
         provider = provider || w.provider;
