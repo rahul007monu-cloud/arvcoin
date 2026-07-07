@@ -35,6 +35,7 @@
 
       <nav class="side-nav">
         <a class="side-link active" data-view="home"><i>▦</i> Dashboard</a>
+        <a class="side-link" data-view="collect"><i>❖</i> Collect (My QR)</a>
         <a class="side-link" data-view="portfolio"><i>◈</i> Portfolio</a>
         <a class="side-link" data-view="sip"><i>↻</i> Auto-invest (SIP)</a>
         <a class="side-link" data-view="wallet"><i>▢</i> Wallet</a>
@@ -151,6 +152,52 @@
             <a class="link-more" data-view="activity">View all →</a>
           </div>
           <div class="act-list" id="act-list-home"></div>
+        </section>
+
+        <!-- ===== COLLECT (SHOPKEEPER QR) VIEW ===== -->
+        <section class="view" data-view="collect">
+          <h3 class="view-title">Collect payment</h3>
+          <p class="view-sub">Customer se QR pe payment lo — paisa auto crypto ban ke tumhare wallet me aa jaayega. 💰</p>
+
+          <div class="collect-grid">
+            <div class="qr-card">
+              <div class="qr-shop" id="qr-shop">My Shop</div>
+              <div class="qr-box" id="qr-box"></div>
+              <div class="qr-amt-line" id="qr-amt-line">Customer koi bhi amount daal sakta hai</div>
+              <div class="qr-amt-toggle">
+                <button class="active" data-qm="dynamic">Any amount</button>
+                <button data-qm="fixed">Fixed amount</button>
+              </div>
+              <input type="tel" id="qr-fixed-amt" class="qr-input" placeholder="Fixed ₹ amount" style="display:none" />
+              <div class="qr-actions">
+                <button class="btn btn-ghost" id="qr-download">⬇ Download</button>
+                <button class="btn btn-ghost" id="qr-share">↗ Share</button>
+                <button class="btn btn-ghost" id="qr-print">🖨 Print</button>
+              </div>
+              <div class="qr-note">🛡️ Auto-convert to crypto · Non-custodial · via Transak</div>
+              <button class="btn btn-primary full" id="sim-pay" style="margin-top:12px">▶ Simulate customer payment (demo)</button>
+            </div>
+
+            <div class="collect-side">
+              <div class="collect-summary">
+                <div class="cs-glow"></div>
+                <span class="cs-label">Aaj ka collection</span>
+                <div class="cs-value" id="today-collection">₹0</div>
+                <div class="cs-sub"><span id="today-count">0</span> payments · auto → crypto</div>
+              </div>
+              <div class="setup-card">
+                <h3>Shop setup</h3>
+                <label class="fld-label">Shop name</label>
+                <input type="text" id="shop-name-inp" class="qr-input" placeholder="Tumhari shop ka naam" />
+                <label class="fld-label">UPI ID (collection)</label>
+                <input type="text" id="shop-upi-inp" class="qr-input" placeholder="shopname@upi" />
+                <button class="btn btn-primary full" id="save-shop" style="margin-top:14px">Save &amp; update QR</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-row"><h3>Received payments</h3><a class="link-more" id="withdraw-btn">Withdraw to bank →</a></div>
+          <div class="act-list" id="recv-list"></div>
         </section>
 
         <!-- ===== PORTFOLIO VIEW ===== -->
@@ -386,6 +433,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="3d.js" defer></script>
   <script src="transak.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
   <script src="dashboard.js" defer></script>
 </body>
 </html>

@@ -628,6 +628,12 @@
   var _actRowHTML = actRowHTML;
   actRowHTML = function (x) {
     var a = byId[x.id];
+    if (x.method === "RECV") {
+      return '<div class="act-row"><span class="act-ic" style="background:rgba(47,224,138,.14);color:#2fe08a">\u2193</span>' +
+        '<div><div class="act-name">Payment received \u2192 ' + a.name + '</div><div class="act-sub">QR \u00B7 ' +
+        new Date(x.at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + "</div></div>" +
+        '<span class="act-amt" style="color:#2fe08a">' + inr(x.amt) + "</span></div>";
+    }
     if (x.method === "SELL") {
       return '<div class="act-row"><span class="act-ic" style="background:rgba(255,93,108,.14);color:#ff5d6c">\u2198</span>' +
         '<div><div class="act-name">Sold ' + a.name + '</div><div class="act-sub">Withdraw \u00B7 ' +
@@ -636,6 +642,124 @@
     }
     return _actRowHTML(x);
   };
+
+  /* ---------------- collect (shopkeeper QR) ---------------- */
+  var shop = { name: "My Shop", upi: "myshop@upi" };
+  try {
+    var sc = JSON.parse(localStorage.getItem("arvcoin_shop") || "null");
+    if (sc) shop = sc;
+    else if (name && name !== "Investor") { shop.name = name + "'s Shop"; }
+  } catch (e) {}
+  var qrMode = "dynamic";
+  var qrFixed = 0;
+  var received = [];
+  var RECV_ASSET = "btc"; // received INR auto-converts to this crypto
+
+  function upiString() {
+    var s = "upi://pay?pa=" + encodeURIComponent(shop.upi) + "&pn=" + encodeURIComponent(shop.name) + "&cu=INR";
+    if (qrMode === "fixed" && qrFixed > 0) s += "&am=" + qrFixed;
+    return s;
+  }
+  function generateQR() {
+    var box = $("#qr-box");
+    if (!box) return;
+    box.innerHTML = "";
+    var data = upiString();
+    if (typeof QRCode !== "undefined") {
+      new QRCode(box, { text: data, width: 210, height: 210, colorDark: "#05060f", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M });
+    } else {
+      var img = document.createElement("img");
+      img.src = "https://api.qrserver.com/v1/create-qr-code/?size=210x210&data=" + encodeURIComponent(data);
+      img.alt = "Payment QR";
+      box.appendChild(img);
+    }
+    if ($("#qr-shop")) $("#qr-shop").textContent = shop.name;
+  }
+  function renderCollect() {
+    if ($("#qr-shop")) $("#qr-shop").textContent = shop.name;
+    if ($("#shop-name-inp") && !$("#shop-name-inp").value) $("#shop-name-inp").value = shop.name;
+    if ($("#shop-upi-inp") && !$("#shop-upi-inp").value) $("#shop-upi-inp").value = shop.upi;
+    var total = received.reduce(function (s, r) { return s + r.amt; }, 0);
+    if ($("#today-collection")) $("#today-collection").textContent = inr(total);
+    if ($("#today-count")) $("#today-count").textContent = received.length;
+    if ($("#recv-list")) {
+      $("#recv-list").innerHTML = received.length
+        ? received.map(function (r) {
+            var a = byId[r.crypto];
+            return '<div class="recv-row"><span class="act-ic" style="background:rgba(47,224,138,.14);color:#2fe08a">\u2193</span>' +
+              '<div style="flex:1"><div class="act-name">Payment received</div><div class="act-sub">' +
+              new Date(r.at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) + " \u00B7 \u2192 " + a.sym + " wallet</div></div>" +
+              '<span class="act-amt" style="color:#2fe08a">' + inr(r.amt) + "</span></div>";
+          }).join("")
+        : '<div class="sip-empty">Abhi koi payment nahi. QR share/print karke customer se payment lo! 📷</div>';
+    }
+  }
+
+  // QR amount mode toggle
+  $all(".qr-amt-toggle button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      qrMode = b.getAttribute("data-qm");
+      $all(".qr-amt-toggle button").forEach(function (x) { x.classList.remove("active"); });
+      b.classList.add("active");
+      $("#qr-fixed-amt").style.display = qrMode === "fixed" ? "block" : "none";
+      $("#qr-amt-line").textContent = qrMode === "fixed" ? "Fixed: " + inr(qrFixed || 0) : "Customer koi bhi amount daal sakta hai";
+      generateQR();
+    });
+  });
+  $("#qr-fixed-amt").addEventListener("input", function () {
+    qrFixed = parseInt(this.value.replace(/\D/g, "") || "0", 10);
+    $("#qr-amt-line").textContent = "Fixed: " + inr(qrFixed);
+    generateQR();
+  });
+
+  $("#save-shop").addEventListener("click", function () {
+    var n = $("#shop-name-inp").value.trim(), up = $("#shop-upi-inp").value.trim();
+    if (n) shop.name = n;
+    if (up) shop.upi = up;
+    try { localStorage.setItem("arvcoin_shop", JSON.stringify(shop)); } catch (e) {}
+    generateQR(); renderCollect(); toast("Shop updated \u2705");
+  });
+
+  $("#qr-download").addEventListener("click", function () {
+    var canvas = $("#qr-box canvas"), img = $("#qr-box img");
+    var url = canvas ? canvas.toDataURL("image/png") : (img ? img.src : null);
+    if (!url) { toast("QR ready nahi"); return; }
+    var a = document.createElement("a"); a.href = url; a.download = "arvcoin-qr.png"; a.click();
+    toast("QR downloaded \u2b07");
+  });
+  $("#qr-share").addEventListener("click", function () {
+    var data = upiString();
+    if (navigator.share) { navigator.share({ title: shop.name, text: "Pay " + shop.name + " via arvcoin", url: data }).catch(function () {}); }
+    else { if (navigator.clipboard) navigator.clipboard.writeText(data); toast("Payment link copied! 📋"); }
+  });
+  $("#qr-print").addEventListener("click", function () {
+    var canvas = $("#qr-box canvas"), img = $("#qr-box img");
+    var url = canvas ? canvas.toDataURL("image/png") : (img ? img.src : "");
+    var w = window.open("", "_blank");
+    if (!w) { toast("Popup block hai"); return; }
+    w.document.write('<html><head><title>arvcoin QR</title></head><body style="text-align:center;font-family:sans-serif;padding:40px">' +
+      "<h2>" + shop.name + '</h2><img src="' + url + '" style="width:300px;height:300px"><p>Scan &amp; pay · arvcoin</p></body></html>');
+    w.document.close(); w.focus(); setTimeout(function () { w.print(); }, 400);
+  });
+
+  $("#sim-pay").addEventListener("click", function () {
+    var amt = (qrMode === "fixed" && qrFixed > 0) ? qrFixed : [50, 100, 250, 500, 1000][Math.floor(Math.random() * 5)];
+    var a = byId[RECV_ASSET];
+    var fee = Math.round(amt * 0.005);
+    var net = amt - fee;
+    var uUnits = net / a.price;
+    var h = holdings.filter(function (x) { return x.id === RECV_ASSET; })[0];
+    if (h) { h.units += uUnits; h.invested += net; }
+    else holdings.push({ id: RECV_ASSET, units: uUnits, invested: net });
+    received.unshift({ amt: amt, at: Date.now(), crypto: RECV_ASSET });
+    activity.unshift({ id: RECV_ASSET, amt: net, method: "RECV", at: Date.now() });
+    renderAll();
+    toast("Payment received: " + inr(amt) + " \u2192 crypto 💰");
+  });
+
+  $("#withdraw-btn").addEventListener("click", function () {
+    toast("Withdraw: crypto \u2192 INR bank (via Transak off-ramp) 💸");
+  });
 
   /* ---------------- init ---------------- */
   function renderAll() {
@@ -647,10 +771,12 @@
     renderSips();
     renderWallet();
     renderSettings();
+    renderCollect();
     drawChart();
   }
   renderNotifs();
   renderSipAssets();
+  generateQR();
   renderAll();
   window.addEventListener("resize", drawChart);
 })();
