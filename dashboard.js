@@ -433,29 +433,49 @@
      Stocks (Nifty/Reliance/Gold) abhi "coming soon" locked hain -> simulated.
      Real stocks baad me broker/smallcase API se aayenge. */
   var CG_IDS = { btc: "bitcoin", eth: "ethereum", sol: "solana" };
+  var CB_PAIRS = { btc: "BTC-INR", eth: "ETH-INR", sol: "SOL-INR" };
   var cryptoLive = false;
+
+  function applyRates() {
+    renderBalance();
+    renderHoldings();
+    renderAllocation();
+    if ($(".view[data-view=markets]").classList.contains("active")) renderMarkets();
+  }
+
   function fetchLiveRates() {
+    // 1) PRICE — Coinbase (reliable, seedha INR, CORS-ok, no key, block nahi hota)
+    Object.keys(CB_PAIRS).forEach(function (id) {
+      fetch("https://api.coinbase.com/v2/prices/" + CB_PAIRS[id] + "/spot")
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          var amt = j && j.data ? parseFloat(j.data.amount) : NaN;
+          if (amt && byId[id]) {
+            byId[id].price = Math.round(amt);
+            cryptoLive = true;
+            applyRates();
+          }
+        })
+        .catch(function () {});
+    });
+
+    // 2) 24h CHANGE — CoinGecko (best-effort; fail ho to price phir bhi Coinbase se aayega)
     var ids = [];
     for (var k in CG_IDS) ids.push(CG_IDS[k]);
-    var url = "https://api.coingecko.com/api/v3/simple/price?ids=" + ids.join(",") + "&vs_currencies=inr&include_24hr_change=true";
-    fetch(url)
+    fetch("https://api.coingecko.com/api/v3/simple/price?ids=" + ids.join(",") + "&vs_currencies=inr&include_24hr_change=true")
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
         if (!data) return;
         Object.keys(CG_IDS).forEach(function (id) {
           var d = data[CG_IDS[id]];
           if (d && byId[id]) {
-            if (typeof d.inr === "number") byId[id].price = Math.round(d.inr);
+            if (typeof d.inr === "number" && !cryptoLive) byId[id].price = Math.round(d.inr);
             if (typeof d.inr_24h_change === "number") byId[id].chg = Math.round(d.inr_24h_change * 10) / 10;
           }
         });
-        cryptoLive = true;
-        renderBalance();
-        renderHoldings();
-        renderAllocation();
-        if ($(".view[data-view=markets]").classList.contains("active")) renderMarkets();
+        applyRates();
       })
-      .catch(function () { /* offline/rate-limit -> purana price rehne do */ });
+      .catch(function () {});
   }
 
   /* ---------------- price ticks ----------------
