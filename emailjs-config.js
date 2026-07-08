@@ -16,7 +16,7 @@
    (code alert/console me dikhega — testing ke liye).
    ========================================================= */
 window.ARV_EMAILJS = {
-  publicKey:  "PASTE_PUBLIC_KEY",
-  serviceId:  "PASTE_SERVICE_ID",
-  templateId: "PASTE_TEMPLATE_ID"
+  publicKey:  "1qyrt9cTAhqjwA8gE",
+  serviceId:  "service_joko2ab",
+  templateId: "template_7jhk5jp"
 };
