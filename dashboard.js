@@ -369,9 +369,9 @@
     var btn = $("#do-pay");
     var a = byId[invest.assetId];
 
-    // REAL MODE: Transak configured + crypto asset -> asli widget kholo
-    if (window.ARVTransak && window.ARVTransak.isEnabled() && a && a.type === "crypto") {
-      window.ARVTransak.open({
+    // REAL MODE: Onramp.money configured + crypto asset -> asli widget kholo
+    if (window.ARVOnramp && window.ARVOnramp.isEnabled() && a && a.type === "crypto") {
+      window.ARVOnramp.open({
         assetId: invest.assetId,
         fiatAmount: invest.amount,
         product: "BUY",
@@ -501,7 +501,7 @@
   var notifs = [
     { title: "Welcome to arvcoin! 🎉", body: "Chalo pehla investment karte hain. ₹10 se bhi shuru kar sakte ho.", ago: "just now", read: false },
     { title: "BTC up 2.4% 📈", body: "Tumhara Bitcoin aaj upar hai. Portfolio check karo.", ago: "2h", read: false },
-    { title: "Complete your KYC 🛡️", body: "Investing ke liye ek baar KYC zaroori hai (Transak, 2 min).", ago: "1d", read: true },
+    { title: "Complete your KYC 🛡️", body: "Investing ke liye ek baar KYC zaroori hai (Onramp.money, 2 min).", ago: "1d", read: true },
   ];
   function renderNotifs() {
     var unread = notifs.filter(function (n) { return !n.read; }).length;
@@ -622,7 +622,7 @@
     window.location.href = "login.html";
   });
 
-  /* ---------------- sell (Transak off-ramp) ---------------- */
+  /* ---------------- sell (Onramp.money off-ramp) ---------------- */
   var sellModal = $("#sell-modal");
   var sellState = { assetId: null, amount: 0 };
   function openSell(assetId) {
@@ -647,7 +647,7 @@
       '<div class="rev-row"><span>Sell value</span><b>' + inr(sellState.amount) + "</b></div>" +
       '<div class="rev-row"><span>Fee (0.5%)</span><b>' + inr(fee) + "</b></div>" +
       '<div class="rev-row"><span>You get (bank)</span><b>' + inr(net) + "</b></div>" +
-      '<div class="rev-row"><span>Via</span><b>Transak off-ramp</b></div>';
+      '<div class="rev-row"><span>Via</span><b>Onramp.money off-ramp</b></div>';
   }
   function setSellAmt(n) { sellState.amount = Math.min(n, sellState.maxVal); $("#sell-amt").textContent = sellState.amount.toLocaleString("en-IN"); renderSellReview(); }
   $all("#sell-quick button").forEach(function (b) {
@@ -675,8 +675,8 @@
       $all(".mstep", sellModal).forEach(function (el) { el.classList.toggle("active", el.getAttribute("data-sstep") === "2"); });
       renderAll();
     }
-    if (window.ARVTransak && window.ARVTransak.isEnabled()) {
-      window.ARVTransak.open({ assetId: sellState.assetId, fiatAmount: sellState.amount, product: "SELL", onSuccess: finishSell, onClose: function () {} });
+    if (window.ARVOnramp && window.ARVOnramp.isEnabled()) {
+      window.ARVOnramp.open({ assetId: sellState.assetId, fiatAmount: sellState.amount, product: "SELL", onSuccess: finishSell, onClose: function () {} });
       return;
     }
     btn.textContent = "Processing…"; btn.disabled = true;
@@ -829,7 +829,7 @@
   });
 
   $("#withdraw-btn").addEventListener("click", function () {
-    toast("Withdraw: crypto \u2192 INR bank (via Transak off-ramp) 💸");
+    toast("Withdraw: crypto \u2192 INR bank (via Onramp.money off-ramp) 💸");
   });
 
   /* ---------------- init ---------------- */
