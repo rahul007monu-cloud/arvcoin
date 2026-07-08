@@ -704,12 +704,16 @@
   };
 
   /* ---------------- collect (shopkeeper QR) ---------------- */
-  var shop = { name: "My Shop", upi: "myshop@upi" };
+  // Shop naam logged-in user (Firebase profile) se; UPI default EMPTY
+  // (pehle "myshop@upi" hardcoded tha jo kisi aur ka VPA tha -> scan pe galat naam).
+  var shopFullName = "";
+  try { var _su = JSON.parse(localStorage.getItem("arvcoin_user") || "null"); if (_su && _su.name) shopFullName = _su.name; } catch (e) {}
+  var shop = { name: (shopFullName ? shopFullName + "'s Shop" : (name && name !== "Investor" ? name + "'s Shop" : "My Shop")), upi: "" };
   try {
     var sc = JSON.parse(localStorage.getItem("arvcoin_shop") || "null");
-    if (sc) shop = sc;
-    else if (name && name !== "Investor") { shop.name = name + "'s Shop"; }
+    if (sc && sc.upi !== "myshop@upi") shop = sc; // purana fake default ignore karo
   } catch (e) {}
+  function validUpi(v) { return /^[\w.\-]{2,}@[\w.\-]{2,}$/.test(v || ""); }
   var qrMode = "dynamic";
   var qrFixed = 0;
   var received = [];
@@ -724,6 +728,12 @@
     var box = $("#qr-box");
     if (!box) return;
     box.innerHTML = "";
+    // UPI set nahi hai -> misleading QR mat banao, shopkeeper ko UPI daalne ko bolo
+    if (!validUpi(shop.upi)) {
+      box.innerHTML = '<div class="sip-empty" style="padding:22px 14px;line-height:1.5">Pehle niche <b>Shop settings</b> me apni <b>UPI ID</b> daalo \u2014 tabhi QR banega jispe <b>tumhara apna</b> naam aayega.<br><small style="opacity:.7">Jaise: yourname@okaxis / yourname@ybl</small></div>';
+      if ($("#qr-shop")) $("#qr-shop").textContent = shop.name;
+      return;
+    }
     var data = upiString();
     if (typeof QRCode !== "undefined") {
       new QRCode(box, { text: data, width: 210, height: 210, colorDark: "#05060f", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M });
@@ -774,6 +784,7 @@
 
   $("#save-shop").addEventListener("click", function () {
     var n = $("#shop-name-inp").value.trim(), up = $("#shop-upi-inp").value.trim();
+    if (up && !validUpi(up)) { toast("UPI ID sahi format me daalo (jaise: naam@okaxis)"); return; }
     if (n) shop.name = n;
     if (up) shop.upi = up;
     try { localStorage.setItem("arvcoin_shop", JSON.stringify(shop)); } catch (e) {}
