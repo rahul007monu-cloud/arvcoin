@@ -22,7 +22,7 @@
   "use strict";
 
   var CONFIG = {
-    appId: "",                 // <-- Onramp appId yahan daalna (khali = DEMO)
+    appId: "2264810",          // Onramp SANDBOX/test appId (playground). KYB ke baad live appId aayega.
     fiatType: 1,               // 1 = INR
     paymentMethod: 1,          // 1 = UPI (instant), 2 = bank transfer (IMPS/FAST)
     defaultWalletAddress: "",  // real me per-user embedded wallet address
@@ -65,10 +65,51 @@
     return BASE + "?" + qs;
   }
 
-  // Widget popup window me kholo; band hone pe success callback.
-  // (Production me success Onramp webhook/postMessage se confirm hota hai.)
+  // Onramp Web SDK se overlay modal kholo (preferred). Return true = khul gaya.
+  function openSdk(p, m, wallet, isSell) {
+    var Sdk = window.OnrampWebSDK;
+    if (!Sdk) return false;
+    var cfg = {
+      appId: Number(CONFIG.appId),
+      flowType: isSell ? 2 : 1,
+      fiatType: CONFIG.fiatType,
+      paymentMethod: CONFIG.paymentMethod,
+      coinCode: m.coin,
+      network: m.network,
+      fiatAmount: Number(p.fiatAmount),
+    };
+    if (wallet) cfg.walletAddress = wallet;
+    if (p.merchantRecognitionId) cfg.merchantRecognitionId = p.merchantRecognitionId;
+
+    var inst;
+    try { inst = new Sdk(cfg); } catch (e) { console.warn("[arvcoin] onramp sdk init:", e); return false; }
+
+    var done = false;
+    if (inst.on) {
+      inst.on("WIDGET_EVENTS", function (ev) {
+        var t = (ev && ev.type ? String(ev.type) : "").toUpperCase();
+        if (t.indexOf("TX_COMPLETED") !== -1 || t.indexOf("SUCCESS") !== -1) {
+          done = true; if (p.onSuccess) p.onSuccess();
+        }
+        if (t.indexOf("CLOSE") !== -1) {
+          try { inst.close(); } catch (e) {}
+          if (!done && p.onClose) p.onClose();
+        }
+      });
+    }
+    try { inst.show(); return true; } catch (e) { console.warn("[arvcoin] onramp sdk show:", e); return false; }
+  }
+
+  // Widget kholo: pehle SDK overlay try, warna hosted URL popup (fallback).
   function open(p) {
     if (!isEnabled()) { if (p.onClose) p.onClose(); return; }
+    var m = MAP[p.assetId] || { coin: "usdt", network: "matic20" };
+    var wallet = p.walletAddress || CONFIG.defaultWalletAddress;
+    var isSell = (p.product || "BUY").toUpperCase() === "SELL";
+
+    if (openSdk(p, m, wallet, isSell)) return;
+
+    // Fallback: hosted widget popup window
     var url = buildUrl(p);
     var w = 460, h = 700;
     var left = (screen.width - w) / 2, top = (screen.height - h) / 2;

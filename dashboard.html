@@ -432,6 +432,12 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="3d.js" defer></script>
+  <script type="module">
+    // Onramp Web SDK (overlay modal). Load fail ho to onramp.js hosted-URL popup pe fallback karega.
+    import("https://cdn.jsdelivr.net/npm/@onramp.money/onramp-web-sdk/+esm")
+      .then(function (mod) { window.OnrampWebSDK = mod.OnrampWebSDK || (mod.default && mod.default.OnrampWebSDK) || mod.default; })
+      .catch(function (e) { console.warn("[arvcoin] onramp sdk load fail (fallback to popup):", e); });
+  </script>
   <script src="onramp.js" defer></script>
   <script src="wallet-bundle.js" defer></script>
   <script src="wallet.js" defer></script>

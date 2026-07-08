@@ -1,5 +1,5 @@
 /* arvcoin — service worker (offline cache) */
-var CACHE = "arvcoin-v17";
+var CACHE = "arvcoin-v18";
 var ASSETS = [
   "index.html",
   "styles.css",
