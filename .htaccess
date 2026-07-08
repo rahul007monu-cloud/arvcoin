@@ -6,9 +6,9 @@
   Header set Cross-Origin-Opener-Policy "same-origin-allow-popups"
 </IfModule>
 
-# wallet-bundle.js hamesha fresh mile (purana cache login toड़ता hai)
+# sw.js + wallet-bundle.js hamesha fresh mile (purana cache/SW toड़ta hai)
 <IfModule mod_headers.c>
-  <FilesMatch "wallet-bundle\.js$">
-    Header set Cache-Control "no-cache, must-revalidate"
+  <FilesMatch "(sw|wallet-bundle)\.js$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
   </FilesMatch>
 </IfModule>

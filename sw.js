@@ -1,5 +1,5 @@
 /* arvcoin — service worker (offline cache) */
-var CACHE = "arvcoin-v13";
+var CACHE = "arvcoin-v14";
 var ASSETS = [
   "index.html",
   "styles.css",
@@ -53,13 +53,28 @@ self.addEventListener("activate", function (e) {
 
 self.addEventListener("fetch", function (e) {
   if (e.request.method !== "GET") return;
-  // network-first for HTML, cache-first for assets
-  if (e.request.mode === "navigate") {
+
+  var url = new URL(e.request.url);
+  var sameOrigin = url.origin === self.location.origin;
+  // CODE files (html/js/css) + navigations -> NETWORK-FIRST (online pe hamesha fresh code).
+  // Baaki (images/fonts/svg/wallet-bundle) -> cache-first (fast).
+  var isCode = e.request.mode === "navigate" || /\.(html|js|css)$/i.test(url.pathname);
+
+  if (sameOrigin && isCode) {
     e.respondWith(
-      fetch(e.request).catch(function () { return caches.match(e.request).then(function (r) { return r || caches.match("index.html"); }); })
+      fetch(e.request).then(function (resp) {
+        var copy = resp.clone();
+        caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
+        return resp;
+      }).catch(function () {
+        return caches.match(e.request).then(function (r) {
+          return r || (e.request.mode === "navigate" ? caches.match("index.html") : r);
+        });
+      })
     );
     return;
   }
+
   e.respondWith(
     caches.match(e.request).then(function (cached) {
       return (
