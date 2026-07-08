@@ -1,5 +1,5 @@
 /* arvcoin — service worker (offline cache) */
-var CACHE = "arvcoin-v15";
+var CACHE = "arvcoin-v16";
 var ASSETS = [
   "index.html",
   "styles.css",
@@ -9,6 +9,7 @@ var ASSETS = [
   "auth.js",
   "firebase-config.js",
   "firebase-auth.js",
+  "emailjs-config.js",
   "login.html",
   "signup.html",
   "verify.html",

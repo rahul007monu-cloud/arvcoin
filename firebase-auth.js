@@ -62,6 +62,44 @@ function guardReady() {
   return true;
 }
 
+/* =========================================================
+   EMAIL OTP (free, via EmailJS) — real 6-digit code to inbox
+   ========================================================= */
+var ejs = window.ARV_EMAILJS || {};
+var ejsReady = !!(ejs.publicKey && ejs.serviceId && ejs.templateId &&
+  ejs.publicKey.indexOf("PASTE") === -1 &&
+  ejs.serviceId.indexOf("PASTE") === -1 &&
+  ejs.templateId.indexOf("PASTE") === -1);
+
+if (ejsReady && window.emailjs && emailjs.init) {
+  try { emailjs.init({ publicKey: ejs.publicKey }); } catch (e) { console.warn("[arvcoin] emailjs init:", e); }
+}
+
+function genOtp() { return String(Math.floor(100000 + Math.random() * 900000)); }
+
+// Real email bhejta hai; agar EmailJS set nahi to DEMO mode (code alert me).
+function sendOtpEmail(toEmail, toName, code) {
+  if (!ejsReady || !window.emailjs) {
+    // DEMO fallback — taaki keys aane se pehle bhi flow test ho sake
+    console.log("[arvcoin][DEMO OTP] " + code + " -> " + toEmail);
+    alert("DEMO mode: EmailJS keys abhi nahi lage.\nTumhara OTP hai: " + code + "\n(Asli email tab jayega jab keys daalenge.)");
+    return Promise.resolve({ demo: true });
+  }
+  return emailjs.send(ejs.serviceId, ejs.templateId, {
+    email: toEmail,      // template ke "To Email" field me {{email}} daalna
+    to_email: toEmail,   // (backup naam)
+    name: toName || "there",
+    to_name: toName || "there",
+    passcode: code,      // template body me {{passcode}}
+    otp: code            // (backup naam)
+  });
+}
+
+var PENDING_KEY = "arvcoin_pending";
+function setPending(data) { try { sessionStorage.setItem(PENDING_KEY, JSON.stringify(data)); } catch (e) {} }
+function getPending() { try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null"); } catch (e) { return null; } }
+function clearPending() { try { sessionStorage.removeItem(PENDING_KEY); } catch (e) {} }
+
 /* ---------- SIGNUP ---------- */
 var signupForm = $("signup-form");
 if (signupForm) {
@@ -82,22 +120,26 @@ if (signupForm) {
 
     var btn = signupForm.querySelector("button[type=submit]");
     if (btn) btn.disabled = true;
-    msg("ok", "Account ban raha hai\u2026");
+    msg("ok", "Email pe verification code bhej rahe hain\u2026");
 
-    createUserWithEmailAndPassword(auth, email, pw)
-      .then(function (cred) {
-        var u = cred.user;
-        return updateProfile(u, { displayName: name })
-          .then(function () { return saveProfile(u.uid, { name: name, email: email, mobile: mobile, createdAt: serverTimestamp() }); })
-          .then(function () {
-            saveLocal({ name: name, email: email, mobile: mobile, at: Date.now() });
-            msg("ok", "\uD83C\uDF89 Account ban gaya, " + name.split(" ")[0] + "! Dashboard khul raha hai\u2026");
-            setTimeout(function () { window.location.href = "dashboard.html"; }, 1000);
-          });
+    // Account abhi nahi banega — pehle email OTP verify hoga (verify.html pe).
+    var code = genOtp();
+    var pending = {
+      name: name, email: email, mobile: mobile, pw: pw,
+      code: code, exp: Date.now() + 10 * 60 * 1000, // 10 min valid
+      sentAt: Date.now()
+    };
+    setPending(pending);
+
+    sendOtpEmail(email, name, code)
+      .then(function () {
+        msg("ok", "\uD83D\uDCE7 Code bhej diya " + email + " pe. Verify karo\u2026");
+        setTimeout(function () { window.location.href = "verify.html"; }, 800);
       })
       .catch(function (err) {
         if (btn) btn.disabled = false;
-        msg("bad", friendlyError(err));
+        console.warn("[arvcoin] otp send fail:", err);
+        msg("bad", "Code bhejne me dikkat aayi. Dobara try karo.");
       });
   });
 }
@@ -164,6 +206,45 @@ document.querySelectorAll(".social-btn[data-provider]").forEach(function (btn) {
     else { msg("", "Apple login jaldi aa raha hai. Abhi Google ya email use karo."); }
   });
 });
+
+/* ---------- VERIFY (email OTP) -> account create ---------- */
+// verify.html iske globals use karta hai (box UX wahin rehta hai).
+window.arvOtp = {
+  dest: function () { var p = getPending(); return p && p.email ? p.email : ""; },
+
+  verify: function (codeStr, onOk, onErr) {
+    var p = getPending();
+    if (!p) { onErr && onErr("Session expire ho gaya. Dobara signup karo."); return; }
+    if (Date.now() > p.exp) { onErr && onErr("Code expire ho gaya. Naya code bhejo (Resend)."); return; }
+    if (String(codeStr) !== String(p.code)) { onErr && onErr("Galat code. Dobara check karo."); return; }
+    if (!guardReady()) { onErr && onErr("Firebase config set nahi hai."); return; }
+
+    // Code sahi -> ab asli Firebase account banao
+    createUserWithEmailAndPassword(auth, p.email, p.pw)
+      .then(function (cred) {
+        var u = cred.user;
+        return updateProfile(u, { displayName: p.name })
+          .then(function () { return saveProfile(u.uid, { name: p.name, email: p.email, mobile: p.mobile, emailVerified: true, createdAt: serverTimestamp() }); })
+          .then(function () {
+            saveLocal({ name: p.name, email: p.email, mobile: p.mobile, at: Date.now() });
+            clearPending();
+            onOk && onOk(p.name);
+          });
+      })
+      .catch(function (err) { onErr && onErr(friendlyError(err)); });
+  },
+
+  resend: function (onOk, onErr) {
+    var p = getPending();
+    if (!p) { onErr && onErr("Session expire ho gaya. Dobara signup karo."); return; }
+    var code = genOtp();
+    p.code = code; p.exp = Date.now() + 10 * 60 * 1000; p.sentAt = Date.now();
+    setPending(p);
+    sendOtpEmail(p.email, p.name, code)
+      .then(function () { onOk && onOk(); })
+      .catch(function (e) { onErr && onErr("Resend fail. Dobara try karo."); });
+  }
+};
 
 /* ---------- FORGOT PASSWORD ---------- */
 var forgot = $("forgot-pass");

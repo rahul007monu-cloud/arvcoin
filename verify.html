@@ -54,15 +54,15 @@
       </div>
       <div class="auth-tag">
         <h2>Ek <span class="grad">quick verification</span> aur bas!</h2>
-        <p>Security ke liye hum tumhare number pe ek 6-digit code bhejte hain.</p>
+        <p>Security ke liye hum tumhari email par ek 6-digit code bhejte hain.</p>
       </div>
     </aside>
 
     <main class="auth-form-side">
       <div class="auth-card otp-center">
         <a href="signup.html" class="back-home">← Back</a>
-        <div class="a-brand"><h1>Verify your number</h1></div>
-        <p class="a-sub">Code bheja gaya <span class="dest" id="dest">+91 ●●●●● ●●●●●</span> par</p>
+        <div class="a-brand"><h1>Verify your email</h1></div>
+        <p class="a-sub">Code bheja gaya <span class="dest" id="dest">tumhari email</span> par</p>
 
         <form id="otp-form">
           <div class="otp-boxes" id="otp-boxes">
@@ -78,21 +78,31 @@
         </form>
 
         <p class="resend">Code nahi mila? <a id="resend" class="disabled">Resend in <span id="timer">30</span>s</a></p>
-        <p class="demo-hint">Demo: koi bhi 6 digits daalo (ya <b>123456</b>) — verify ho jayega.</p>
       </div>
     </main>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="emailjs-config.js"></script>
+  <script type="module" src="firebase-auth.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="3d.js" defer></script>
   <script>
     (function () {
-      // show destination number from signup
+      // show destination email from pending signup
+      function maskEmail(e) {
+        var parts = String(e).split("@"); if (parts.length !== 2) return e;
+        var n = parts[0];
+        var shown = n.length <= 2 ? n[0] : n.slice(0, 2);
+        return shown + "•••@" + parts[1];
+      }
       try {
-        var u = JSON.parse(localStorage.getItem("arvcoin_user") || "null");
-        if (u && u.mobile) {
-          var m = String(u.mobile);
-          document.getElementById("dest").textContent = "+91 " + m.slice(0, 2) + "●●● ●●" + m.slice(-3);
+        var p = JSON.parse(sessionStorage.getItem("arvcoin_pending") || "null");
+        if (p && p.email) document.getElementById("dest").textContent = maskEmail(p.email);
+        else {
+          // koi pending signup nahi -> signup pe bhej do
+          document.getElementById("dest").textContent = "—";
         }
       } catch (e) {}
 
@@ -121,11 +131,20 @@
         t--; timerEl.textContent = t;
         if (t <= 0) { clearInterval(iv); resend.classList.remove("disabled"); resend.textContent = "Resend code"; }
       }, 1000);
-      resend.addEventListener("click", function () {
-        if (resend.classList.contains("disabled")) return;
+      function startTimer() {
         resend.classList.add("disabled"); resend.innerHTML = 'Resend in <span id="timer">30</span>s';
         t = 30; timerEl = document.getElementById("timer");
         iv = setInterval(function () { t--; timerEl.textContent = t; if (t <= 0) { clearInterval(iv); resend.classList.remove("disabled"); resend.textContent = "Resend code"; } }, 1000);
+      }
+
+      resend.addEventListener("click", function () {
+        if (resend.classList.contains("disabled")) return;
+        var msg = document.getElementById("msg");
+        if (!window.arvOtp) { msg.className = "a-msg bad"; msg.textContent = "Thodi der ruko, load ho raha hai\u2026"; return; }
+        window.arvOtp.resend(function () {
+          msg.className = "a-msg ok"; msg.textContent = "\uD83D\uDCE7 Naya code bhej diya. Inbox/spam check karo.";
+          startTimer();
+        }, function (err) { msg.className = "a-msg bad"; msg.textContent = err; });
       });
 
       document.getElementById("otp-form").addEventListener("submit", function (e) {
@@ -133,8 +152,20 @@
         var code = boxes.map(function (b) { return b.value; }).join("");
         var msg = document.getElementById("msg");
         if (code.length < 6) { msg.className = "a-msg bad"; msg.textContent = "Poora 6-digit code daalo."; return; }
-        msg.className = "a-msg ok"; msg.textContent = "\u2705 Verified! Ab KYC complete karte hain\u2026";
-        setTimeout(function () { window.location.href = "kyc.html"; }, 1200);
+        if (!window.arvOtp) { msg.className = "a-msg bad"; msg.textContent = "Thodi der ruko, load ho raha hai\u2026"; return; }
+
+        var btn = document.querySelector("#otp-form button[type=submit]");
+        if (btn) btn.disabled = true;
+        msg.className = "a-msg ok"; msg.textContent = "Verify ho raha hai\u2026";
+
+        window.arvOtp.verify(code, function (name) {
+          msg.className = "a-msg ok";
+          msg.textContent = "\u2705 Email verified! Account ban gaya" + (name ? ", " + String(name).split(" ")[0] : "") + ". Dashboard khul raha hai\u2026";
+          setTimeout(function () { window.location.href = "dashboard.html"; }, 1000);
+        }, function (err) {
+          if (btn) btn.disabled = false;
+          msg.className = "a-msg bad"; msg.textContent = err;
+        });
       });
     })();
   </script>
