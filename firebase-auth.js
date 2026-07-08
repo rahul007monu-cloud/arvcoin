@@ -85,13 +85,17 @@ function sendOtpEmail(toEmail, toName, code) {
     alert("DEMO mode: EmailJS keys abhi nahi lage.\nTumhara OTP hai: " + code + "\n(Asli email tab jayega jab keys daalenge.)");
     return Promise.resolve({ demo: true });
   }
+  // "valid till {{time}}" ke liye readable expiry time (IST)
+  var expTime = new Date(Date.now() + 15 * 60 * 1000)
+    .toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
   return emailjs.send(ejs.serviceId, ejs.templateId, {
     email: toEmail,      // template ke "To Email" field me {{email}} daalna
     to_email: toEmail,   // (backup naam)
     name: toName || "there",
     to_name: toName || "there",
     passcode: code,      // template body me {{passcode}}
-    otp: code            // (backup naam)
+    otp: code,           // (backup naam)
+    time: expTime        // template body me {{time}}
   });
 }
 
@@ -126,7 +130,7 @@ if (signupForm) {
     var code = genOtp();
     var pending = {
       name: name, email: email, mobile: mobile, pw: pw,
-      code: code, exp: Date.now() + 10 * 60 * 1000, // 10 min valid
+      code: code, exp: Date.now() + 15 * 60 * 1000, // 15 min valid
       sentAt: Date.now()
     };
     setPending(pending);
@@ -238,7 +242,7 @@ window.arvOtp = {
     var p = getPending();
     if (!p) { onErr && onErr("Session expire ho gaya. Dobara signup karo."); return; }
     var code = genOtp();
-    p.code = code; p.exp = Date.now() + 10 * 60 * 1000; p.sentAt = Date.now();
+    p.code = code; p.exp = Date.now() + 15 * 60 * 1000; p.sentAt = Date.now();
     setPending(p);
     sendOtpEmail(p.email, p.name, code)
       .then(function () { onOk && onOk(); })
