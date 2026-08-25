@@ -99,8 +99,21 @@ function sendOtpEmail(toEmail, toName, code) {
   });
 }
 
+/* ---------- pending signup state ----------
+   ⚠️ SECURITY: yahan password KABHI store nahi hota.
+   Pehle Firebase account banta hai (password seedha Firebase ko jaata hai,
+   hash hokar), phir OTP se email verify hoti hai. Pehle plaintext password
+   sessionStorage me rakha jaa raha tha — wo fix ho gaya. */
 var PENDING_KEY = "arvcoin_pending";
-function setPending(data) { try { sessionStorage.setItem(PENDING_KEY, JSON.stringify(data)); } catch (e) {} }
+function setPending(data) {
+  try {
+    var safe = {
+      name: data.name, email: data.email, mobile: data.mobile,
+      code: data.code, exp: data.exp, sentAt: data.sentAt, uid: data.uid
+    };
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify(safe));
+  } catch (e) {}
+}
 function getPending() { try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null"); } catch (e) { return null; } }
 function clearPending() { try { sessionStorage.removeItem(PENDING_KEY); } catch (e) {} }
 
@@ -124,26 +137,40 @@ if (signupForm) {
 
     var btn = signupForm.querySelector("button[type=submit]");
     if (btn) btn.disabled = true;
-    msg("ok", "Email pe verification code bhej rahe hain\u2026");
+    msg("ok", "Account bana rahe hain\u2026");
 
-    // Account abhi nahi banega — pehle email OTP verify hoga (verify.html pe).
+    /* Account ABHI banta hai — password seedha Firebase ko jaata hai aur
+       kahin store nahi hota. Uske baad email OTP verify hoti hai. */
     var code = genOtp();
-    var pending = {
-      name: name, email: email, mobile: mobile, pw: pw,
-      code: code, exp: Date.now() + 15 * 60 * 1000, // 15 min valid
-      sentAt: Date.now()
-    };
-    setPending(pending);
 
-    sendOtpEmail(email, name, code)
-      .then(function () {
-        msg("ok", "\uD83D\uDCE7 Code bhej diya " + email + " pe. Verify karo\u2026");
-        setTimeout(function () { window.location.href = "verify.html"; }, 800);
+    createUserWithEmailAndPassword(auth, email, pw)
+      .then(function (cred) {
+        var u = cred.user;
+        return updateProfile(u, { displayName: name })
+          .then(function () {
+            return saveProfile(u.uid, {
+              name: name, email: email, mobile: mobile,
+              emailVerified: false, createdAt: serverTimestamp()
+            });
+          })
+          .then(function () {
+            setPending({
+              name: name, email: email, mobile: mobile, uid: u.uid,
+              code: code, exp: Date.now() + 15 * 60 * 1000, // 15 min
+              sentAt: Date.now()
+            });
+            msg("ok", "Email pe verification code bhej rahe hain\u2026");
+            return sendOtpEmail(email, name, code);
+          })
+          .then(function () {
+            msg("ok", "\uD83D\uDCE7 Code bhej diya " + email + " pe. Verify karo\u2026");
+            setTimeout(function () { window.location.href = "verify.html"; }, 800);
+          });
       })
       .catch(function (err) {
         if (btn) btn.disabled = false;
-        console.warn("[arvcoin] otp send fail:", err);
-        msg("bad", "Code bhejne me dikkat aayi. Dobara try karo.");
+        console.warn("[arvcoin] signup fail:", err);
+        msg("bad", friendlyError(err));
       });
   });
 }
@@ -223,17 +250,16 @@ window.arvOtp = {
     if (String(codeStr) !== String(p.code)) { onErr && onErr("Galat code. Dobara check karo."); return; }
     if (!guardReady()) { onErr && onErr("Firebase config set nahi hai."); return; }
 
-    // Code sahi -> ab asli Firebase account banao
-    createUserWithEmailAndPassword(auth, p.email, p.pw)
-      .then(function (cred) {
-        var u = cred.user;
-        return updateProfile(u, { displayName: p.name })
-          .then(function () { return saveProfile(u.uid, { name: p.name, email: p.email, mobile: p.mobile, emailVerified: true, createdAt: serverTimestamp() }); })
-          .then(function () {
-            saveLocal({ name: p.name, email: p.email, mobile: p.mobile, at: Date.now() });
-            clearPending();
-            onOk && onOk(p.name);
-          });
+    /* Account signup pe hi ban gaya tha. Yahan sirf email verified mark
+       karte hain — koi password handling nahi. */
+    var uid = p.uid || (auth.currentUser && auth.currentUser.uid);
+    if (!uid) { onErr && onErr("Session mil nahi raha. Dobara login karo."); return; }
+
+    saveProfile(uid, { emailVerified: true, verifiedAt: serverTimestamp() })
+      .then(function () {
+        saveLocal({ name: p.name, email: p.email, mobile: p.mobile, at: Date.now() });
+        clearPending();
+        onOk && onOk(p.name);
       })
       .catch(function (err) { onErr && onErr(friendlyError(err)); });
   },
