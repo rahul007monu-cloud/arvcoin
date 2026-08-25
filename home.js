@@ -24,7 +24,7 @@
       var s = CFG.SEGMENTS[id];
       var count = (s.instruments || []).length;
       return '' +
-        '<div class="lux seg-card lux-tilt rv' + (i ? " d" + Math.min(i, 5) : "") + '">' +
+        '<div class="lux seg-card lux-3d rv' + (i ? " d" + Math.min(i, 5) : "") + '">' +
           '<span class="sc-ico" style="color:' + s.color + '">' + s.icon + '</span>' +
           '<h3>' + esc(s.name) + '</h3>' +
           '<p>' + esc(s.blurb) + '</p>' +
@@ -45,7 +45,7 @@
       }).join(" ");
 
       return '' +
-        '<div class="lux plan lux-tilt rv' + (i ? " d" + Math.min(i, 5) : "") + (p.popular ? " pop" : "") + '">' +
+        '<div class="lux plan lux-3d rv' + (i ? " d" + Math.min(i, 5) : "") + (p.popular ? " pop" : "") + '">' +
           (p.popular ? '<span class="tag">Most popular</span>' : "") +
           (p.saveLabel && !p.popular ? '<span class="tag">' + esc(p.saveLabel) + '</span>' : "") +
           '<h3>' + esc(p.name) + '</h3>' +

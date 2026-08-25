@@ -61,16 +61,16 @@ function paintModeBanner() {
       "Reg. no. " + ra.number +
       (ra.entityName ? " · " + ra.entityName : "") +
       (ra.analystName ? " · Analyst: " + ra.analystName : "") +
-      ". Har call pe registration details di gayi hain.";
+      ". Registration details appear on every note.";
   } else {
     b.className = "mode-banner";
     $("mb-ico").textContent = "🎓";
-    $("mb-title").textContent = "Education mode chalu hai.";
+    $("mb-title").textContent = "Education mode is active.";
     $("mb-text").textContent =
-      "Yahan levels analysis, market recap aur lessons milte hain — computed support/resistance " +
-      "aur structural observations ke saath. Buy/sell recommendations ke liye SEBI Research " +
-      "Analyst registration zaroori hai (RA Regulations, 2014), wo aane par unlock hongi.";
-    $("ph-sub").textContent = "Levels analysis, daily recap aur market concepts.";
+      "Levels analysis, market recaps and lessons — with computed support and resistance " +
+      "plus structural observations. Buy and sell recommendations require SEBI Research " +
+      "Analyst registration (RA Regulations, 2014) and unlock once that is in place.";
+    $("ph-sub").textContent = "Levels analysis, daily recaps and market concepts.";
   }
 }
 
@@ -208,12 +208,12 @@ function lockedCard(t) {
         '<div class="lvl"><small>Type</small><b>limit</b></div>' +
       '</div>' +
       '<div class="cc-why"><b>Rationale</b>' +
-        'Is call ka poora analysis subscribers ke liye hai. Entry, targets, stop loss aur research rationale unlock karne ke liye plan chahiye.' +
+        'The full analysis is available to subscribers. A plan unlocks the entry, targets, stop loss and research rationale.' +
       '</div>' +
       '<div class="lock-overlay">' +
         '<span class="lk-ico">🔒</span>' +
-        '<p>' + esc(seg.name) + ' calls unlock karne ke liye plan chahiye</p>' +
-        '<a href="pricing.html" class="btn btn-primary">Plans dekho →</a>' +
+        '<p>' + esc(seg.name) + ' research requires a plan</p>' +
+        '<a href="pricing.html" class="btn btn-primary">View plans →</a>' +
       '</div>' +
     '</article>';
 }
@@ -255,7 +255,7 @@ function analysisCard(a) {
 
       '<div class="cc-ra">' +
         '<b>Levels calculation</b> Classic pivots + CPR · ' +
-        'Ye computed analysis hai, koi buy/sell recommendation nahi.' +
+        'Computed analysis — not a buy or sell recommendation.' +
       '</div>' +
     '</article>';
 }
@@ -275,7 +275,7 @@ function lessonCard(l) {
         (l.level ? '<span class="chip">' + esc(l.level) + '</span>' : "") +
         (l.readMins ? '<span class="chip">' + esc(l.readMins) + ' min read</span>' : "") +
       '</div>' +
-      (l.summary ? '<div class="cc-why"><b>Kya seekhoge</b>' + esc(l.summary) + '</div>' : "") +
+      (l.summary ? '<div class="cc-why"><b>What you will learn</b>' + esc(l.summary) + '</div>' : "") +
     '</article>';
 }
 
@@ -287,8 +287,8 @@ function recapCard(r) {
         '<span class="cc-status closed">Recap</span>' +
         '<span class="cc-when">' + when(r.createdAt || r.date) + '</span>' +
       '</div>' +
-      (r.summary ? '<div class="cc-why"><b>Aaj kya hua</b>' + esc(r.summary) + '</div>' : "") +
-      (r.why ? '<div class="cc-why"><b>Kyun hua</b>' + esc(r.why) + '</div>' : "") +
+      (r.summary ? '<div class="cc-why"><b>What happened</b>' + esc(r.summary) + '</div>' : "") +
+      (r.why ? '<div class="cc-why"><b>Why it happened</b>' + esc(r.why) + '</div>' : "") +
     '</article>';
 }
 
@@ -318,9 +318,9 @@ function paintFeed() {
     state.lessons.forEach(function (l) { eduHtml += lessonCard(l); });
 
     if (!eduHtml) {
-      eduHtml = emptyState("🧮", "Analysis jaldi aa raha hai",
-        "Levels analysis, market recap aur lessons publish ho rahe hain. " +
-        "Tab tak free Levels Calculator use karo — kisi bhi instrument ke support/resistance nikaalo.",
+      eduHtml = emptyState("🧮", "Analysis coming soon",
+        "Levels analysis, market recaps and lessons are being published. " +
+        "Meanwhile, use the free levels calculator to compute support and resistance for any instrument.",
         '<a href="levels.html" class="btn btn-primary">Levels calculator →</a>');
     }
     feed.innerHTML = eduHtml;
@@ -352,12 +352,12 @@ function paintFeed() {
 
   if (!html) {
     if (!state.ent.active) {
-      html = emptyState("🔒", "Plan chahiye",
-        "Research calls subscribers ke liye hain. Plan lo aur equity, F&O, commodity, currency aur crypto research unlock karo.",
-        '<a href="pricing.html" class="btn btn-primary">Plans dekho →</a>');
+      html = emptyState("🔒", "A plan is required",
+        "Research notes are for subscribers. Choose a plan to unlock equity, F&O, commodity, currency and crypto research.",
+        '<a href="pricing.html" class="btn btn-primary">View plans →</a>');
     } else {
-      html = emptyState("📭", "Is segment me abhi koi call nahi",
-        "Naye calls publish hote hi yahan dikhenge. Notification on rakho.");
+      html = emptyState("📭", "Nothing in this segment yet",
+        "New research appears here as soon as it is published.");
     }
   }
 
@@ -410,7 +410,7 @@ paintTabs();
 
 if (!ready) {
   $("feed").innerHTML = emptyState("⚙️", "Firebase config missing",
-    "firebase-config.js me project config daalo, phir ye page live data dikhayega.");
+    "Add your project config to firebase-config.js and this page will show live data.");
 } else {
   requireAuth("login.html").then(function (u) {
     if (!u) return;

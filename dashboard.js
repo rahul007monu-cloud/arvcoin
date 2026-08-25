@@ -123,12 +123,12 @@ function paintPlan() {
 
   if (ent.active) {
     $("plan-name").textContent = ent.planName || ent.planId;
-    $("plan-meta").textContent = ent.daysLeft + " din baaki · " +
+    $("plan-meta").textContent = ent.daysLeft + " days left · "  +
       ent.segments.length + " / " + CFG.SEGMENT_ORDER.length + " segments unlocked";
     $("plan-cta").textContent = "Upgrade →";
   } else if (ent.expired) {
     $("plan-name").textContent = "Plan expired";
-    $("plan-meta").textContent = "Renew karke research access wapas paao.";
+    $("plan-meta").textContent = "Renew to restore your research access.";
     $("plan-cta").textContent = "Renew →";
   }
 
@@ -154,7 +154,7 @@ function paintPlan() {
       promo.style.display = "block";
       $("sp-sub").textContent = missing.map(function (sid) {
         return CFG.SEGMENTS[sid].name;
-      }).join(", ") + " unlock karo.";
+      }).join(", ") + " — unlock these.";
     } else {
       promo.style.display = "none";
     }
@@ -166,7 +166,7 @@ function paintPlan() {
   $("p-till").textContent = ent.activeTill
     ? new Date(ent.activeTill).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
     : "—";
-  $("p-days").textContent = ent.active ? ent.daysLeft + " din" : "—";
+  $("p-days").textContent = ent.active ? ent.daysLeft + " days" : "—";
   $("p-segs").textContent = ent.active && ent.segments.length
     ? ent.segments.map(function (s) { return CFG.SEGMENTS[s] ? CFG.SEGMENTS[s].name : s; }).join(", ")
     : "—";
@@ -208,8 +208,8 @@ function recapCard(r) {
         '<span class="cc-inst">Recap — ' + esc(r.date || "") + '</span>' +
         '<span class="cc-when">' + when(r.createdAt || r.date) + '</span>' +
       '</div>' +
-      (r.summary ? '<div class="cc-why"><b>Kya hua</b>' + esc(r.summary) + '</div>' : "") +
-      (r.why ? '<div class="cc-why"><b>Kyun hua</b>' + esc(r.why) + '</div>' : "") +
+      (r.summary ? '<div class="cc-why"><b>What happened</b>' + esc(r.summary) + '</div>' : "") +
+      (r.why ? '<div class="cc-why"><b>Why it happened</b>' + esc(r.why) + '</div>' : "") +
     '</article>';
 }
 
@@ -226,7 +226,7 @@ function lessonCard(l) {
         '<span class="chip">' + seg.icon + " " + esc(seg.name) + '</span>' +
         (l.level ? '<span class="chip">' + esc(l.level) + '</span>' : "") +
       '</div>' +
-      (l.summary ? '<div class="cc-why"><b>Kya seekhoge</b>' + esc(l.summary) + '</div>' : "") +
+      (l.summary ? '<div class="cc-why"><b>What you will learn</b>' + esc(l.summary) + '</div>' : "") +
     '</article>';
 }
 
@@ -242,21 +242,21 @@ function loadFeeds() {
   listAnalysis({ limit: 5 }).then(function (rows) {
     $("latest-feed").innerHTML = rows.length
       ? rows.map(analysisCard).join("")
-      : empty("🧮", "Analysis jaldi aayega",
-          "Levels analysis publish hote hi yahan dikhega. Tab tak free calculator use karo.",
+      : empty("🧮", "Analysis coming soon",
+          "Levels analysis appears here once published. Meanwhile, use the free calculator.",
           '<a href="levels.html" class="btn btn-primary">Levels calculator →</a>');
   });
 
   listRecaps(10).then(function (rows) {
     $("recap-feed").innerHTML = rows.length
       ? rows.map(recapCard).join("")
-      : empty("≣", "Recap jaldi shuru hoga", "Daily market recap publish hote hi yahan dikhega.");
+      : empty("≣", "Recaps starting soon", "Daily market recaps will appear here once published.");
   });
 
   listLessons({ limit: 30 }).then(function (rows) {
     $("lesson-feed").innerHTML = rows.length
       ? rows.map(lessonCard).join("")
-      : empty("🎓", "Lessons aa rahe hain", "Market basics se advanced concepts tak — publish ho rahe hain.");
+      : empty("🎓", "Lessons on the way", "From market basics to advanced concepts — being published now.");
   });
 }
 
@@ -268,7 +268,7 @@ paintPlan();
 
 if (!ready) {
   $("latest-feed").innerHTML = empty("⚙️", "Firebase config missing",
-    "firebase-config.js me project config daalo.");
+    "Add your project config to firebase-config.js.");
 } else {
   requireAuth("login.html").then(function (u) {
     if (!u) return;

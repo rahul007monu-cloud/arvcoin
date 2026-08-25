@@ -34,9 +34,10 @@
      ========================================================= */
   function initTilt() {
     if (reduced || isTouch || isSmall) return;
-    var MAX = 7; // degrees
 
-    $all(".lux-tilt").forEach(function (el) {
+    $all(".lux-tilt, .lux-3d").forEach(function (el) {
+      // .lux-3d rotates further than .lux-tilt
+      var MAX = el.classList.contains("lux-3d") ? 12 : 7;
       var raf = null;
 
       el.addEventListener("pointerenter", function () {
@@ -284,7 +285,7 @@
         if (!sw) return;
         sw.addEventListener("statechange", function () {
           if (sw.state === "installed" && navigator.serviceWorker.controller) {
-            console.log("[arvcoin] naya version mila, reload kar rahe hain");
+            console.log("[arvcoin] new version found, reloading");
           }
         });
       });
@@ -302,10 +303,66 @@
   }
 
   /* =========================================================
+     11) PWA INSTALL PROMPT
+     ---------------------------------------------------------
+     Chrome/Edge fire beforeinstallprompt when the app is
+     installable. We stash the event and show our own button,
+     because the native mini-infobar is easy to miss.
+     ========================================================= */
+  function initInstall() {
+    var deferred = null;
+
+    function makeButton() {
+      if (document.getElementById("pwa-install")) return null;
+      var b = document.createElement("button");
+      b.id = "pwa-install";
+      b.type = "button";
+      b.className = "pwa-install";
+      b.innerHTML = '<span class="pi-ico">⬇</span><span>Install app</span>';
+      document.body.appendChild(b);
+      return b;
+    }
+
+    window.addEventListener("beforeinstallprompt", function (e) {
+      e.preventDefault();
+      deferred = e;
+
+      try {
+        if (localStorage.getItem("arvcoin_install_dismissed") === "1") return;
+      } catch (err) {}
+
+      var btn = makeButton();
+      if (!btn) return;
+
+      requestAnimationFrame(function () { btn.classList.add("show"); });
+
+      btn.addEventListener("click", function () {
+        if (!deferred) return;
+        deferred.prompt();
+        deferred.userChoice.then(function (res) {
+          if (res.outcome !== "accepted") {
+            try { localStorage.setItem("arvcoin_install_dismissed", "1"); } catch (err) {}
+          }
+          deferred = null;
+          btn.classList.remove("show");
+          setTimeout(function () { btn.remove(); }, 400);
+        });
+      });
+    });
+
+    window.addEventListener("appinstalled", function () {
+      var b = document.getElementById("pwa-install");
+      if (b) b.remove();
+      try { localStorage.setItem("arvcoin_installed", "1"); } catch (err) {}
+    });
+  }
+
+  /* =========================================================
      Boot
      ========================================================= */
   function boot() {
     initSW();
+    initInstall();
     initSpotlight();
     initTilt();
     initReveal();

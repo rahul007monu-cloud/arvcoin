@@ -34,7 +34,7 @@
     if (!s) {
       $("ladder").innerHTML =
         '<div class="lux-note" style="margin:0"><span class="n-ico">ℹ️</span>' +
-        '<div>Woodie pivots ke liye <b>Open</b> value bhi chahiye.</div></div>';
+        '<div>Woodie pivots also need the <b>open</b> value.</div></div>';
       return;
     }
 
@@ -200,7 +200,7 @@
     var D = CFG.DISCLOSURES;
     $("disc").innerHTML = "<b>Important disclosures</b>" +
       [
-        "Ye page ek calculation tool hai. Yahan koi buy/sell recommendation nahi di jaati.",
+        "This page is a calculation tool. No buy or sell recommendations are given here.",
         D.educationOnly,
         CFG.isRegistered() ? D.registeredNote : D.notRegistered,
         D.marketRisk,

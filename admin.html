@@ -42,7 +42,7 @@
     <div class="ph">
       <div>
         <h1>Publish <span class="grad">research</span></h1>
-        <p>Analyst control room. Har call compliance check se guzarta hai.</p>
+        <p>Analyst control room. Every note passes a compliance check.</p>
       </div>
       <div class="ph-right">
         <span class="pill-stat" id="pill-role">—</span>
@@ -52,15 +52,15 @@
 
     <!-- RA registration gate -->
     <div class="gate-warn" id="ra-gate" style="display:none">
-      <b>🚫 Publishing band hai — RA registration set nahi hai</b>
-      Fee lekar securities par buy/sell recommendation dene ke liye SEBI Research Analyst
-      registration zaroori hai (SEBI RA Regulations, 2014). Ye gate isliye hai ki galti se
-      bhi unregistered call publish na ho jaaye.<br><br>
-      <code>arv-config.js</code> → <code>RA_REGISTRATION.number</code> me apna registration
-      number daalo (ya partner RA/IA ka, revenue-share arrangement me). Number aane ke baad
-      publishing turant chalu ho jaayegi.<br><br>
-      Tab tak <b>Lesson</b> aur <b>Market recap</b> publish kar sakte ho — wo education
-      content hai, registration ki zaroorat nahi.
+      <b>🚫 Publishing is disabled — RA registration is not set</b>
+      Publishing buy or sell recommendations on securities for a fee requires SEBI Research
+      Analyst registration (SEBI RA Regulations, 2014). This gate exists so an unregistered
+      recommendation can never be published by accident.<br><br>
+      <code>arv-config.js</code> → <code>RA_REGISTRATION.number</code> with your registration
+      number (or a partner RA/IA's, under a revenue-share arrangement). Publishing enables
+      immediately once it is set.<br><br>
+      In the meantime you can publish <b>Levels analysis</b>, <b>Lessons</b> and
+      <b>Market recaps</b> — those are educational content and need no registration.
     </div>
 
     <!-- what to publish -->
@@ -82,16 +82,16 @@
         <form id="form-analysis">
           <h2>Levels analysis</h2>
           <p class="card-sub">
-            H/L/C daalo — levels khud compute ho jaayenge. Registration ki zaroorat nahi,
-            turant publish hota hai.
+            Enter the high, low and close — levels compute automatically. No registration needed,
+            publishes immediately.
           </p>
 
           <div class="lux-note good" style="margin-bottom:20px;font-size:13.5px">
             <span class="n-ico">✓</span>
             <div>
-              Ye <b>calculator output + aapka structural view</b> hai. Isme koi
-              buy/sell action, entry, target ya stop-loss field nahi hai — isliye ye
-              RA registration ke bina publish ho jaata hai aur subscribers ko turant dikhta hai.
+              This is <b>calculator output plus your structural view</b>. It has no buy/sell
+              action, entry, target or stop-loss field — which is why it publishes without
+              RA registration and reaches subscribers immediately.
             </div>
           </div>
 
@@ -108,15 +108,15 @@
 
           <div class="fld-row-3">
             <div class="fld">
-              <label for="a-high">Prev High</label>
+              <label for="a-high">Previous high</label>
               <input id="a-high" type="number" step="any" inputmode="decimal" placeholder="1450" />
             </div>
             <div class="fld">
-              <label for="a-low">Prev Low</label>
+              <label for="a-low">Previous low</label>
               <input id="a-low" type="number" step="any" inputmode="decimal" placeholder="1395" />
             </div>
             <div class="fld">
-              <label for="a-close">Prev Close</label>
+              <label for="a-close">Previous close</label>
               <input id="a-close" type="number" step="any" inputmode="decimal" placeholder="1432" />
             </div>
           </div>
@@ -124,11 +124,11 @@
           <div id="a-levels-out" style="display:none;margin-bottom:18px"></div>
 
           <div class="fld">
-            <label for="a-observation">Structural observation (min 20 chars)</label>
-            <textarea id="a-observation" placeholder="Price computed pivot ke upar hai, CPR narrow hai. Volume previous session me average se zyada tha. R1 ke aas-paas supply zone dikh raha hai..."></textarea>
+            <label for="a-observation">Structural observation (minimum 20 characters)</label>
+            <textarea id="a-observation" placeholder="Price is above the computed pivot and the CPR is narrow. Volume ran above average in the previous session. A supply zone appears around R1..."></textarea>
             <p class="hint">
-              Structure, volume, CPR, level clusters — kya observe kiya. "Buy karo", "target",
-              "SL" jaisi bhasha auto-block ho jaayegi.
+              Structure, volume, CPR, level clusters — what you observed. Wording like "buy",
+              "target" or "SL" is blocked automatically.
             </p>
           </div>
 
@@ -145,7 +145,7 @@
               <label for="a-free">Access</label>
               <select id="a-free">
                 <option value="false">Subscribers only</option>
-                <option value="true">Free (SEO + funnel)</option>
+                <option value="true">Free (SEO and funnel)</option>
               </select>
             </div>
           </div>
@@ -155,8 +155,8 @@
 
         <!-- ---------- CALL FORM ---------- -->
         <form id="form-call" style="display:none">
-          <h2>New research call</h2>
-          <p class="card-sub">Rationale zaroori hai — bina research ke bare tip research nahi hoti.</p>
+          <h2>New research note</h2>
+          <p class="card-sub">A rationale is required — a bare tip without research is not research.</p>
 
           <div class="fld-row">
             <div class="fld">
@@ -189,8 +189,8 @@
           <div class="fld" id="fx-warn" style="display:none">
             <div class="gate-warn" style="margin:0">
               <b>⚠️ Currency segment</b>
-              Sirf RBI-approved INR pairs, recognised Indian exchanges (NSE/BSE/MSE) par.
-              Offshore/OTC forex FEMA ke against hai — penalty transaction amount ke 3x tak.
+              RBI-approved INR pairs on recognised Indian exchanges (NSE/BSE/MSE) only.
+              Offshore and OTC forex breaches FEMA — penalties reach three times the transaction value.
             </div>
           </div>
 
@@ -241,16 +241,16 @@
           <div class="fld" id="f-rationale">
             <label for="c-rationale">Rationale (min 20 chars)</label>
             <textarea id="c-rationale" placeholder="Research basis — technical setup, fundamentals, sector view, risk factors..."></textarea>
-            <p class="hint">Ye subscribers ko dikhta hai aur SEBI record ka hissa hai. "Guaranteed", "sure shot", "pakka profit" type language block ho jaayegi.</p>
+            <p class="hint">This is shown to subscribers and forms part of the SEBI record. Wording like "guaranteed", "sure shot" or "assured profit" is blocked.</p>
           </div>
 
-          <button type="submit" class="btn btn-primary btn-lg" id="btn-call">Publish call</button>
+          <button type="submit" class="btn btn-primary btn-lg" id="btn-call">Publish note</button>
         </form>
 
         <!-- ---------- LESSON FORM ---------- -->
         <form id="form-lesson" style="display:none">
           <h2>New lesson</h2>
-          <p class="card-sub">Education content — registration ki zaroorat nahi.</p>
+          <p class="card-sub">Educational content — no registration required.</p>
 
           <div class="fld-row">
             <div class="fld">
@@ -274,11 +274,11 @@
 
           <div class="fld">
             <label for="l-summary">Summary</label>
-            <textarea id="l-summary" placeholder="Is lesson me kya cover hoga..."></textarea>
+            <textarea id="l-summary" placeholder="What this lesson covers..."></textarea>
           </div>
 
           <div class="fld">
-            <label for="l-body">Body (markdown chalega)</label>
+            <label for="l-body">Body (markdown supported)</label>
             <textarea id="l-body" style="min-height:180px" placeholder="Poora lesson content..."></textarea>
           </div>
 
@@ -290,7 +290,7 @@
             <div class="fld">
               <label for="l-free">Access</label>
               <select id="l-free">
-                <option value="true">Free (SEO + funnel)</option>
+                <option value="true">Free (SEO and funnel)</option>
                 <option value="false">Subscribers only</option>
               </select>
             </div>
@@ -302,7 +302,7 @@
         <!-- ---------- RECAP FORM ---------- -->
         <form id="form-recap" style="display:none">
           <h2>Daily market recap</h2>
-          <p class="card-sub">Jo ho gaya uska factual summary. Aage kya hoga — wo nahi.</p>
+          <p class="card-sub">A factual summary of what happened. Not what will happen next.</p>
 
           <div class="fld">
             <label for="r-date">Date</label>
@@ -310,14 +310,14 @@
           </div>
 
           <div class="fld">
-            <label for="r-summary">Aaj kya hua</label>
-            <textarea id="r-summary" placeholder="Nifty 0.6% up, banking led the gains, IT lagged..."></textarea>
+            <label for="r-summary">What happened</label>
+            <textarea id="r-summary" placeholder="Nifty up 0.6%, banking led the gains, IT lagged..."></textarea>
           </div>
 
           <div class="fld">
-            <label for="r-why">Kyun hua</label>
+            <label for="r-why">Why it happened</label>
             <textarea id="r-why" placeholder="Factors — global cues, FII flows, sector news, macro data..."></textarea>
-            <p class="hint">Past tense me likho. "Kal kya hoga" wala forward view yahan nahi — wo recommendation ban jaata hai.</p>
+            <p class="hint">Write in the past tense. No forward-looking view here — that would become a recommendation.</p>
           </div>
 
           <button type="submit" class="btn btn-primary btn-lg" id="btn-recap">Publish recap</button>
@@ -328,7 +328,7 @@
       <div>
         <div class="card" style="margin-bottom:18px">
           <h2>Live preview</h2>
-          <p class="card-sub">Subscriber ko aisa dikhega.</p>
+          <p class="card-sub">This is how a subscriber will see it.</p>
           <div class="preview-call">
             <div class="pv-label">Preview</div>
             <div id="preview"></div>
@@ -337,14 +337,14 @@
 
         <div class="card">
           <h2>Compliance reminders</h2>
-          <p class="card-sub">Har publish se pehle.</p>
+          <p class="card-sub">Before every publish.</p>
           <div class="disc-box" style="margin:0;border:0;padding:0;background:none">
-            <p>• Guaranteed / assured / fixed returns — kabhi nahi. Auto-block hai.</p>
-            <p>• Accuracy % sirf poori history se, cherry-picked winners se nahi.</p>
-            <p>• Publish ke baad call edit/delete nahi hota. Outcome update hota hai, audit trail ke saath.</p>
-            <p>• Personalised advice RA registration cover nahi karta (wo IA hai).</p>
-            <p>• Currency = sirf INR pairs, Indian exchanges.</p>
-            <p>• ARV Coin ko investment/appreciating asset kehna — kabhi nahi.</p>
+            <p>• Guaranteed, assured or fixed returns — never. Automatically blocked.</p>
+            <p>• Accuracy figures must come from the full history, never cherry-picked winners.</p>
+            <p>• A published note cannot be edited or deleted. Outcomes are updated with an audit trail.</p>
+            <p>• RA registration does not cover personalised advice — that requires IA registration.</p>
+            <p>• Currency: INR pairs on Indian exchanges only.</p>
+            <p>• Never describe ARV as an investment or an appreciating asset.</p>
           </div>
         </div>
       </div>
