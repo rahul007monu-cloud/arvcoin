@@ -1,0 +1,13 @@
+{
+  "name": "arvcoin-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Admin tools for arvcoin — grant analyst/admin access",
+  "scripts": {
+    "grant": "node grant-admin.js",
+    "list": "node grant-admin.js --list"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}
