@@ -313,7 +313,7 @@ service cloud.firestore {
        Grants analyst/admin access without needing the CLI.
 
        Document ID must be the user's Firebase Auth UID.
-       Fields: { analyst: true, admin: true }
+       Fields: analyst = true, admin = true (both booleans)
 
        Client can read only its own document, and can NEVER write here.
        Writes come from the Firebase Console or the Admin SDK, both of
