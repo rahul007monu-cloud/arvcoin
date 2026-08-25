@@ -11,9 +11,11 @@
    chhup jaana sirf UX hai, security rules me hai.
    ========================================================= */
 import {
-  ready, requireAnalyst, isAdmin, isAnalyst, db,
+  ready, requireAnalyst, isAdmin, isAnalyst, db, currentUser,
   publishCall, when
 } from "./arv-core.js";
+
+function currentUid() { var u = currentUser(); return u ? u.uid : null; }
 import {
   collection, addDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -22,7 +24,8 @@ var CFG = window.ARV_CONFIG;
 var $ = function (id) { return document.getElementById(id); };
 
 var REGISTERED = CFG.isRegistered();
-var kind = "call";
+var kind = "analysis";
+var lastLevels = null;
 
 /* ---------------------------------------------------------
    Setup
@@ -73,6 +76,7 @@ function showLint(res) {
 --------------------------------------------------------- */
 function switchKind(k) {
   kind = k;
+  $("form-analysis").style.display = k === "analysis" ? "block" : "none";
   $("form-call").style.display = k === "call" ? "block" : "none";
   $("form-lesson").style.display = k === "lesson" ? "block" : "none";
   $("form-recap").style.display = k === "recap" ? "block" : "none";
@@ -133,6 +137,33 @@ function num(n) {
 
 function renderPreview() {
   var p = $("preview");
+
+  if (kind === "analysis") {
+    var seg0 = CFG.SEGMENTS[$("a-segment").value] || { name: "—", icon: "🧮", color: "#00e0ff" };
+    var lv = lastLevels;
+    p.innerHTML =
+      '<div class="cc-top">' +
+        '<span class="cc-inst">' + (esc($("a-instrument").value) || "INSTRUMENT") + '</span>' +
+        '<span class="cc-status ' + (lv && lv.biasTone === "up" ? "target_hit" :
+            (lv && lv.biasTone === "down" ? "sl_hit" : "closed")) + '">' +
+          (lv ? esc(lv.biasLabel) : "Levels") + '</span>' +
+      '</div>' +
+      '<div class="cc-meta">' +
+        '<span class="chip" style="color:' + seg0.color + '">' + seg0.icon + " " + esc(seg0.name) + '</span>' +
+        '<span class="chip">' + esc($("a-timeframe").value) + '</span>' +
+        ($("a-free").value === "true" ? '<span class="chip">Free</span>' : '<span class="chip">🔒 Subscribers</span>') +
+      '</div>' +
+      (lv ?
+        '<div class="cc-levels">' +
+          '<div class="lvl s"><small>Support S1</small><b>' + num(lv.s1) + '</b></div>' +
+          '<div class="lvl"><small>Pivot</small><b>' + num(lv.pivot) + '</b></div>' +
+          '<div class="lvl t"><small>Resistance R1</small><b>' + num(lv.r1) + '</b></div>' +
+          '<div class="lvl"><small>CPR</small><b>' + esc(lv.cprShape) + '</b></div>' +
+        '</div>' : "") +
+      ($("a-observation").value ?
+        '<div class="cc-why"><b>Observation</b>' + esc($("a-observation").value) + '</div>' : "");
+    return;
+  }
 
   if (kind === "call") {
     var c = readCall();
@@ -201,6 +232,127 @@ function renderPreview() {
     showLint(text.trim() ? window.ARVLint.check(text) : null);
   });
   el.addEventListener("change", renderPreview);
+});
+
+/* ---------------------------------------------------------
+   ANALYSIS — levels auto-compute + publish (RA gate se free)
+--------------------------------------------------------- */
+function computeAnalysisLevels() {
+  var L = window.ARVLevels;
+  var box = $("a-levels-out");
+  if (!L) return null;
+
+  var res = L.compute({
+    high: $("a-high").value,
+    low: $("a-low").value,
+    close: $("a-close").value
+  });
+
+  if (!res.ok) { box.style.display = "none"; lastLevels = null; return null; }
+
+  var c = res.sets.classic;
+  var f = res.sets.fibonacci;
+
+  lastLevels = {
+    high: res.input.high, low: res.input.low, close: res.input.close,
+    range: res.range, rangePct: res.rangePct,
+    pivot: c.pivot,
+    r1: c.r1, r2: c.r2, r3: c.r3, r4: c.r4,
+    s1: c.s1, s2: c.s2, s3: c.s3, s4: c.s4,
+    fibR1: f.r1, fibR2: f.r2, fibS1: f.s1, fibS2: f.s2,
+    cprTop: res.cpr.tc, cprBottom: res.cpr.bc,
+    cprWidthPct: res.cpr.widthPct, cprShape: res.cpr.shape,
+    biasLabel: res.bias.label, biasTone: res.bias.tone,
+    biasDistPct: res.bias.distPct,
+    rangePosition: res.bias.posInRange
+  };
+
+  function cell(lbl, val, color) {
+    return '<div style="padding:9px 12px;border-radius:11px;background:rgba(255,255,255,.03);' +
+           'border:1px solid var(--stroke)"><small style="display:block;font-size:10px;' +
+           'color:var(--muted-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">' +
+           lbl + '</small><b style="font-family:var(--font-alt);font-size:14.5px' +
+           (color ? ";color:" + color : "") + '">' + num(val) + '</b></div>';
+  }
+
+  box.style.display = "block";
+  box.innerHTML =
+    '<div style="font-size:11.5px;color:var(--muted-2);text-transform:uppercase;' +
+    'letter-spacing:.06em;margin-bottom:10px">Auto-computed levels</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">' +
+      cell("R4", c.r4, "var(--down)") + cell("R3", c.r3, "var(--down)") +
+      cell("R2", c.r2, "var(--down)") + cell("R1", c.r1, "var(--down)") +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">' +
+      cell("CPR top", res.cpr.tc, "var(--cyan)") +
+      cell("Pivot", c.pivot) +
+      cell("CPR bot", res.cpr.bc, "var(--cyan)") +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">' +
+      cell("S1", c.s1, "var(--up)") + cell("S2", c.s2, "var(--up)") +
+      cell("S3", c.s3, "var(--up)") + cell("S4", c.s4, "var(--up)") +
+    '</div>' +
+    '<p style="margin-top:11px;font-size:12.5px;color:var(--muted)">' +
+      res.bias.label + " · " + (res.bias.distPct >= 0 ? "+" : "") + res.bias.distPct +
+      "% from pivot · CPR " + res.cpr.shape + " (" + res.cpr.widthPct.toFixed(2) + "%)" +
+    '</p>';
+
+  return lastLevels;
+}
+
+["a-high", "a-low", "a-close"].forEach(function (id) {
+  var el = $(id);
+  if (el) el.addEventListener("input", function () { computeAnalysisLevels(); renderPreview(); });
+});
+
+$("form-analysis").addEventListener("submit", function (e) {
+  e.preventDefault();
+  clearMsg();
+
+  var inst = $("a-instrument").value.trim();
+  var obs = $("a-observation").value.trim();
+
+  if (inst.length < 2) { msg("bad", "Instrument ka naam daalo."); return; }
+  if (obs.length < 20) { msg("bad", "Observation likho (min 20 chars)."); return; }
+
+  var lv = computeAnalysisLevels();
+  if (!lv) { msg("bad", "Prev High, Low aur Close theek se daalo."); return; }
+
+  var lint = window.ARVLint.check([inst, obs].join("\n"));
+  showLint(lint);
+  if (!lint.ok) { msg("bad", "Compliance block — banned phrases hata do."); return; }
+  if (lint.hasPersonal) { msg("bad", "Personalised advice wali bhasha hata do."); return; }
+
+  var btn = $("btn-analysis");
+  btn.disabled = true;
+  msg("ok", "Publish ho raha hai…");
+
+  /* ⚠️ Is payload me action/entry/targets/stopLoss KABHI na add karna.
+     firestore.rules bhi inhe reject karti hain. */
+  addDoc(collection(db, "analysis"), {
+    instrument: inst,
+    segment: $("a-segment").value,
+    timeframe: $("a-timeframe").value,
+    levels: lv,
+    observation: obs,
+    free: $("a-free").value === "true",
+    publishedAt: serverTimestamp(),
+    createdBy: currentUid()
+  })
+    .then(function (ref) {
+      msg("ok", "✅ Analysis publish ho gaya (" + ref.id + "). Feed pe turant dikhega.");
+      $("a-instrument").value = "";
+      $("a-observation").value = "";
+      $("a-high").value = ""; $("a-low").value = ""; $("a-close").value = "";
+      $("a-levels-out").style.display = "none";
+      lastLevels = null;
+      renderPreview();
+      btn.disabled = false;
+    })
+    .catch(function (err) {
+      msg("bad", "❌ " + (err && err.message ? err.message : "Publish fail"));
+      btn.disabled = false;
+    });
 });
 
 /* ---------------------------------------------------------
@@ -328,8 +480,16 @@ $("form-recap").addEventListener("submit", function (e) {
 /* ---------------------------------------------------------
    Boot
 --------------------------------------------------------- */
+fillSegments("a-segment");
 fillSegments("c-segment");
 fillSegments("l-segment");
+["a-segment", "a-instrument", "a-observation", "a-timeframe", "a-free"].forEach(function (id) {
+  var el = $(id);
+  if (el) {
+    el.addEventListener("input", renderPreview);
+    el.addEventListener("change", renderPreview);
+  }
+});
 $("r-date").value = new Date().toISOString().slice(0, 10);
 
 if (!ready) {
@@ -338,7 +498,7 @@ if (!ready) {
   requireAnalyst("dashboard.html").then(function (u) {
     if (!u) return;
     paintHeader();
-    renderPreview();
+    switchKind("analysis");   // ye turant kaam karta hai, RA gate se free
     if (!REGISTERED) {
       $("btn-call").disabled = true;
       $("btn-call").textContent = "Publishing band — RA number set karo";

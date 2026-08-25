@@ -475,6 +475,44 @@ export function performanceStats(calls) {
    LESSONS / RECAPS
    ========================================================= */
 
+/* =========================================================
+   ANALYSIS — levels + structural observation
+   RA registration ke bina publish hota hai (koi action/entry/
+   target/SL field nahi). Free wale sabko, baaki subscribers ko.
+   ========================================================= */
+export function listAnalysis(opts) {
+  opts = opts || {};
+  if (!ready) return Promise.resolve([]);
+  var parts = [collection(db, "analysis")];
+  if (opts.segment) parts.push(where("segment", "==", opts.segment));
+  if (opts.freeOnly) parts.push(where("free", "==", true));
+  parts.push(orderBy("publishedAt", "desc"));
+  parts.push(qLimit(opts.limit || 40));
+  return getDocs(query.apply(null, parts)).then(function (snap) {
+    var out = [];
+    snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data())); });
+    return out;
+  }).catch(function (e) {
+    if (e && e.code === "permission-denied") return [];
+    console.warn("[arvcoin] listAnalysis:", e);
+    return [];
+  });
+}
+
+export function watchAnalysis(opts, cb) {
+  opts = opts || {};
+  if (!ready) return function () {};
+  var parts = [collection(db, "analysis")];
+  if (opts.segment) parts.push(where("segment", "==", opts.segment));
+  parts.push(orderBy("publishedAt", "desc"));
+  parts.push(qLimit(opts.limit || 40));
+  return onSnapshot(query.apply(null, parts), function (snap) {
+    var out = [];
+    snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data())); });
+    cb(out, null);
+  }, function (e) { cb([], e); });
+}
+
 export function listLessons(opts) {
   opts = opts || {};
   if (!ready) return Promise.resolve([]);

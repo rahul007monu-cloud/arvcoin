@@ -172,6 +172,38 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    /* ---------- analysis (levels + structure) ----------
+       Calculator ka output + analyst ka structural observation.
+       Koi buy/sell action, entry, target ya stop-loss field NAHI —
+       isliye RA registration ka gate yahan lagu nahi hota.
+
+       ⚠️ Is schema me kabhi bhi action/entry/target/stopLoss
+       fields NA add karna. Field add karte hi ye recommendation
+       ban jaayega aur registration ke bina illegal ho jaayega. */
+    match /analysis/{docId} {
+      allow read: if resource.data.free == true || subActive() || isAnalyst();
+
+      allow create: if isAnalyst()
+                    && request.resource.data.instrument is string
+                    && request.resource.data.segment in
+                       ['equity','options','commodity','currency','crypto']
+                    && request.resource.data.observation is string
+                    && request.resource.data.observation.size() >= 20
+                    // recommendation fields blocked at the rules layer
+                    && !request.resource.data.keys().hasAny(
+                         ['action','entry','targets','target','stopLoss','sl',
+                          'recommendation','rating','callType','expectedReturn']);
+
+      allow update: if isAnalyst()
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+                         ['instrument','segment','levels','publishedAt'])
+                    && !request.resource.data.keys().hasAny(
+                         ['action','entry','targets','target','stopLoss','sl',
+                          'recommendation','rating','callType','expectedReturn']);
+
+      allow delete: if isAdmin();
+    }
+
     /* ---------- lessons (education, free + gated) ---------- */
     match /lessons/{lessonId} {
       allow read: if resource.data.free == true || subActive() || isAnalyst();
