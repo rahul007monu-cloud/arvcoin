@@ -335,15 +335,18 @@
 
     var tracked = items.map(function (el, i) {
       el.style.willChange = "transform";
+      var isSection = el.classList.contains("lux-wrap") || el.classList.contains("lux-narrow");
       return {
         el: el,
         seed: parseFloat(el.dataset.floatSeed || ((i % 5) * 0.28)),
-        depth: el.classList.contains("lux-wrap") || el.classList.contains("lux-narrow")
-          ? 0.35   // whole sections drift less
-          : 1,
+        // sections drift gently; cards move a lot so the effect is visible
+        depth: isSection ? 0.3 : 1,
+        isSection: isSection,
         cy: 0, ch: 0,
         y: 0, ty: 0,
-        r: 0, tr: 0
+        r: 0, tr: 0,
+        ry: 0, tRy: 0,
+        s: 1, ts: 1
       };
     });
 
@@ -364,14 +367,27 @@
 
       tracked.forEach(function (t) {
         // -1 (below viewport) .. 0 (centred) .. 1 (above viewport)
-        var d = (mid - t.cy) / (vh * 0.9);
-        d = Math.max(-1.4, Math.min(1.4, d));
+        var d = (mid - t.cy) / (vh * 0.85);
+        d = Math.max(-1.5, Math.min(1.5, d));
 
-        // drift: element rises as it passes the centre
-        t.ty = -d * 26 * t.depth + Math.sin(t.seed * 3.1) * 2;
+        var ad = Math.abs(d);
 
-        // subtle 3D tilt, strongest at the edges
-        t.tr = d * 2.4 * t.depth;
+        if (t.isSection) {
+          t.ty = -d * 34 * t.depth;
+          t.tr = d * 3 * t.depth;
+          t.tRy = 0;
+          t.ts = 1;
+        } else {
+          // Cards: pronounced rise, 3D tilt, a touch of yaw, and a
+          // settle-into-place scale. Seed offsets stagger each column
+          // so a grid floats in a rhythm rather than as one slab.
+          var stagger = 1 + t.seed * 0.5;
+
+          t.ty = -d * 76 * stagger + Math.sin(t.seed * 3.1) * 4;
+          t.tr = d * 9;                              // rotateX — the lift
+          t.tRy = Math.sin(d * 1.7 + t.seed) * 5;    // rotateY — the rotation
+          t.ts = 1 - Math.min(0.07, ad * 0.055);     // settles as it centres
+        }
       });
     }
 
@@ -380,13 +396,25 @@
       var moving = false;
 
       tracked.forEach(function (t) {
-        t.y += (t.ty - t.y) * 0.085;
-        t.r += (t.tr - t.r) * 0.085;
+        t.y  += (t.ty  - t.y)  * 0.075;
+        t.r  += (t.tr  - t.r)  * 0.075;
+        t.ry += (t.tRy - t.ry) * 0.075;
+        t.s  += (t.ts  - t.s)  * 0.075;
 
-        if (Math.abs(t.ty - t.y) > 0.05 || Math.abs(t.tr - t.r) > 0.01) moving = true;
+        if (Math.abs(t.ty - t.y) > 0.06 ||
+            Math.abs(t.tr - t.r) > 0.02 ||
+            Math.abs(t.tRy - t.ry) > 0.02 ||
+            Math.abs(t.ts - t.s) > 0.0008) moving = true;
 
+        /* perspective() is inside the transform, per element.
+           Putting `perspective` on <body> broke every position:fixed
+           child — the background canvas, aurora and grid overlay all
+           became positioned against body instead of the viewport. */
         t.el.style.transform =
-          "translate3d(0," + t.y.toFixed(2) + "px,0) rotateX(" + t.r.toFixed(3) + "deg)";
+          "perspective(1200px) translate3d(0," + t.y.toFixed(2) + "px,0)" +
+          " rotateX(" + t.r.toFixed(3) + "deg)" +
+          " rotateY(" + t.ry.toFixed(3) + "deg)" +
+          " scale(" + t.s.toFixed(4) + ")";
       });
 
       if (moving) {
@@ -405,10 +433,6 @@
       clearTimeout(measureTimer);
       measureTimer = setTimeout(function () { measure(); onScroll(); }, 160);
     }
-
-    // perspective on the scroll container so rotateX reads as depth
-    document.body.style.perspective = "1400px";
-    document.body.style.perspectiveOrigin = "50% 50%";
 
     measure();
     onScroll();
