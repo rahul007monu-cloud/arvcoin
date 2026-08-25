@@ -62,7 +62,7 @@
       <div class="auth-card otp-center">
         <a href="signup.html" class="back-home">← Back</a>
         <div class="a-brand"><h1>Verify your email</h1></div>
-        <p class="a-sub">Code bheja gaya <span class="dest" id="dest">tumhari email</span> par</p>
+        <p class="a-sub">We sent a code to <span class="dest" id="dest">your email</span> par</p>
 
         <form id="otp-form">
           <div class="otp-boxes" id="otp-boxes">
@@ -140,9 +140,9 @@
       resend.addEventListener("click", function () {
         if (resend.classList.contains("disabled")) return;
         var msg = document.getElementById("msg");
-        if (!window.arvOtp) { msg.className = "a-msg bad"; msg.textContent = "Thodi der ruko, load ho raha hai\u2026"; return; }
+        if (!window.arvOtp) { msg.className = "a-msg bad"; msg.textContent = "One moment, still loading\u2026"; return; }
         window.arvOtp.resend(function () {
-          msg.className = "a-msg ok"; msg.textContent = "\uD83D\uDCE7 Naya code bhej diya. Inbox/spam check karo.";
+          msg.className = "a-msg ok"; msg.textContent = "\uD83D\uDCE7 A new code has been sent. Check your inbox and spam folder.";
           startTimer();
         }, function (err) { msg.className = "a-msg bad"; msg.textContent = err; });
       });
@@ -151,16 +151,16 @@
         e.preventDefault();
         var code = boxes.map(function (b) { return b.value; }).join("");
         var msg = document.getElementById("msg");
-        if (code.length < 6) { msg.className = "a-msg bad"; msg.textContent = "Poora 6-digit code daalo."; return; }
-        if (!window.arvOtp) { msg.className = "a-msg bad"; msg.textContent = "Thodi der ruko, load ho raha hai\u2026"; return; }
+        if (code.length < 6) { msg.className = "a-msg bad"; msg.textContent = "Enter the full 6-digit code."; return; }
+        if (!window.arvOtp) { msg.className = "a-msg bad"; msg.textContent = "One moment, still loading\u2026"; return; }
 
         var btn = document.querySelector("#otp-form button[type=submit]");
         if (btn) btn.disabled = true;
-        msg.className = "a-msg ok"; msg.textContent = "Verify ho raha hai\u2026";
+        msg.className = "a-msg ok"; msg.textContent = "Verifying\u2026";
 
         window.arvOtp.verify(code, function (name) {
           msg.className = "a-msg ok";
-          msg.textContent = "\u2705 Email verified! Account ban gaya" + (name ? ", " + String(name).split(" ")[0] : "") + ". Dashboard khul raha hai\u2026";
+          msg.textContent = "\u2705 Email verified. Your account is ready" + (name ? ", " + String(name).split(" ")[0] : "") + ". Dashboard khul raha hai\u2026";
           setTimeout(function () { window.location.href = "dashboard.html"; }, 1000);
         }, function (err) {
           if (btn) btn.disabled = false;

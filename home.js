@@ -1,6 +1,6 @@
 /* =========================================================
    arvcoin — homepage dynamic bits
-   Segments grid, plans grid, disclosures — sab arv-config.js se.
+   Segments grid, plans grid and disclosures — all from arv-config.js.
    ========================================================= */
 (function () {
   "use strict";

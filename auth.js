@@ -3,7 +3,7 @@
    mobile digits, live-validation-clear).
 
    Actual login/signup/Google/password-reset ab firebase-auth.js
-   (Firebase) handle karta hai — reliable, no popup/bundler drama.
+   is handled by Firebase — reliable, with no popup or bundler issues.
    ========================================================= */
 (function () {
   "use strict";

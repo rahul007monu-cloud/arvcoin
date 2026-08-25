@@ -1,154 +1,206 @@
-# arvcoin
+# arvcoin — Market Research Desk
 
-**Chhoti UPI payment, bada future.** India ka micro-investment super app (Paytm-style):
-UPI/QR se INR pay karo → paisa auto-invest ho jaye **crypto** (BTC/ETH/SOL) ya
-**Indian stocks & mutual funds** me — user ki choice pe.
+**Structured market research and investor education.** Stocks, F&O options, commodity
+(gold, silver, copper, zinc, crude, natural gas, agri), currency (INR pairs) and crypto —
+every note published with its rationale, and the full history kept public.
 
-> Yeh ek **mock demo prototype** hai (no API keys needed). Real launch pe
-> partner integrations plug-in ho jayenge — code us tarah structured hai.
-
----
-
-## 📦 Repo structure
-
-```
-arvcoin/
-├── website/      → Premium 3D-animated landing page (static, Hostinger-ready)
-├── mobile/       → Expo React Native app (Android + iOS + web)
-└── README.md
-```
+Live at **[arvcoin.com](https://arvcoin.com)**
 
 ---
 
-## 🌐 Website (`/website`)
+## What this is
 
-Pure **HTML + CSS + JS** — koi build step nahi. Three.js se 3D coin + particle
-background, glassmorphism, scroll animations, live-ish price ticker, phone mockup,
-waitlist form (demo, localStorage me save hota hai).
+Three products in one:
 
-### Locally dekhna
+| Product | Access | What it does |
+|---|---|---|
+| **Levels calculator** | Free, no login | Support, resistance, pivots and CPR for any instrument, from Classic / Fibonacci / Camarilla / Woodie formulas |
+| **Levels analysis** | Free or subscriber | Computed levels plus an analyst's structural observation. No action, entry, target or stop-loss fields |
+| **Research notes** | Subscriber, gated | Buy/sell recommendations with entry, targets, stop loss and rationale. Requires SEBI RA registration |
+
+Plus daily market recaps and structured lessons.
+
+---
+
+## Tech
+
+Deliberately simple — **no build step, no framework, no bundler.**
+
+- **Frontend:** plain HTML, CSS and JavaScript. ES modules where a page needs them.
+- **3D:** Three.js (r128, CDN) — a layered background field plus a rotating hero scene
+- **Auth:** Firebase Authentication (email/password, Google, one-time email OTP via EmailJS)
+- **Database:** Firestore, with all access gating enforced in `firestore.rules`
+- **Payments:** Razorpay (order created and webhook verified server-side)
+- **Hosting:** Hostinger, deployed automatically from `main` via its GitHub integration
+- **PWA:** installable, with a service worker and offline shell
+
+---
+
+## Local development
+
+No install required:
+
 ```bash
-cd website
-# koi bhi static server, ya seedha index.html browser me kholo
 python3 -m http.server 8080
-# phir kholo: http://localhost:8080
+# then open http://localhost:8080
 ```
 
-### Website pages & flow
-| Page | File | Kya hai |
-|------|------|---------|
-| Landing | `index.html` | Hero 3D coin, features, live ticker, testimonials, FAQ, waitlist |
-| Sign up | `signup.html` | Account create → OTP verify pe jaata hai |
-| OTP verify | `verify.html` | 6-box auto-advance code → KYC pe jaata hai |
-| KYC | `kyc.html` | PAN → Aadhaar → selfie stepper → dashboard |
-| Log in | `login.html` | Login → dashboard |
-| Dashboard | `dashboard.html` | Portfolio, live chart, holdings, invest+**sell** modal, **SIP auto-invest**, **wallet**, **settings**, notifications, markets, rewards |
-| Pricing | `pricing.html` | Transparent fees & plans |
-| About | `about.html` | Mission / story / values |
-| Legal | `legal.html` | Privacy / Terms / Risk disclosure |
-| 404 | `404.html` | Not-found page |
-| KYB guide | `docs/KYB-GUIDE.md` | Step-by-step Transak go-live guide |
-
-**Full flow:** `signup → verify → kyc → dashboard`  ·  `login → dashboard`
-
-**World-class extras:** PWA (installable, offline via `sw.js` + `manifest.json`),
-SEO + Open Graph + JSON-LD, `sitemap.xml`, `robots.txt`, cookie consent banner,
-animated counters, FAQ accordion. Sab demo-mode (localStorage) — real backend Phase 2.
-
-### Hostinger pe deploy (arvcoin.com)
-1. **hPanel → Files → File Manager** kholo.
-2. `arvcoin.com` ke `public_html` folder me jao.
-3. **Purani site ka backup pehle lo** (neeche "Data shift" dekho).
-4. `website/` folder ke saare files (`index.html`, `styles.css`, `main.js`, `3d.js`)
-   `public_html` me upload kar do.
-5. Hostinger **free SSL** (https) auto-enable ho jayega. Done ✅
-
-> Note: Website ko internet chahiye (Google Fonts + Three.js CDN). Fully offline
-> chahiye to in files ko locally host kar sakte hain — bolna, kar dunga.
+Any static server works. Some features need config — see below.
 
 ---
 
-## 📱 Mobile app (`/mobile`)
+## Configuration
 
-**Expo (React Native) + expo-router + TypeScript.** Screens:
-`Portfolio dashboard → Pay (UPI/QR) → Choose investment → Review → Success`.
-Crypto-first (stocks "coming soon" jab tak broker/smallcase KYC approve na ho).
+All product configuration lives in **`arv-config.js`**. Nothing else needs editing for
+day-to-day changes.
 
-### Run karna (apne laptop pe)
+### SEBI RA registration
+
+Gates the research-note publishing path. While `number` is empty, the app runs in
+education mode (levels analysis, lessons and recaps only).
+
+```js
+var RA_REGISTRATION = {
+  number:      "INH000021086",
+  entityName:  "",   // required — exact entity name from the certificate
+  analystName: "",   // required — principal analyst
+  validTill:   ""    // required — "YYYY-MM-DD" or "Perpetual"
+};
+```
+
+`missingRaFields()` surfaces any blanks in the admin panel.
+
+### Plans and pricing
+
+```js
+PLAN_PRICES.pro.priceInr = 999;   // Basic 499 / Pro 999 / Elite 1999 / Quarterly 4999
+```
+
+Charges exclude GST (18%). No auto-renewal — access simply expires.
+
+### Payments
+
+```js
+PAYMENTS.razorpayKeyId  = "rzp_live_...";   // public key only
+PAYMENTS.createOrderUrl = "https://.../createOrder";
+```
+
+The secret key must never appear in this repo — it belongs in the Cloud Function
+environment only.
+
+### Firebase and email
+
+- `firebase-config.js` — Firebase web SDK config. These values are public by design.
+- `emailjs-config.js` — EmailJS keys for OTP delivery. Falls back to a DEMO mode that
+  prints the code to the console when unset.
+
+---
+
+## Pages
+
+| Page | File | Purpose |
+|---|---|---|
+| Landing | `index.html` | Positioning, segments, sample note, plans, FAQ |
+| Levels calculator | `levels.html` | Free tool — S/R, pivots, CPR, momentum bias |
+| Research feed | `calls.html` | Notes and analysis, gated by subscription |
+| Dashboard | `dashboard.html` | Plan status, coverage, latest analysis, recaps, lessons |
+| Publish | `admin.html` | Analyst panel — analysis, notes, lessons, recaps |
+| Plans | `pricing.html` | Pricing, coverage matrix, segment detail |
+| About | `about.html` | Positioning and compliance stance |
+| Legal | `legal.html` | Disclosures, Terms, Privacy, Risk, Refund, Grievance |
+| Auth | `login.html`, `signup.html`, `verify.html` | Sign in, sign up, one-time OTP |
+
+---
+
+## Deployment
+
+`main` is wired to Hostinger through its GitHub integration — **merging to `main`
+deploys the site.**
+
+Two things do **not** deploy that way and must be run manually:
+
 ```bash
-cd mobile
-npm install
-npx expo start
-```
-- Phone pe **Expo Go** app install karo → terminal me aaye **QR code scan** karo.
-- Ya `w` dabao browser me chalane ke liye, `a` Android emulator, `i` iOS simulator.
+# 1. Firestore security rules — this is what actually enforces access gating
+firebase deploy --only firestore:rules --project arvcoin
 
-### Build APK / store ke liye (baad me)
-```bash
-npm install -g eas-cli
-eas build -p android    # APK/AAB
-eas build -p ios        # iOS
+# 2. Grant a user analyst/admin access (Firebase Console has no UI for custom claims)
+cd tools
+npm install firebase-admin
+node grant-admin.js you@email.com
 ```
 
----
+After granting a claim, sign out and back in so the token refreshes.
 
-## 🔌 Real integrations (Phase 2 — mock hatao, real lagao)
-
-Sab mock functions ek jagah hain, easily swappable:
-
-| Kaam | Abhi (mock) | Real (Phase 2) |
-|------|-------------|----------------|
-| Crypto buy+sell | mock units calc | **Transak** widget (on/off-ramp, KYC included) → user embedded wallet |
-| Wallet | mock | Embedded wallet (Web3Auth / Privy / Turnkey) |
-| Stocks/MF | locked "coming soon" | **smallcase Gateway** / broker API (Zerodha/Angel/Upstox) |
-| Prices | `mockData.jitterPrice()` | CoinGecko / exchange feeds |
-
-### 🟣 Transak integration (already wired, demo-safe)
-
-Crypto model = **Transak + embedded wallet (Option A)** → sab arvcoin ke andar
-(buy, hold, live portfolio, sell). Transak khud **KYC + payment + compliance**
-handle karta hai (FIU-registered), tujhe apni crypto license nahi chahiye.
-
-**Config files:**
-- Website: `website/transak.js` → `CONFIG.apiKey` set karo (khali = demo)
-- Mobile: `mobile/src/transak.ts` → `TRANSAK_CONFIG.apiKey` set karo
-
-Jab tak key khali hai → **DEMO mode** (mock invest). Key daalte hi → asli Transak
-widget khulta hai (`STAGING` test key turant, `PRODUCTION` KYB ke baad).
-
-**arvcoin ki kamai:** Transak dashboard me **partner fee (up to 5%)** set karo →
-har buy/sell pe automatically milega. Alag referral link ki zaroorat nahi.
-
-### 🎁 ARV Rewards (Phase 4, optional)
-Loyalty points ("ARV") — invest/refer/login pe earn, redeem: fee discount /
-bonus crypto. Start **off-chain points** se (legal-safe); real on-chain token
-bahut baad me (India VDA rules dhyaan se).
-
-**Files to touch:** `mobile/src/mockData.ts` (data) aur `mobile/src/store.tsx` (`invest`).
+> **Service worker:** bump `CACHE` in `sw.js` whenever assets change, and add any new
+> file to its `ASSETS` list. Registration lives in `index.html` and `lux.js`.
 
 ---
 
-## 🔁 Purani website ka data shift (Hostinger)
+## Architecture notes
 
-Naya arvcoin site daalne se pehle purana data safe karo:
+**Access gating is server-side.** `firestore.rules` is the enforcement point; client-side
+checks exist only for UX. A locked research note's detail never reaches the browser — the
+query returns `permission-denied`, and public teasers come from a separate collection. The
+blur in the UI is real, not cosmetic.
 
-1. **Backup**: hPanel → *Files → Backups* se poora backup download karo,
-   ya File Manager me `public_html` ko select → **Compress** (zip) → download.
-2. **Purani site bachani hai?** Ek free **subdomain** bana lo:
-   - hPanel → *Domains → Subdomains* → naam `old` → domain `arvcoin.com` → **Create**
-   - Purana content `public_html/old` me move kar do → `old.arvcoin.com` pe chalega.
-3. **Naya daalo**: `public_html` (root) me arvcoin website upload karo.
+**Never client-writable:** `wallets`, `subscriptions`, `ledger`, `payments`. Subscriptions
+are activated only by a Cloud Function after a verified Razorpay webhook signature.
 
-> Subdomain + SSL dono **free** hain, same hosting plan me. Zero data loss.
+**Notes are append-only.** Once published, a research note cannot be edited or deleted —
+outcomes are recorded as revisions with an audit trail, so a losing note cannot be hidden.
+Performance statistics count every note ever published.
+
+**Schema as a compliance control.** The `analysis` collection has no `action`, `entry`,
+`targets` or `stopLoss` fields, and `firestore.rules` explicitly rejects them. An analyst
+cannot publish a recommendation through that path even by mistake.
+
+**`compliance-lint.js`** blocks phrasing like "guaranteed returns", "sure shot" and
+"assured profit" before anything publishes.
 
 ---
 
-## ⚖️ Legal model (short)
+## Compliance
 
-Partner licenses use hote hain — apni license baad me:
-- **Crypto** → Onramp.money (FIU-registered) / CoinDCX. Non-custodial, seedha user wallet.
-- **Stocks/MF** → SEBI-compliant broker/smallcase. Paisa seedha user ke demat me
-  (third-party deposit allowed nahi, isliye partner route).
-- **Payments** → Razorpay.
+Publishing buy/sell recommendations on securities for a fee requires registration under
+the SEBI (Research Analysts) Regulations, 2014. The registration gate in `arv-config.js`
+enforces this in code.
 
-*Investments are subject to market risk. Yeh demo preview hai.*
+Other constraints reflected in the product:
+
+- **Currency:** RBI-approved INR pairs on recognised Indian exchanges only. Offshore and
+  OTC forex breach FEMA, with penalties up to three times the transaction value.
+- **Crypto:** outside SEBI's remit; taxed at 30% plus 1% TDS.
+- **Fee cap:** SEBI caps research fees at ₹1,51,000 per year per family.
+- **Disclosures:** the SEBI-mandated disclaimer, conflict-of-interest disclosure and
+  standard research caution render on every note and across the legal pages.
+
+Development guardrails are documented in `.kiro/steering/compliance.md`.
+
+> This repository is software. It is not legal advice. Have a securities lawyer or Company
+> Secretary review the disclosures, terms and refund policy before taking payments.
+
+---
+
+## Repository layout
+
+```
+arv-config.js          all product configuration
+arv-core.js            Firebase data layer (auth, subscriptions, notes, analysis)
+levels.js              levels maths — pivots, CPR, bias
+compliance-lint.js     blocked-phrase filter
+lux.css / lux.js       design system and interactions
+3d.js                  Three.js background and hero scenes
+firestore.rules        access gating — the real enforcement point
+tools/grant-admin.js   grant analyst/admin custom claims
+mobile/                Expo app (being migrated to the research product)
+```
+
+---
+
+## Status
+
+Working: levels calculator, levels analysis publishing, research feed with server-side
+gating, admin panel, auth with one-time OTP, plans and legal pages, PWA install.
+
+In progress: Cloud Functions for Razorpay orders and webhooks; the Expo mobile app still
+carries the previous product's flow.

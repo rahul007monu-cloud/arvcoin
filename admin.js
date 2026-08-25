@@ -1,18 +1,20 @@
 /* =========================================================
    arvcoin — admin publishing panel
 
-   Teen cheezein publish hoti hain:
-     call   -> RA registration ZAROORI (gate lagi hai)
-     lesson -> education, registration nahi chahiye
-     recap  -> education, registration nahi chahiye
+   Three content types can be published:
+     note   -> RA registration REQUIRED (gated)
+     lesson -> educational, no registration needed
+     recap  -> educational, no registration needed
 
-   Access: sirf analyst/admin custom claim wale users.
-   firestore.rules bhi yahi enforce karti hain — ye page
-   chhup jaana sirf UX hai, security rules me hai.
+   Access: users with an analyst/admin custom claim only.
+   firestore.rules enforces the same thing — hiding this page is
+   only UX; the real security is in the rules.
    ========================================================= */
 import {
   ready, requireAnalyst, isAdmin, isAnalyst, db, currentUser,
-  publishCall, when
+  publishCall, when,
+  getSettings, saveSettings,
+  pendingPaymentProofs, approvePayment, rejectPayment
 } from "./arv-core.js";
 
 function currentUid() { var u = currentUser(); return u ? u.uid : null; }
@@ -80,6 +82,11 @@ function switchKind(k) {
   $("form-call").style.display = k === "call" ? "block" : "none";
   $("form-lesson").style.display = k === "lesson" ? "block" : "none";
   $("form-recap").style.display = k === "recap" ? "block" : "none";
+  $("form-pricing").style.display = k === "pricing" ? "block" : "none";
+  $("form-approvals").style.display = k === "approvals" ? "block" : "none";
+
+  if (k === "pricing") paintPricingEditors();
+  if (k === "approvals") loadApprovals();
   clearMsg();
   showLint(null);
   renderPreview();
@@ -235,7 +242,7 @@ function renderPreview() {
 });
 
 /* ---------------------------------------------------------
-   ANALYSIS — levels auto-compute + publish (RA gate se free)
+   ANALYSIS — auto-compute levels and publish (outside the RA gate)
 --------------------------------------------------------- */
 function computeAnalysisLevels() {
   var L = window.ARVLevels;
@@ -327,8 +334,8 @@ $("form-analysis").addEventListener("submit", function (e) {
   btn.disabled = true;
   msg("ok", "Publish ho raha hai…");
 
-  /* ⚠️ Is payload me action/entry/targets/stopLoss KABHI na add karna.
-     firestore.rules bhi inhe reject karti hain. */
+  /* ⚠️ NEVER add action/entry/targets/stopLoss to this payload.
+     firestore.rules rejects them too. */
   addDoc(collection(db, "analysis"), {
     instrument: inst,
     segment: $("a-segment").value,
@@ -477,6 +484,230 @@ $("form-recap").addEventListener("submit", function (e) {
     });
 });
 
+/* =========================================================
+   PRICING & PAYMENT SETTINGS
+   Stored in Firestore so they survive deployments and need no code edit.
+   ========================================================= */
+var settings = {};
+
+function paintPricingEditors() {
+  var wrap = $("plan-editors");
+  if (!wrap) return;
+
+  wrap.innerHTML = CFG.PLAN_ORDER.map(function (id) {
+    var p = CFG.plan(id);
+    var over = (settings.plans && settings.plans[id]) || {};
+    var price = typeof over.priceInr === "number" ? over.priceInr : p.priceInr;
+    var days = typeof over.durationDays === "number" ? over.durationDays : p.durationDays;
+    var on = over.enabled !== false;
+
+    return '' +
+      '<div style="padding:16px;border-radius:14px;background:rgba(255,255,255,.03);' +
+      'border:1px solid var(--stroke);margin-bottom:12px">' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">' +
+          '<b style="font-size:15px">' + esc(p.name) + '</b>' +
+          '<span class="chip">' + p.segments.length + ' segments</span>' +
+          '<label style="margin-left:auto;display:flex;align-items:center;gap:7px;' +
+            'font-size:12.5px;color:var(--muted);cursor:pointer">' +
+            '<input type="checkbox" class="pl-on" data-plan="' + id + '"' + (on ? " checked" : "") +
+            ' style="width:auto;margin:0" /> Visible</label>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+          '<div><label style="display:block;font-size:11.5px;color:var(--muted-2);' +
+            'text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Price (₹)</label>' +
+            '<input type="number" class="pl-price" data-plan="' + id + '" value="' + price + '" min="0" step="1" /></div>' +
+          '<div><label style="display:block;font-size:11.5px;color:var(--muted-2);' +
+            'text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Duration (days)</label>' +
+            '<input type="number" class="pl-days" data-plan="' + id + '" value="' + days + '" min="1" step="1" /></div>' +
+        '</div>' +
+      '</div>';
+  }).join("");
+
+  // payment fields
+  var pay = settings.payment || {};
+  $("s-upi").value = pay.upiId || "";
+  $("s-payee").value = pay.payeeName || "";
+  $("s-qr").value = pay.qrUrl || "";
+  $("s-instructions").value = pay.instructions || "";
+  $("s-support").value = pay.supportContact || "";
+
+  paintQrPreview();
+}
+
+/* Generate a QR from the UPI ID when no image is supplied */
+function upiQrUrl(upiId, payee, amount) {
+  if (!upiId) return "";
+  var uri = "upi://pay?pa=" + encodeURIComponent(upiId) +
+            "&pn=" + encodeURIComponent(payee || "arvcoin") +
+            "&cu=INR" + (amount ? "&am=" + amount : "");
+  return "https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=" + encodeURIComponent(uri);
+}
+
+function paintQrPreview() {
+  var box = $("qr-preview");
+  if (!box) return;
+  var url = $("s-qr").value.trim();
+  var upi = $("s-upi").value.trim();
+  var src = url || upiQrUrl(upi, $("s-payee").value.trim());
+
+  if (!src) { box.style.display = "none"; return; }
+
+  box.style.display = "block";
+  box.innerHTML =
+    '<div style="font-size:11.5px;color:var(--muted-2);text-transform:uppercase;' +
+    'letter-spacing:.06em;margin-bottom:10px">QR preview' +
+    (url ? " (your image)" : " (generated from UPI ID)") + '</div>' +
+    '<div style="display:inline-block;padding:14px;border-radius:16px;background:#fff">' +
+      '<img src="' + esc(src) + '" alt="Payment QR" width="200" height="200" ' +
+      'style="display:block;width:200px;height:200px;object-fit:contain" />' +
+    '</div>';
+}
+
+["s-upi", "s-payee", "s-qr"].forEach(function (id) {
+  var el = $(id);
+  if (el) el.addEventListener("input", paintQrPreview);
+});
+
+$("form-pricing").addEventListener("submit", function (e) {
+  e.preventDefault();
+  clearMsg();
+
+  if (!isAdmin()) { msg("bad", "Admin access is required to change settings."); return; }
+
+  var plans = {};
+  var bad = false;
+
+  document.querySelectorAll(".pl-price").forEach(function (inp) {
+    var id = inp.getAttribute("data-plan");
+    var v = parseInt(inp.value, 10);
+    if (isNaN(v) || v < 0) { bad = true; return; }
+    if (v > CFG.ANNUAL_FEE_CAP_INR) { bad = "cap"; return; }
+    plans[id] = plans[id] || {};
+    plans[id].priceInr = v;
+  });
+
+  document.querySelectorAll(".pl-days").forEach(function (inp) {
+    var id = inp.getAttribute("data-plan");
+    var v = parseInt(inp.value, 10);
+    if (isNaN(v) || v < 1) { bad = true; return; }
+    plans[id] = plans[id] || {};
+    plans[id].durationDays = v;
+  });
+
+  document.querySelectorAll(".pl-on").forEach(function (cb) {
+    var id = cb.getAttribute("data-plan");
+    plans[id] = plans[id] || {};
+    plans[id].enabled = cb.checked;
+  });
+
+  if (bad === "cap") {
+    msg("bad", "A price exceeds the SEBI annual fee cap of " +
+        CFG.inrFmt(CFG.ANNUAL_FEE_CAP_INR) + " per family.");
+    return;
+  }
+  if (bad) { msg("bad", "Check the price and duration values."); return; }
+
+  var btn = $("btn-pricing");
+  btn.disabled = true;
+  msg("ok", "Saving…");
+
+  saveSettings({
+    plans: plans,
+    payment: {
+      upiId: $("s-upi").value.trim(),
+      payeeName: $("s-payee").value.trim(),
+      qrUrl: $("s-qr").value.trim(),
+      instructions: $("s-instructions").value.trim(),
+      supportContact: $("s-support").value.trim()
+    }
+  })
+    .then(function () {
+      msg("ok", "✅ Saved. The live site is updated immediately.");
+      settings.plans = plans;
+      btn.disabled = false;
+    })
+    .catch(function (err) {
+      msg("bad", "❌ " + (err && err.message ? err.message : "Save failed"));
+      btn.disabled = false;
+    });
+});
+
+/* =========================================================
+   PAYMENT APPROVALS
+   ========================================================= */
+function loadApprovals() {
+  var list = $("approval-list");
+  if (!list) return;
+
+  if (!isAdmin()) {
+    list.innerHTML = '<div class="empty"><div class="e-ico">🔒</div>' +
+      '<h3>Admin access required</h3><p>Only an admin can approve payments.</p></div>';
+    return;
+  }
+
+  list.innerHTML = '<div class="skel"></div>';
+
+  pendingPaymentProofs(50).then(function (rows) {
+    var badge = $("appr-count");
+    if (badge) badge.textContent = rows.length ? "(" + rows.length + ")" : "";
+
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty"><div class="e-ico">✓</div>' +
+        '<h3>Nothing pending</h3><p>Payment submissions awaiting verification will appear here.</p></div>';
+      return;
+    }
+
+    list.innerHTML = rows.map(function (r) {
+      return '' +
+        '<div class="call-card" data-proof="' + esc(r.id) + '">' +
+          '<div class="cc-top">' +
+            '<span class="cc-inst">' + esc(r.name || r.email) + '</span>' +
+            '<span class="cc-status active">' + esc(r.planName) + '</span>' +
+            '<span class="cc-when">' + when(r.createdAt) + '</span>' +
+          '</div>' +
+          '<div class="lux-table" style="margin-bottom:14px">' +
+            '<div class="tr"><span>Email</span><b>' + esc(r.email) + '</b></div>' +
+            '<div class="tr"><span>Amount</span><b>' + CFG.inrFmt(r.amountInr) + '</b></div>' +
+            '<div class="tr"><span>Reference / UTR</span><b>' + esc(r.reference) + '</b></div>' +
+            (r.payerNote ? '<div class="tr"><span>Note</span><b>' + esc(r.payerNote) + '</b></div>' : "") +
+          '</div>' +
+          '<div class="cta-row">' +
+            '<button type="button" class="btn btn-primary ap-yes" data-id="' + esc(r.id) + '">Approve &amp; activate</button>' +
+            '<button type="button" class="btn-glass ap-no" data-id="' + esc(r.id) + '">Reject</button>' +
+          '</div>' +
+        '</div>';
+    }).join("");
+
+    var byId = {};
+    rows.forEach(function (r) { byId[r.id] = r; });
+
+    list.querySelectorAll(".ap-yes").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var r = byId[b.getAttribute("data-id")];
+        b.disabled = true;
+        b.textContent = "Activating…";
+        approvePayment(r)
+          .then(function () { msg("ok", "✅ Activated for " + (r.email || r.name)); loadApprovals(); })
+          .catch(function (e) {
+            msg("bad", "❌ " + e.message);
+            b.disabled = false;
+            b.textContent = "Approve & activate";
+          });
+      });
+    });
+
+    list.querySelectorAll(".ap-no").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var reason = prompt("Reason for rejection (shown to the user):") || "";
+        b.disabled = true;
+        rejectPayment(b.getAttribute("data-id"), reason)
+          .then(function () { msg("ok", "Rejected."); loadApprovals(); })
+          .catch(function (e) { msg("bad", "❌ " + e.message); b.disabled = false; });
+      });
+    });
+  });
+}
+
 /* ---------------------------------------------------------
    Boot
 --------------------------------------------------------- */
@@ -493,12 +724,12 @@ fillSegments("l-segment");
 $("r-date").value = new Date().toISOString().slice(0, 10);
 
 if (!ready) {
-  msg("bad", "Firebase config missing — firebase-config.js me daalo.");
+  msg("bad", "Firebase config missing — add it to firebase-config.js.");
 } else {
   requireAnalyst("dashboard.html").then(function (u) {
     if (!u) return;
     paintHeader();
-    switchKind("analysis");   // ye turant kaam karta hai, RA gate se free
+    switchKind("analysis");   // works immediately, outside the RA gate
     if (!REGISTERED) {
       $("btn-call").disabled = true;
       $("btn-call").textContent = "Publishing disabled — set the RA number";

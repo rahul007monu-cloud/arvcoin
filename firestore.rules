@@ -129,6 +129,38 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    /* ---------- settings ----------
+       Admin-editable, publicly readable configuration: plan prices,
+       payment QR / UPI details, contact info.
+
+       This is what lets the owner change pricing and payment details
+       from the admin panel instead of editing code. */
+    match /settings/{docId} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+
+    /* ---------- paymentProofs ----------
+       Manual payment flow: the user pays via QR/UPI and submits a
+       reference. Admin verifies and grants access.
+
+       The user can create their own proof but cannot change its status —
+       otherwise anyone could mark themselves as paid. */
+    match /paymentProofs/{proofId} {
+      allow read: if isAdmin() ||
+                     (signedIn() && resource.data.uid == request.auth.uid);
+
+      allow create: if signedIn()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.planId is string
+                    && request.resource.data.reference is string
+                    && request.resource.data.reference.size() >= 4;
+
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
     /* ---------- callTeasers (PUBLIC) ----------
        Sirf title + segment + date. Koi entry/target/SL nahi.
        SEO aur funnel ke liye — Google index kar sake. */

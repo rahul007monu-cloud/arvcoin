@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#05060f" />
+  <title>Checkout — arvcoin</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="lux.css" />
+  <link rel="stylesheet" href="calls.css" />
+  <style>
+    .co-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+    @media(max-width:860px){.co-grid{grid-template-columns:1fr}}
+    .qr-box{text-align:center;padding:26px}
+    .qr-frame{display:inline-block;padding:16px;border-radius:20px;background:#fff;
+      box-shadow:0 20px 50px -20px rgba(0,0,0,.7)}
+    .qr-frame img{display:block;width:230px;height:230px;object-fit:contain}
+    @media(max-width:420px){.qr-frame img{width:190px;height:190px}}
+    .upi-row{display:flex;align-items:center;gap:10px;justify-content:center;
+      margin-top:18px;padding:13px 18px;border-radius:13px;
+      background:rgba(255,255,255,.04);border:1px solid var(--stroke)}
+    .upi-row code{font-family:var(--font-alt);font-size:15px;color:var(--cyan)}
+    .copy-btn{padding:7px 14px;border-radius:9px;cursor:pointer;border:1px solid var(--stroke);
+      background:rgba(255,255,255,.05);color:var(--muted);font-family:var(--font);font-size:12.5px}
+    .copy-btn:hover{color:var(--txt)}
+    .step-n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;
+      background:linear-gradient(150deg,rgba(124,92,255,.3),rgba(0,224,255,.12));
+      border:1px solid var(--stroke-strong);font-family:var(--font-alt);font-size:12px;
+      font-weight:800;margin-right:9px}
+    .pay-step{display:flex;gap:2px;align-items:flex-start;padding:11px 0;
+      font-size:14.5px;color:var(--muted);line-height:1.6}
+  </style>
+</head>
+<body>
+  <canvas id="bg-canvas"></canvas>
+  <div class="aurora"><span class="a1"></span><span class="a2"></span></div>
+  <div class="grid-overlay"></div>
+  <div class="grain"></div>
+
+  <header class="nav scrolled" id="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 40 40" width="30" height="30">
+            <defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#7c5cff"/><stop offset="0.5" stop-color="#00e0ff"/><stop offset="1" stop-color="#00ffa3"/>
+            </linearGradient></defs>
+            <circle cx="20" cy="20" r="18" fill="none" stroke="url(#lg1)" stroke-width="2.5"/>
+            <path d="M13 26 L20 12 L27 26 M15.6 21 H24.4" fill="none" stroke="url(#lg1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="brand-name">arv<span>coin</span></span>
+      </a>
+      <div class="nav-cta">
+        <a href="pricing.html" class="btn btn-ghost">All plans</a>
+        <a href="dashboard.html" class="btn btn-primary">Dashboard</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="lux-wrap lux-page" style="padding-bottom:70px;max-width:960px">
+
+    <div class="lux-head" style="text-align:left;margin-bottom:26px">
+      <span class="lux-eyebrow"><span class="dot"></span> Checkout</span>
+      <h1 class="lux-h1" style="font-size:clamp(26px,4.4vw,44px)">
+        Complete your <span class="shimmer">payment</span>
+      </h1>
+    </div>
+
+    <div class="adm-msg" id="msg" style="margin-bottom:20px"></div>
+
+    <!-- order summary -->
+    <div class="lux" style="padding:24px;margin-bottom:22px">
+      <div class="lux-table">
+        <div class="tr"><span>Plan</span><b id="o-plan">—</b></div>
+        <div class="tr"><span>Duration</span><b id="o-days">—</b></div>
+        <div class="tr"><span>Segments</span><b id="o-segs">—</b></div>
+        <div class="tr"><span>Amount</span><b id="o-base">—</b></div>
+        <div class="tr"><span>GST (18%)</span><b id="o-gst">—</b></div>
+        <div class="tr hd"><span>Total payable</span><b id="o-total">—</b></div>
+      </div>
+    </div>
+
+    <div class="co-grid">
+      <!-- QR -->
+      <div class="lux qr-box">
+        <h2 style="font-size:17px;font-weight:700;margin-bottom:6px">Scan to pay</h2>
+        <p style="color:var(--muted-2);font-size:13px;margin-bottom:20px">
+          Any UPI app — GPay, PhonePe, Paytm, BHIM
+        </p>
+        <div id="qr-holder"></div>
+        <div class="upi-row" id="upi-row" style="display:none">
+          <code id="upi-id"></code>
+          <button type="button" class="copy-btn" id="copy-upi">Copy</button>
+        </div>
+        <p style="color:var(--muted-2);font-size:12.5px;margin-top:14px" id="payee-line"></p>
+      </div>
+
+      <!-- steps + reference -->
+      <div class="lux" style="padding:26px">
+        <h2 style="font-size:17px;font-weight:700;margin-bottom:16px">How it works</h2>
+        <div class="pay-step"><span class="step-n">1</span><span>Scan the QR code, or pay to the UPI ID shown.</span></div>
+        <div class="pay-step"><span class="step-n">2</span><span>Pay the exact total shown above.</span></div>
+        <div class="pay-step"><span class="step-n">3</span><span>Copy the transaction reference (UTR) from your UPI app.</span></div>
+        <div class="pay-step"><span class="step-n">4</span><span>Paste it below and submit.</span></div>
+
+        <div id="instructions-box" style="display:none;margin:18px 0"></div>
+
+        <form id="proof-form" style="margin-top:20px">
+          <div class="fld">
+            <label for="p-ref">Transaction reference / UTR</label>
+            <input id="p-ref" placeholder="e.g. 428913004567" autocomplete="off" />
+            <p class="hint">Found in your UPI app's transaction details.</p>
+          </div>
+          <div class="fld">
+            <label for="p-note">Note (optional)</label>
+            <input id="p-note" placeholder="Anything we should know" autocomplete="off" />
+          </div>
+          <button type="submit" class="btn-lux" id="btn-submit" style="width:100%;justify-content:center">
+            Submit payment details
+          </button>
+        </form>
+
+        <p style="color:var(--muted-2);font-size:12.5px;margin-top:16px" id="support-line"></p>
+      </div>
+    </div>
+
+    <!-- previous submissions -->
+    <div id="my-proofs" style="margin-top:24px"></div>
+
+    <div class="disclosure" id="disc"></div>
+    <a href="pricing.html" class="back-link">← All plans</a>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="arv-config.js"></script>
+  <script src="3d.js" defer></script>
+  <script src="lux.js" defer></script>
+  <script type="module" src="checkout.js"></script>
+</body>
+</html>

@@ -5,7 +5,7 @@
      1) #bg-canvas   — full-page depth field: drifting particles
                        plus slowly rotating wireframe solids
      2) #lux-stage   — hero centrepiece: a rotating glass coin
-                       inside orbiting rings, with floating shards
+                       inside orbiting rings
 
    Guards:
      - bails out silently if THREE is unavailable
@@ -28,7 +28,6 @@
   var VIOLET = 0x7c5cff;
   var CYAN = 0x00e0ff;
   var MINT = 0x00ffa3;
-  var GOLD = 0xe8c98a;
 
   /* Shared pointer state, smoothed */
   var ptr = { x: 0, y: 0, sx: 0, sy: 0 };
@@ -108,42 +107,10 @@
       layers.push({ mesh: pts, speed: 0.02 + Math.random() * 0.03 });
     });
 
-    /* ---- slowly rotating wireframe solids ---- */
-    var solids = [];
-    var solidSpec = isSmall
-      ? [{ type: "ico", r: 70, x: -180, y: 110, z: -230, color: VIOLET },
-         { type: "torus", r: 60, x: 200, y: -130, z: -300, color: CYAN }]
-      : [{ type: "ico", r: 90, x: -340, y: 150, z: -260, color: VIOLET },
-         { type: "torus", r: 78, x: 380, y: -160, z: -320, color: CYAN },
-         { type: "octa", r: 60, x: 240, y: 220, z: -420, color: MINT },
-         { type: "torusKnot", r: 46, x: -300, y: -200, z: -380, color: GOLD }];
-
-    solidSpec.forEach(function (s) {
-      var geo;
-      if (s.type === "ico") geo = new THREE.IcosahedronGeometry(s.r, 1);
-      else if (s.type === "torus") geo = new THREE.TorusGeometry(s.r, s.r * 0.3, 12, 32);
-      else if (s.type === "octa") geo = new THREE.OctahedronGeometry(s.r, 0);
-      else geo = new THREE.TorusKnotGeometry(s.r, s.r * 0.26, 64, 10);
-
-      var mat = new THREE.MeshBasicMaterial({
-        color: s.color, wireframe: true,
-        transparent: true, opacity: 0.16, depthWrite: false
-      });
-
-      var mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(s.x, s.y, s.z);
-      scene.add(mesh);
-
-      solids.push({
-        mesh: mesh,
-        rx: (Math.random() - 0.5) * 0.0025,
-        ry: (Math.random() - 0.5) * 0.0025,
-        floatAmp: 12 + Math.random() * 18,
-        floatSpeed: 0.0003 + Math.random() * 0.0004,
-        baseY: s.y,
-        phase: Math.random() * Math.PI * 2
-      });
-    });
+    /* Note: wireframe solids were removed — they read as clutter.
+       The background is now pure atmospheric depth. The sense of
+       three dimensions comes from the page content floating on
+       scroll (see initScrollFloat in lux.js). */
 
     /* ---- resize ---- */
     var resizeTimer;
@@ -172,14 +139,10 @@
           l.mesh.position.y = ptr.sy * d;
         });
 
-        solids.forEach(function (s) {
-          s.mesh.rotation.x += s.rx;
-          s.mesh.rotation.y += s.ry;
-          s.mesh.position.y = s.baseY + Math.sin(t * s.floatSpeed + s.phase) * s.floatAmp;
-        });
-
+        // camera drifts with the pointer and eases with scroll,
+        // so the starfield parallaxes gently behind the content
         camera.position.x = -ptr.sx * 26;
-        camera.position.y = ptr.sy * 20;
+        camera.position.y = ptr.sy * 20 - (window.scrollY || 0) * 0.012;
         camera.lookAt(0, 0, -200);
       }
 
@@ -190,7 +153,7 @@
 
   /* =========================================================
      SCENE 2 — hero centrepiece (#lux-stage)
-     Rotating coin, orbiting rings, floating shards
+     Rotating coin with orbiting rings
      ========================================================= */
   function heroStage() {
     var host = document.getElementById("lux-stage");
@@ -289,42 +252,9 @@
       rings.push({ mesh: m, speed: r.speed, tilt: r.tilt });
     });
 
-    /* ---- floating shards ---- */
-    var shards = [];
-    var shardCount = isSmall ? 7 : 13;
-    for (var i = 0; i < shardCount; i++) {
-      var t = i % 3;
-      var g = t === 0 ? new THREE.TetrahedronGeometry(0.3)
-            : t === 1 ? new THREE.OctahedronGeometry(0.26)
-            : new THREE.BoxGeometry(0.34, 0.34, 0.34);
-
-      var col = [VIOLET, CYAN, MINT, GOLD][i % 4];
-      var m2 = new THREE.Mesh(g, new THREE.MeshStandardMaterial({
-        color: col, metalness: 0.85, roughness: 0.3,
-        emissive: col, emissiveIntensity: 0.35,
-        transparent: true, opacity: 0.9
-      }));
-
-      var ang = (i / shardCount) * Math.PI * 2;
-      var rad = 5.2 + Math.random() * 2.6;
-      m2.position.set(
-        Math.cos(ang) * rad,
-        (Math.random() - 0.5) * 6,
-        Math.sin(ang) * rad
-      );
-      root.add(m2);
-
-      shards.push({
-        mesh: m2, ang: ang, rad: rad,
-        ySpeed: 0.00035 + Math.random() * 0.0005,
-        yAmp: 0.5 + Math.random() * 0.9,
-        baseY: m2.position.y,
-        orbit: 0.00018 + Math.random() * 0.00022,
-        rx: (Math.random() - 0.5) * 0.014,
-        ry: (Math.random() - 0.5) * 0.014,
-        phase: Math.random() * Math.PI * 2
-      });
-    }
+    /* Note: the orbiting geometric shards were removed — they read as
+       floating blocks rather than luxury. The coin and its rings carry
+       the scene; depth comes from the content floating on scroll. */
 
     /* ---- dust ---- */
     var dustGeo = new THREE.BufferGeometry();
@@ -376,15 +306,6 @@
       rings.forEach(function (r, i) {
         r.mesh.rotation.z += r.speed;
         r.mesh.rotation.x = r.tilt + Math.sin(t * 0.0004 + i) * 0.14;
-      });
-
-      shards.forEach(function (s) {
-        s.ang += s.orbit;
-        s.mesh.position.x = Math.cos(s.ang) * s.rad;
-        s.mesh.position.z = Math.sin(s.ang) * s.rad;
-        s.mesh.position.y = s.baseY + Math.sin(t * s.ySpeed + s.phase) * s.yAmp;
-        s.mesh.rotation.x += s.rx;
-        s.mesh.rotation.y += s.ry;
       });
 
       dust.rotation.y = t * 0.00007;

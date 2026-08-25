@@ -1,7 +1,7 @@
 /* =========================================================
    arvcoin — REAL auth via Firebase (login / signup / Google / password reset)
-   Static site pe reliably chalta hai (koi bundler/popup drama nahi).
-   Config firebase-config.js se aata hai (window.ARV_FIREBASE_CONFIG).
+   Works reliably on a static site — no bundler required.
+   Config comes from firebase-config.js (window.ARV_FIREBASE_CONFIG).
    ========================================================= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
@@ -44,12 +44,12 @@ function saveProfile(uid, data) {
     .catch(function (e) { console.warn("[arvcoin] firestore save fail:", e); });
 }
 
-/* Email ek hi baar verify hoti hai. Uske baad OTP dobara NAHI maangte. */
+/* Email is verified once. After that we never ask for an OTP again. */
 function isVerified(uid) {
   if (!db || !uid) return Promise.resolve(true);
   return getDoc(doc(db, "users", uid))
     .then(function (s) { return !!(s.exists() && s.data().emailVerified); })
-    .catch(function () { return true; }); // read fail ho to user ko rok nahi rahe
+    .catch(function () { return true; }); // on a read failure, do not block the user
 }
 
 function friendlyError(e) {
@@ -85,19 +85,19 @@ if (ejsReady && window.emailjs && emailjs.init) {
 
 function genOtp() { return String(Math.floor(100000 + Math.random() * 900000)); }
 
-// Real email bhejta hai; agar EmailJS set nahi to DEMO mode (code alert me).
+// Sends a real email; falls back to DEMO mode if EmailJS is unconfigured.
 function sendOtpEmail(toEmail, toName, code) {
   if (!ejsReady || !window.emailjs) {
-    // DEMO fallback — taaki keys aane se pehle bhi flow test ho sake
+    // DEMO fallback, so the flow can be tested before keys are added
     console.log("[arvcoin][DEMO OTP] " + code + " -> " + toEmail);
     alert("DEMO mode: EmailJS keys are not configured yet.\nYour OTP is: " + code + "\n(Real emails will send once the keys are added.)");
     return Promise.resolve({ demo: true });
   }
-  // "valid till {{time}}" ke liye readable expiry time (IST)
+  // readable expiry time for "valid till {{time}}" (IST)
   var expTime = new Date(Date.now() + 15 * 60 * 1000)
     .toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
   return emailjs.send(ejs.serviceId, ejs.templateId, {
-    email: toEmail,      // template ke "To Email" field me {{email}} daalna
+    email: toEmail,      // put {{email}} in the template's "To Email" field
     to_email: toEmail,   // (backup naam)
     name: toName || "there",
     to_name: toName || "there",
@@ -108,10 +108,10 @@ function sendOtpEmail(toEmail, toName, code) {
 }
 
 /* ---------- pending signup state ----------
-   ⚠️ SECURITY: yahan password KABHI store nahi hota.
-   Pehle Firebase account banta hai (password seedha Firebase ko jaata hai,
-   hash hokar), phir OTP se email verify hoti hai. Pehle plaintext password
-   sessionStorage me rakha jaa raha tha — wo fix ho gaya. */
+   ⚠️ SECURITY: the password is NEVER stored here.
+   The Firebase account is created first, so the password goes straight to
+   Firebase and is hashed there; the email is then verified by OTP. An
+   earlier version kept the plaintext password in sessionStorage — fixed. */
 var PENDING_KEY = "arvcoin_pending";
 function setPending(data) {
   try {
@@ -147,8 +147,8 @@ if (signupForm) {
     if (btn) btn.disabled = true;
     msg("ok", "Creating your account\u2026");
 
-    /* Account ABHI banta hai — password seedha Firebase ko jaata hai aur
-       kahin store nahi hota. Uske baad email OTP verify hoti hai. */
+    /* The account is created now, so the password goes straight to Firebase
+       and is stored nowhere else. The email is verified by OTP afterwards. */
     var code = genOtp();
 
     createUserWithEmailAndPassword(auth, email, pw)
@@ -208,8 +208,8 @@ if (loginForm) {
         var u = cred.user;
         saveLocal({ name: u.displayName || "", email: u.email, mobile: "", at: Date.now() });
 
-        /* Email pehle se verified hai -> seedha dashboard, koi OTP nahi.
-           Sirf pehli baar (unverified account) OTP maangte hain. */
+        /* Already verified -> straight to the dashboard, no OTP.
+           We only ask for an OTP on the first, unverified sign-in. */
         return isVerified(u.uid).then(function (ok) {
           if (ok) {
             msg("ok", "\uD83D\uDD13 Welcome back — opening your dashboard\u2026");
@@ -244,7 +244,7 @@ function googleLogin(btn) {
   signInWithPopup(auth, provider)
     .then(function (res) {
       var u = res.user;
-      /* Google already email verify kar chuka hai -> OTP kabhi nahi maangte. */
+      /* Google has already verified the email -> never ask for an OTP. */
       return saveProfile(u.uid, {
         name: u.displayName || "", email: u.email || "", provider: "google",
         emailVerified: true, createdAt: serverTimestamp()
@@ -269,7 +269,7 @@ document.querySelectorAll(".social-btn[data-provider]").forEach(function (btn) {
 });
 
 /* ---------- VERIFY (email OTP) -> account create ---------- */
-// verify.html iske globals use karta hai (box UX wahin rehta hai).
+// verify.html uses these globals; the box UX stays there.
 window.arvOtp = {
   dest: function () { var p = getPending(); return p && p.email ? p.email : ""; },
 
@@ -280,8 +280,8 @@ window.arvOtp = {
     if (String(codeStr) !== String(p.code)) { onErr && onErr("Incorrect code. Please check and try again."); return; }
     if (!guardReady()) { onErr && onErr("Firebase config is not set."); return; }
 
-    /* Account signup pe hi ban gaya tha. Yahan sirf email verified mark
-       karte hain — koi password handling nahi. */
+    /* The account was created at signup. Here we only mark the email as
+       verified — no password handling. */
     var uid = p.uid || (auth.currentUser && auth.currentUser.uid);
     if (!uid) { onErr && onErr("Session not found. Please sign in again."); return; }
 

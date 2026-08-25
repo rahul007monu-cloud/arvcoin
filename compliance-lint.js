@@ -1,17 +1,17 @@
 /* =========================================================
    arvcoin — compliance linter
 
-   Publish se pehle content check karta hai. Jo phrases SEBI ke
-   saamne problem banate hain, unko block karta hai.
+   Checks content before publishing and blocks phrases that would
+   create a problem with SEBI.
 
-   ⚠️ Is wordlist ko kamzor NA karo. Naye phrases add karo.
-   Ye aapko disgorgement/penalty se bachane wala pehla filter hai.
+   ⚠️ Do NOT weaken this wordlist — extend it. This is the first
+   filter protecting you from disgorgement and penalties.
    ========================================================= */
 (function () {
   "use strict";
 
   /* ---------- HARD BLOCK: guaranteed / assured returns ----------
-     Ye kabhi allowed nahi — registered ho ya na ho. */
+     Never permitted, registered or not. */
   var BANNED = [
     // guaranteed returns
     /\bguarantee(d|s)?\s+(return|profit|income|gain|money|paisa)/i,
@@ -47,8 +47,8 @@
     /\bblind(ly)?\s+(buy|kharido|lo)\b/i
   ];
 
-  /* ---------- WARN: review chahiye, block nahi ----------
-     Ye phrases context pe depend karte hain. */
+  /* ---------- WARN: needs review, not blocked ----------
+     These phrases depend on context. */
   var WARN = [
     /\bmulti\s*bagger\b/i,
     /\bhuge\s+(profit|gain|return)/i,
@@ -63,8 +63,8 @@
   ];
 
   /* ---------- Personalised-advice detection ----------
-     RA registration research cover karta hai, personalised advice
-     nahi (wo IA registration hai). Aise sawaal/jawab block karo. */
+     RA registration covers research, not personalised advice — that
+     requires IA registration. Block these questions and answers. */
   var PERSONAL = [
     /\bmera\s+(stock|share|portfolio|paisa|investment|position)\b/i,
     /\bmujhe\s+kya\s+(karna|lena|bechna)\b/i,
@@ -85,7 +85,7 @@
 
   /**
    * check(text) -> { ok, hits, warnings, personal }
-   *   ok === false  => publish block karo
+   *   ok === false  => block the publish
    */
   function check(text) {
     var hits = scan(text, BANNED);
@@ -100,7 +100,7 @@
     };
   }
 
-  /** Human-readable summary — admin panel me dikhane ke liye. */
+  /** Human-readable summary, for display in the admin panel. */
   function explain(res) {
     var out = [];
     if (res.hits.length) {
