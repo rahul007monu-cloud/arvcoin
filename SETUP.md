@@ -3,12 +3,18 @@
 Follow this once to connect arvcoin to a Firebase project. Everything is done
 in the browser except the final rules deploy.
 
-> **Note on the old project:** the previous project ID `arvcoin` is taken and
-> inaccessible. Project IDs are globally unique, so the new one needs a
-> different ID — `arvcoin-app` for example. The *display name* can still be
-> "arvcoin".
+> **Status: steps 1–3 are done.** The project is created and connected:
 >
-> Users who signed up on the old project will not carry over. They will need
+> | | |
+> |---|---|
+> | Project ID | `arvcoin-fbd29` |
+> | Project number | `44275546012` |
+> | Auth domain | `arvcoin-fbd29.firebaseapp.com` |
+>
+> `firebase-config.js` is updated and `.firebaserc` pins the project, so
+> `firebase deploy` no longer needs a `--project` flag.
+>
+> Users from the old inaccessible project do not carry over — they will need
 > to sign up again.
 
 ---
@@ -103,10 +109,10 @@ without it.
 ```bash
 npm install -g firebase-tools     # once
 firebase login                    # opens a browser
-firebase deploy --only firestore:rules,firestore:indexes --project YOUR_PROJECT_ID
+firebase deploy --only firestore:rules,firestore:indexes
 ```
 
-Replace `YOUR_PROJECT_ID` with the ID from step 1.
+No `--project` flag needed — `.firebaserc` pins it to `arvcoin-fbd29`.
 
 **No terminal available?** Paste the rules manually instead:
 
@@ -156,9 +162,9 @@ email service and a template containing `{{passcode}}` in the body and
 
 ## Checklist
 
-- [ ] Project created, Project ID written down
-- [ ] Web app registered, config copied
-- [ ] `firebase-config.js` updated
+- [x] Project created — `arvcoin-fbd29`
+- [x] Web app registered, config copied
+- [x] `firebase-config.js` updated
 - [ ] Email/Password sign-in enabled
 - [ ] Google sign-in enabled
 - [ ] `arvcoin.com` added to authorised domains
