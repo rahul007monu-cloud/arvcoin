@@ -30,9 +30,19 @@
 # Custom 404
 ErrorDocument 404 /404.html
 
-# Purane crypto/wallet pages -> naye pages pe bhejo
 <IfModule mod_rewrite.c>
   RewriteEngine On
+
+  # Old crypto/wallet pages -> current pages
   RewriteRule ^kyc\.html$ /dashboard.html [R=301,L]
   RewriteRule ^wallet\.html$ /dashboard.html [R=301,L]
+
+  # Allow clean URLs without the .html extension, so /admin serves
+  # admin.html and /levels serves levels.html. Static hosting otherwise
+  # 404s on an extension-less path, which is easy to hit by hand.
+  # Only rewrites when the .html file actually exists.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_FILENAME}\.html -f
+  RewriteRule ^(.+)$ $1.html [L]
 </IfModule>
