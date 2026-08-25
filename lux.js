@@ -303,6 +303,122 @@
   }
 
   /* =========================================================
+     10b) SCROLL FLOAT — the page itself floats
+     ---------------------------------------------------------
+     This is what creates the luxury depth. As you scroll, each
+     panel drifts on its own axis relative to the viewport centre:
+
+       - lifts and settles (translateY)
+       - tilts very slightly in 3D (rotateX) so it reads as a
+         physical card catching light
+       - eases its scale and opacity a touch at the edges
+
+     Everything is driven from one rAF loop reading a single
+     scroll position, so it stays smooth with many elements.
+     ========================================================= */
+  function initScrollFloat() {
+    if (reduced) return;
+
+    var items = $all(".float-on-scroll, .lux-sec > .lux-wrap, .lux-sec > .lux-narrow");
+
+    // also float individual cards inside grids, with a per-column offset
+    $all(".lux-grid").forEach(function (grid) {
+      Array.prototype.forEach.call(grid.children, function (child, i) {
+        if (child.classList.contains("float-on-scroll")) return;
+        child.classList.add("float-on-scroll");
+        child.dataset.floatSeed = (i % 4) * 0.35;
+        items.push(child);
+      });
+    });
+
+    if (!items.length) return;
+
+    var tracked = items.map(function (el, i) {
+      el.style.willChange = "transform";
+      return {
+        el: el,
+        seed: parseFloat(el.dataset.floatSeed || ((i % 5) * 0.28)),
+        depth: el.classList.contains("lux-wrap") || el.classList.contains("lux-narrow")
+          ? 0.35   // whole sections drift less
+          : 1,
+        cy: 0, ch: 0,
+        y: 0, ty: 0,
+        r: 0, tr: 0
+      };
+    });
+
+    var vh = window.innerHeight;
+    var measureTimer;
+
+    function measure() {
+      vh = window.innerHeight;
+      tracked.forEach(function (t) {
+        var r = t.el.getBoundingClientRect();
+        t.cy = r.top + window.scrollY + r.height / 2;
+        t.ch = r.height;
+      });
+    }
+
+    function compute() {
+      var mid = window.scrollY + vh / 2;
+
+      tracked.forEach(function (t) {
+        // -1 (below viewport) .. 0 (centred) .. 1 (above viewport)
+        var d = (mid - t.cy) / (vh * 0.9);
+        d = Math.max(-1.4, Math.min(1.4, d));
+
+        // drift: element rises as it passes the centre
+        t.ty = -d * 26 * t.depth + Math.sin(t.seed * 3.1) * 2;
+
+        // subtle 3D tilt, strongest at the edges
+        t.tr = d * 2.4 * t.depth;
+      });
+    }
+
+    var running = false;
+    function loop() {
+      var moving = false;
+
+      tracked.forEach(function (t) {
+        t.y += (t.ty - t.y) * 0.085;
+        t.r += (t.tr - t.r) * 0.085;
+
+        if (Math.abs(t.ty - t.y) > 0.05 || Math.abs(t.tr - t.r) > 0.01) moving = true;
+
+        t.el.style.transform =
+          "translate3d(0," + t.y.toFixed(2) + "px,0) rotateX(" + t.r.toFixed(3) + "deg)";
+      });
+
+      if (moving) {
+        requestAnimationFrame(loop);
+      } else {
+        running = false;
+      }
+    }
+
+    function onScroll() {
+      compute();
+      if (!running) { running = true; requestAnimationFrame(loop); }
+    }
+
+    function onResize() {
+      clearTimeout(measureTimer);
+      measureTimer = setTimeout(function () { measure(); onScroll(); }, 160);
+    }
+
+    // perspective on the scroll container so rotateX reads as depth
+    document.body.style.perspective = "1400px";
+    document.body.style.perspectiveOrigin = "50% 50%";
+
+    measure();
+    onScroll();
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize);
+    window.addEventListener("load", function () { measure(); onScroll(); });
+  }
+
+  /* =========================================================
      11) PWA INSTALL PROMPT
      ---------------------------------------------------------
      Chrome/Edge fire beforeinstallprompt when the app is
@@ -363,6 +479,7 @@
   function boot() {
     initSW();
     initInstall();
+    initScrollFloat();
     initSpotlight();
     initTilt();
     initReveal();

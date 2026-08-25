@@ -69,6 +69,8 @@
       <button class="seg-tab" data-kind="call"><i>◹</i> Research call</button>
       <button class="seg-tab" data-kind="lesson"><i>🎓</i> Lesson</button>
       <button class="seg-tab" data-kind="recap"><i>≣</i> Market recap</button>
+      <button class="seg-tab" data-kind="pricing"><i>₹</i> Pricing &amp; payment</button>
+      <button class="seg-tab" data-kind="approvals"><i>✓</i> Approvals <span class="lock" id="appr-count"></span></button>
     </div>
 
     <div class="adm-grid">
@@ -322,6 +324,71 @@
 
           <button type="submit" class="btn btn-primary btn-lg" id="btn-recap">Publish recap</button>
         </form>
+
+        <!-- ---------- PRICING & PAYMENT ---------- -->
+        <form id="form-pricing" style="display:none">
+          <h2>Pricing &amp; payment</h2>
+          <p class="card-sub">
+            Change prices and payment details here — no code editing needed.
+            Saved values override the defaults and apply to the live site immediately.
+          </p>
+
+          <div class="lux-note info" style="margin-bottom:22px;font-size:13.5px">
+            <span class="n-ico">₹</span>
+            <div>These settings are stored in the database, so they survive every
+              deployment. Prices exclude GST.</div>
+          </div>
+
+          <h3 style="font-size:15px;font-weight:700;margin:0 0 14px">Plan prices</h3>
+          <div id="plan-editors"></div>
+
+          <h3 style="font-size:15px;font-weight:700;margin:28px 0 14px">Payment details</h3>
+
+          <div class="fld">
+            <label for="s-upi">UPI ID</label>
+            <input id="s-upi" placeholder="yourname@paytm / yourname@okhdfcbank" autocomplete="off" />
+            <p class="hint">Shown to users on the checkout page so they can pay directly.</p>
+          </div>
+
+          <div class="fld">
+            <label for="s-payee">Payee name</label>
+            <input id="s-payee" placeholder="Name shown in the UPI app" autocomplete="off" />
+          </div>
+
+          <div class="fld">
+            <label for="s-qr">Payment QR code — image URL</label>
+            <input id="s-qr" placeholder="https://arvcoin.com/qr.png" autocomplete="off" />
+            <p class="hint">
+              Upload your QR image anywhere public (your Hostinger <code>public_html</code>
+              folder is easiest) and paste the URL here. Leave this blank and a QR code will
+              be generated automatically from your UPI ID.
+            </p>
+          </div>
+
+          <div class="fld">
+            <label for="s-instructions">Payment instructions</label>
+            <textarea id="s-instructions" placeholder="Scan the QR or pay to the UPI ID above, then paste your transaction reference below. Access is activated within 30 minutes."></textarea>
+          </div>
+
+          <div class="fld">
+            <label for="s-support">Support contact shown at checkout</label>
+            <input id="s-support" placeholder="support@arvcoin.com or a WhatsApp number" autocomplete="off" />
+          </div>
+
+          <div id="qr-preview" style="display:none;margin-bottom:20px"></div>
+
+          <button type="submit" class="btn btn-primary btn-lg" id="btn-pricing">Save settings</button>
+        </form>
+
+        <!-- ---------- APPROVALS ---------- -->
+        <div id="form-approvals" style="display:none">
+          <h2>Payment approvals</h2>
+          <p class="card-sub">
+            Users who paid by QR or UPI and submitted a reference. Verify it in your bank
+            or UPI app, then approve to activate their subscription.
+          </p>
+          <div id="approval-list"></div>
+        </div>
       </div>
 
       <!-- ===================== SIDE ===================== -->

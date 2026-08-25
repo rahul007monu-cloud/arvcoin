@@ -55,7 +55,7 @@
           '<p class="amt-sub">/ ' + p.durationDays + ' din &nbsp;·&nbsp; ' + segIcons +
             '<br /><small style="color:var(--muted-2)">+ GST = ' + CFG.inrFmt(t.total) + ' total</small></p>' +
           '<ul>' + feats + miss + '</ul>' +
-          '<a href="signup.html?plan=' + p.id + '" class="' + (p.popular ? "btn-lux" : "btn-glass") + '">' +
+          '<a href="checkout.html?plan=' + p.id + '" class="' + (p.popular ? "btn-lux" : "btn-glass") + '">' +
             (p.popular ? "Get " + esc(p.name) : "Choose " + esc(p.name)) + '</a>' +
         '</div>';
     }).join("");

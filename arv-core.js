@@ -513,6 +513,167 @@ export function watchAnalysis(opts, cb) {
   }, function (e) { cb([], e); });
 }
 
+/* =========================================================
+   SETTINGS — admin-editable, publicly readable
+
+   Lets the owner change plan prices and payment details from the
+   admin panel instead of editing arv-config.js. Values found here
+   override the defaults in the config file.
+   ========================================================= */
+
+var _settingsCache = null;
+
+export function getSettings() {
+  if (!ready) return Promise.resolve(null);
+  if (_settingsCache) return Promise.resolve(_settingsCache);
+  return getDoc(doc(db, "settings", "app")).then(function (s) {
+    _settingsCache = s.exists() ? s.data() : {};
+    return _settingsCache;
+  }).catch(function () { return {}; });
+}
+
+export function watchSettings(cb) {
+  if (!ready) return function () {};
+  return onSnapshot(doc(db, "settings", "app"), function (s) {
+    _settingsCache = s.exists() ? s.data() : {};
+    cb(_settingsCache);
+  }, function () { cb({}); });
+}
+
+/** Admin only. Merges into settings/app. */
+export function saveSettings(patch) {
+  if (!ready) return Promise.reject(new Error("Firebase is not ready"));
+  if (!isAdmin()) return Promise.reject(new Error("Admin access required"));
+  _settingsCache = null;
+  return setDoc(doc(db, "settings", "app"),
+    Object.assign({}, patch, { updatedAt: serverTimestamp() }), { merge: true });
+}
+
+/**
+ * Merge saved settings over the config defaults.
+ * Returns a plan object with any admin-set price applied.
+ */
+export function effectivePlan(planId, settings) {
+  var base = CFG.plan(planId);
+  if (!base) return null;
+  var out = Object.assign({}, base);
+  var over = settings && settings.plans && settings.plans[planId];
+  if (over) {
+    if (typeof over.priceInr === "number") out.priceInr = over.priceInr;
+    if (typeof over.durationDays === "number") out.durationDays = over.durationDays;
+    if (over.name) out.name = over.name;
+    if (over.tagline) out.tagline = over.tagline;
+    if (Array.isArray(over.segments) && over.segments.length) out.segments = over.segments;
+    if (over.enabled === false) out.disabled = true;
+  }
+  return out;
+}
+
+/* =========================================================
+   PAYMENT PROOFS — manual QR/UPI flow
+
+   The user pays via the QR code or UPI ID shown on the site, then
+   submits the transaction reference. An admin verifies it and grants
+   access. Status is never client-writable.
+   ========================================================= */
+
+export function submitPaymentProof(data) {
+  if (!ready || !_user) return Promise.reject(new Error("Please sign in first"));
+  if (!data.reference || String(data.reference).trim().length < 4) {
+    return Promise.reject(new Error("Enter the UPI transaction reference or UTR"));
+  }
+  var p = CFG.plan(data.planId);
+  if (!p) return Promise.reject(new Error("Plan not found"));
+
+  return addDoc(collection(db, "paymentProofs"), {
+    uid: _user.uid,
+    email: _user.email || "",
+    name: _user.displayName || "",
+    planId: p.id,
+    planName: p.name,
+    amountInr: data.amountInr || p.priceInr,
+    reference: String(data.reference).trim().slice(0, 120),
+    payerNote: String(data.note || "").slice(0, 300),
+    status: "pending",
+    createdAt: serverTimestamp()
+  });
+}
+
+export function myPaymentProofs(max) {
+  if (!ready || !_user) return Promise.resolve([]);
+  var q = query(
+    collection(db, "paymentProofs"),
+    where("uid", "==", _user.uid),
+    orderBy("createdAt", "desc"),
+    qLimit(max || 10)
+  );
+  return getDocs(q).then(function (snap) {
+    var out = [];
+    snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data())); });
+    return out;
+  }).catch(function () { return []; });
+}
+
+/** Admin: pending payment proofs awaiting verification. */
+export function pendingPaymentProofs(max) {
+  if (!ready || !isAdmin()) return Promise.resolve([]);
+  var q = query(
+    collection(db, "paymentProofs"),
+    where("status", "==", "pending"),
+    orderBy("createdAt", "desc"),
+    qLimit(max || 50)
+  );
+  return getDocs(q).then(function (snap) {
+    var out = [];
+    snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data())); });
+    return out;
+  }).catch(function () { return []; });
+}
+
+/**
+ * Admin: approve a payment and activate the subscription.
+ * Writes subscriptions/{uid} — which only admins and Cloud Functions can do.
+ */
+export function approvePayment(proof) {
+  if (!ready || !isAdmin()) return Promise.reject(new Error("Admin access required"));
+
+  var p = CFG.plan(proof.planId);
+  if (!p) return Promise.reject(new Error("Plan not found: " + proof.planId));
+
+  var days = p.durationDays || 30;
+  var till = new Date(Date.now() + days * 86400000);
+
+  return setDoc(doc(db, "subscriptions", proof.uid), {
+    uid: proof.uid,
+    email: proof.email || "",
+    planId: p.id,
+    segments: p.segments,
+    status: "active",
+    activeTill: Timestamp.fromDate(till),
+    grantedBy: _user.uid,
+    grantedAt: serverTimestamp(),
+    source: "manual_qr",
+    reference: proof.reference || ""
+  }, { merge: true }).then(function () {
+    return updateDoc(doc(db, "paymentProofs", proof.id), {
+      status: "approved",
+      approvedBy: _user.uid,
+      approvedAt: serverTimestamp(),
+      activeTill: Timestamp.fromDate(till)
+    });
+  });
+}
+
+export function rejectPayment(proofId, reason) {
+  if (!ready || !isAdmin()) return Promise.reject(new Error("Admin access required"));
+  return updateDoc(doc(db, "paymentProofs", proofId), {
+    status: "rejected",
+    rejectReason: String(reason || "").slice(0, 300),
+    reviewedBy: _user.uid,
+    reviewedAt: serverTimestamp()
+  });
+}
+
 export function listLessons(opts) {
   opts = opts || {};
   if (!ready) return Promise.resolve([]);

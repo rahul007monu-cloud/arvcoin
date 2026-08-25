@@ -456,3 +456,39 @@ h1.lux-h,.lux-h1{
   .lux-3d.is-tilting{transform:none}
   .lux-3d > *{transform:none}
 }
+
+
+/* =========================================================
+   SCROLL FLOAT
+   The page content itself floats as you scroll. JS writes the
+   transform; these rules give it depth and keep it smooth.
+   ========================================================= */
+.float-on-scroll{
+  transform-style:preserve-3d;
+  backface-visibility:hidden;
+}
+
+/* Sections get a soft shadow that deepens the floating illusion */
+.lux-sec > .lux-wrap,
+.lux-sec > .lux-narrow{
+  transform-style:preserve-3d;
+}
+
+/* Cards lift off the page a little more convincingly */
+.lux-grid > .lux{
+  transition:box-shadow .6s var(--ease-lux);
+}
+.lux-grid > .lux:hover{
+  box-shadow:0 44px 88px -32px rgba(0,0,0,.85),
+             0 0 54px -22px rgba(124,92,255,.34);
+}
+
+/* Hero panels drift on their own gentle cycle */
+.lux-hero .hero-peek{
+  transform-style:preserve-3d;
+  backface-visibility:hidden;
+}
+
+@media(prefers-reduced-motion:reduce){
+  .float-on-scroll{transform:none!important}
+}
