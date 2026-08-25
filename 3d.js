@@ -5,7 +5,7 @@
      1) #bg-canvas   — full-page depth field: drifting particles
                        plus slowly rotating wireframe solids
      2) #lux-stage   — hero centrepiece: a rotating glass coin
-                       inside orbiting rings, with floating shards
+                       inside orbiting rings
 
    Guards:
      - bails out silently if THREE is unavailable
@@ -28,7 +28,6 @@
   var VIOLET = 0x7c5cff;
   var CYAN = 0x00e0ff;
   var MINT = 0x00ffa3;
-  var GOLD = 0xe8c98a;
 
   /* Shared pointer state, smoothed */
   var ptr = { x: 0, y: 0, sx: 0, sy: 0 };
@@ -154,7 +153,7 @@
 
   /* =========================================================
      SCENE 2 — hero centrepiece (#lux-stage)
-     Rotating coin, orbiting rings, floating shards
+     Rotating coin with orbiting rings
      ========================================================= */
   function heroStage() {
     var host = document.getElementById("lux-stage");
