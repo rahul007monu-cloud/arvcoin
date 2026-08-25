@@ -20,22 +20,26 @@
    AURORA — layered ambient depth
    ========================================================= */
 .aurora{position:fixed;inset:0;z-index:-2;pointer-events:none;overflow:hidden}
+/* Restraint is what reads as luxury. These were at .7 opacity with
+   heavy colour stops, which washed the near-black base into a purple
+   and green gradient — closer to a template than to a premium product.
+   Pulled right back: the base stays black, the colour only suggests. */
 .aurora span{
-  position:absolute;border-radius:50%;filter:blur(96px);opacity:.7;
+  position:absolute;border-radius:50%;filter:blur(130px);opacity:.26;
   will-change:transform;
 }
-.aurora .a1{width:58vw;height:58vw;left:-14vw;top:-16vh;
-  background:radial-gradient(circle,rgba(124,92,255,.82),transparent 64%);
-  animation:drift1 26s var(--ease-soft) infinite alternate}
-.aurora .a2{width:50vw;height:50vw;right:-12vw;top:4vh;
-  background:radial-gradient(circle,rgba(0,224,255,.62),transparent 64%);
-  animation:drift2 32s var(--ease-soft) infinite alternate}
-.aurora .a3{width:44vw;height:44vw;left:20vw;bottom:-18vh;
-  background:radial-gradient(circle,rgba(0,255,163,.46),transparent 64%);
-  animation:drift3 29s var(--ease-soft) infinite alternate}
-.aurora .a4{width:36vw;height:36vw;right:12vw;bottom:-10vh;
-  background:radial-gradient(circle,rgba(232,201,138,.4),transparent 64%);
-  animation:drift1 36s var(--ease-soft) infinite alternate-reverse}
+.aurora .a1{width:52vw;height:52vw;left:-16vw;top:-20vh;
+  background:radial-gradient(circle,rgba(124,92,255,.5),transparent 68%);
+  animation:drift1 34s var(--ease-soft) infinite alternate}
+.aurora .a2{width:42vw;height:42vw;right:-14vw;top:2vh;
+  background:radial-gradient(circle,rgba(0,180,225,.34),transparent 68%);
+  animation:drift2 42s var(--ease-soft) infinite alternate}
+.aurora .a3{width:38vw;height:38vw;left:18vw;bottom:-22vh;
+  background:radial-gradient(circle,rgba(0,255,163,.2),transparent 70%);
+  animation:drift3 38s var(--ease-soft) infinite alternate}
+.aurora .a4{width:30vw;height:30vw;right:10vw;bottom:-14vh;
+  background:radial-gradient(circle,rgba(232,201,138,.18),transparent 70%);
+  animation:drift1 46s var(--ease-soft) infinite alternate-reverse}
 
 @keyframes drift1{to{transform:translate3d(7vw,9vh,0) scale(1.14)}}
 @keyframes drift2{to{transform:translate3d(-8vw,12vh,0) scale(1.2)}}
@@ -504,13 +508,14 @@ h1.lux-h,.lux-h1{
    THEME — richer, more obviously premium
    ========================================================= */
 
-/* deeper ambient wash behind everything */
+/* A deep vignette that pushes the edges toward black, so content sits in
+   a pool of light. This replaced a triple colour wash that was flattening
+   everything into the same purple-green haze. */
 body::after{
   content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
   background:
-    radial-gradient(60% 40% at 15% 10%,rgba(124,92,255,.16),transparent 70%),
-    radial-gradient(50% 40% at 85% 25%,rgba(0,224,255,.12),transparent 70%),
-    radial-gradient(60% 50% at 50% 100%,rgba(0,255,163,.09),transparent 70%);
+    radial-gradient(75% 55% at 50% 32%,rgba(124,92,255,.07),transparent 72%),
+    radial-gradient(120% 90% at 50% 50%,transparent 40%,rgba(2,3,10,.62) 100%);
 }
 
 /* headings get a gold hairline accent */
@@ -633,3 +638,180 @@ body::after{
   margin-top:22px;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--muted-2);
 }
+
+
+/* =========================================================
+   LUXURY REFINEMENT PASS
+   The previous look was oversaturated — colour everywhere, nothing
+   given room. Luxury comes from a near-black base, generous space,
+   tight typography and accents used sparingly.
+   ========================================================= */
+
+/* deepen the base — the gradient wash was lifting it to grey-purple */
+body{background:#03040a}
+
+/* ---------- typography ---------- */
+.lux-h1,h1.lux-h{
+  letter-spacing:-.045em;
+  font-weight:800;
+  line-height:1.0;
+}
+.lux-h2{letter-spacing:-.035em;line-height:1.08}
+
+/* headline: mostly white, one accent line — not a full rainbow */
+.shimmer{
+  background:linear-gradient(96deg,#ffffff 0%,#cfe3ff 38%,var(--cyan) 78%,var(--mint) 100%);
+  background-size:180% auto;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:shim 11s linear infinite;
+}
+
+.lux-lead{
+  font-size:clamp(15px,1.55vw,17.5px);
+  line-height:1.75;
+  color:#8f98bd;
+  max-width:52ch;
+}
+
+/* ---------- eyebrow: quieter, more editorial ---------- */
+.lux-eyebrow{
+  font-size:10.5px;letter-spacing:.26em;
+  padding:7px 15px;
+  background:rgba(255,255,255,.03);
+  border-color:rgba(255,255,255,.09);
+  color:#9aa3c7;
+}
+.lux-eyebrow .dot{width:5px;height:5px;box-shadow:0 0 9px var(--mint)}
+
+/* remove the gold underline — it was on every heading, so it read as
+   decoration rather than emphasis */
+.lux-h2::after,.lux-head .lux-h2::after{display:none}
+
+/* ---------- glass: quieter, thinner edge ---------- */
+.lux{
+  border-radius:22px;
+  background:
+    linear-gradient(165deg,rgba(255,255,255,.055),rgba(255,255,255,.018) 60%);
+  border:1px solid rgba(255,255,255,.075);
+  backdrop-filter:blur(30px) saturate(1.15);
+  -webkit-backdrop-filter:blur(30px) saturate(1.15);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.07) inset,
+    0 30px 64px -34px rgba(0,0,0,.9);
+}
+.lux::before{
+  background:linear-gradient(180deg,rgba(255,255,255,.05),transparent 38%);
+  opacity:.9;
+}
+.lux::after{
+  background:radial-gradient(460px circle at var(--mx,50%) var(--my,50%),
+    rgba(255,255,255,.05),transparent 60%);
+}
+.lux:hover{border-color:rgba(255,255,255,.14)}
+
+.lux-grid > .lux:hover{
+  box-shadow:0 40px 84px -36px rgba(0,0,0,.95),
+             0 0 42px -26px rgba(124,92,255,.24);
+}
+
+/* ---------- icon tiles: monochrome with a hint of colour ---------- */
+.lux-card .ico{
+  width:44px;height:44px;border-radius:13px;font-size:19px;
+  background:linear-gradient(155deg,rgba(255,255,255,.09),rgba(255,255,255,.025));
+  border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 1px 0 rgba(255,255,255,.1) inset;
+}
+
+.lux-card h3{font-size:17px;letter-spacing:-.01em;margin-bottom:8px}
+.lux-card p{font-size:14.2px;color:#858ead;line-height:1.7}
+
+/* ---------- more air between sections ---------- */
+.lux-sec{padding:clamp(84px,11vw,150px) 0}
+.lux-head{margin-bottom:clamp(44px,6vw,72px)}
+
+/* dividers: barely there */
+.lux-sec + .lux-sec::before{
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);
+}
+
+/* ---------- buttons: restrained, gold on hover ---------- */
+.btn-lux{
+  padding:14px 30px;font-size:15px;font-weight:650;
+  box-shadow:0 12px 34px -14px rgba(0,224,255,.5),
+             0 0 0 1px rgba(255,255,255,.1) inset;
+}
+.btn-lux:hover{
+  box-shadow:0 18px 44px -14px rgba(0,224,255,.62),
+             0 0 0 1px rgba(255,255,255,.16) inset;
+}
+.btn-glass{
+  padding:14px 28px;font-size:15px;
+  background:rgba(255,255,255,.035);
+  border-color:rgba(255,255,255,.12);
+}
+.btn-glass:hover{
+  background:rgba(255,255,255,.06);
+  border-color:rgba(232,201,138,.3);
+  color:#f4e9cf;
+}
+
+/* ---------- plan cards ---------- */
+.plan.pop{
+  background:linear-gradient(165deg,rgba(124,92,255,.16),rgba(255,255,255,.02) 62%);
+  border-color:rgba(124,92,255,.26);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.1) inset,
+    0 0 52px -28px rgba(124,92,255,.4),
+    0 40px 80px -36px rgba(0,0,0,.94);
+}
+.plan .tag{font-size:10px;letter-spacing:.12em;padding:5px 14px}
+.plan .amt{font-size:34px}
+
+/* ---------- notes: less shouty ---------- */
+.lux-note{
+  border-radius:16px;padding:17px 20px;font-size:14px;
+  background:rgba(255,176,32,.045);border-color:rgba(255,176,32,.15);
+  color:#8f98bd;
+}
+.lux-note.info{background:rgba(0,224,255,.035);border-color:rgba(0,224,255,.14)}
+.lux-note.good{background:rgba(0,255,163,.035);border-color:rgba(0,255,163,.14)}
+
+/* ---------- nav: thinner, floating ---------- */
+.nav-inner{
+  backdrop-filter:blur(28px) saturate(1.3);
+  -webkit-backdrop-filter:blur(28px) saturate(1.3);
+}
+.nav-links{gap:26px}
+.nav-links a{font-size:14.2px;color:#8f98bd}
+
+/* ---------- hero: more room, quieter panels ---------- */
+.lux-hero{padding:150px 0 96px}
+.hero-peek{
+  padding:13px 16px;border-radius:15px;
+  background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02));
+  border-color:rgba(255,255,255,.08);
+}
+.hero-peek b{font-size:13.5px}
+.hero-peek small{font-size:11px;color:#6b7299}
+
+/* ---------- stat blocks ---------- */
+.lux-stat b{font-size:clamp(25px,3.2vw,38px)}
+.lux-stat small{font-size:11.5px;letter-spacing:.09em}
+
+/* ---------- marquee: quieter ---------- */
+.mq-item{
+  background:rgba(255,255,255,.028);
+  border-color:rgba(255,255,255,.07);
+  font-size:13.2px;padding:11px 19px;
+}
+
+/* ---------- disclosure block ---------- */
+.disclosure{
+  background:rgba(255,255,255,.014);
+  border-color:rgba(255,255,255,.06);
+  font-size:12.4px;color:#6b7299;
+}
+
+/* ---------- footer ---------- */
+.lux-foot{border-top-color:rgba(255,255,255,.06)}
+.foot-grid a{font-size:13.8px;color:#8f98bd}
