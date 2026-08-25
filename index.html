@@ -18,6 +18,24 @@
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="lux.css" />
+  <script>
+  /* Service worker — jitna jaldi possible register karo.
+     Purana SW atka reh jaaye to naya isse turant le leta hai. */
+  (function () {
+    if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+    var reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").then(function (reg) {
+        reg.update().catch(function () {});
+      }).catch(function () {});
+    });
+  })();
+  </script>
   <script type="application/ld+json">
   {
     "@context":"https://schema.org",
