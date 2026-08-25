@@ -68,7 +68,7 @@
   });
   renderer.setPixelRatio(DPR);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.18;
+  renderer.toneMappingExposure = 0.92;
   if ("outputEncoding" in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
 
   var scene = new THREE.Scene();
@@ -80,11 +80,11 @@
   /* ---------------------------------------------------------
      Lighting — key, fill, rim, plus a travelling accent
   --------------------------------------------------------- */
-  scene.add(new THREE.AmbientLight(0xffffff, 0.42));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.3));
 
-  var key  = new THREE.PointLight(0x8b6cff, 3.0, 150); key.position.set(-18, 14, 26);
-  var fill = new THREE.PointLight(0x33e6ff, 2.6, 150); fill.position.set(18, -12, 22);
-  var rim  = new THREE.PointLight(0x33ffb4, 1.7, 110); rim.position.set(0, -20, -10);
+  var key  = new THREE.PointLight(0x8b6cff, 1.5, 150); key.position.set(-18, 14, 26);
+  var fill = new THREE.PointLight(0x33e6ff, 1.2, 150); fill.position.set(18, -12, 22);
+  var rim  = new THREE.PointLight(0x33ffb4, 0.7, 110); rim.position.set(0, -20, -10);
   var accent = new THREE.PointLight(0xffffff, 1.4, 60);
   scene.add(key, fill, rim, accent);
 
@@ -94,7 +94,7 @@
   /* ---------------------------------------------------------
      Geometry parameters
   --------------------------------------------------------- */
-  var R = isSmall ? 3.6 : 5.0;
+  var R = isSmall ? 2.6 : 3.6;
   var SPAN = 300;
   var TURNS = isSmall ? 8 : 11;
   var STEPS = isSmall ? 320 : 560;          // curve resolution
@@ -132,7 +132,7 @@
       new THREE.TubeGeometry(curve, STEPS, isSmall ? 0.075 : 0.1, RADIAL, false),
       new THREE.MeshStandardMaterial({
         color: 0xffffff, metalness: 0.2, roughness: 0.15,
-        emissive: sp.glow, emissiveIntensity: 2.4
+        emissive: sp.glow, emissiveIntensity: 0.85
       })
     );
     helix.add(core);
@@ -142,8 +142,8 @@
       new THREE.TubeGeometry(curve, STEPS, isSmall ? 0.17 : 0.23, RADIAL, false),
       new THREE.MeshStandardMaterial({
         color: sp.core, metalness: 0.95, roughness: 0.22,
-        emissive: sp.glow, emissiveIntensity: 0.5,
-        transparent: true, opacity: 0.62
+        emissive: sp.glow, emissiveIntensity: 0.22,
+        transparent: true, opacity: 0.5
       })
     );
     helix.add(shell);
@@ -152,7 +152,7 @@
     var halo = new THREE.Mesh(
       new THREE.TubeGeometry(curve, Math.floor(STEPS * 0.6), isSmall ? 0.42 : 0.58, 10, false),
       new THREE.MeshBasicMaterial({
-        color: sp.glow, transparent: true, opacity: 0.13,
+        color: sp.glow, transparent: true, opacity: 0.055,
         blending: THREE.AdditiveBlending, depthWrite: false
       })
     );
@@ -182,13 +182,13 @@
 
     var solid = new THREE.Mesh(rungGeo, new THREE.MeshStandardMaterial({
       color: 0xffffff, metalness: 0.6, roughness: 0.3,
-      emissive: col, emissiveIntensity: 1.1,
-      transparent: true, opacity: 0.5
+      emissive: col, emissiveIntensity: 0.4,
+      transparent: true, opacity: 0.3
     }));
     g.add(solid);
 
     var glow = new THREE.Mesh(rungGlowGeo, new THREE.MeshBasicMaterial({
-      color: col, transparent: true, opacity: 0.07,
+      color: col, transparent: true, opacity: 0.03,
       blending: THREE.AdditiveBlending, depthWrite: false
     }));
     g.add(glow);
@@ -273,7 +273,7 @@
       new THREE.SphereGeometry(rr, 32, 24),
       new THREE.MeshStandardMaterial({
         color: 0xffffff, metalness: 0.1, roughness: 0.1,
-        emissive: n.color, emissiveIntensity: 2.2
+        emissive: n.color, emissiveIntensity: 1.1
       })
     );
     holder.add(core);
@@ -382,7 +382,7 @@
     camera.updateProjectionMatrix();
 
     // on wide screens the strand sits right of centre so copy stays clear
-    var offset = w > 1100 ? R + 5.5 : 0;
+    var offset = w > 1100 ? R + 11 : 0;
     helix.position.x = offset;
     camera.position.x = offset;
   }
@@ -455,7 +455,7 @@
     pSX += (pX - pSX) * 0.045;
     pSY += (pY - pSY) * 0.045;
 
-    canvas.style.opacity = (fade * (isMid ? 0.5 : 0.92)).toFixed(3);
+    canvas.style.opacity = (fade * (isMid ? 0.14 : 0.34)).toFixed(3);
 
     // nothing to draw before the hero has cleared
     if (fade < 0.01) return;
@@ -476,10 +476,10 @@
       var near = Math.max(0, 1 - d / 18);
       var pulse = 1 + Math.sin(t * 0.0022 + i) * 0.045;
 
-      b.core.material.emissiveIntensity = 1.1 + near * 2.6;
+      b.core.material.emissiveIntensity = 0.55 + near * 1.3;
       b.shell.material.opacity = 0.16 + near * 0.3;
-      b.halo1.material.opacity = 0.07 + near * 0.26;
-      b.halo2.material.opacity = 0.03 + near * 0.13;
+      b.halo1.material.opacity = 0.03 + near * 0.12;
+      b.halo2.material.opacity = 0.012 + near * 0.055;
       b.halo1.scale.setScalar(pulse * (1 + near * 0.34));
       b.halo2.scale.setScalar(pulse * (1 + near * 0.5));
       b.plate.material.opacity = 0.12 + near * 0.88;
@@ -496,8 +496,8 @@
     rungs.forEach(function (r) {
       var wy = r.y + helix.position.y;
       var f = Math.max(0, 1 - Math.abs(wy) / 70);
-      r.solid.opacity = 0.1 + f * 0.55;
-      r.glow.opacity = 0.02 + f * 0.12;
+      r.solid.opacity = 0.06 + f * 0.3;
+      r.glow.opacity = 0.008 + f * 0.05;
     });
 
     // sparks run along the strands
@@ -507,7 +507,7 @@
       sp.curve.getPointAt(sp.u, tmp);
       sp.mesh.position.copy(tmp);
       var wy = tmp.y + helix.position.y;
-      sp.mesh.material.opacity = Math.max(0, 0.9 - Math.abs(wy) / 60);
+      sp.mesh.material.opacity = Math.max(0, 0.45 - Math.abs(wy) / 60);
     });
 
     key.position.y = 14 - travel * 0.08;

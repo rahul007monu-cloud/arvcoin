@@ -94,6 +94,13 @@ body::before{ /* ambient top glow */
 .nav-links a:hover{color:var(--txt)}
 .nav-links a:hover::after{width:100%}
 .nav-cta{display:flex;gap:12px;align-items:center}
+
+/* BUG FIX: .mobile-auth duplicates the Log in / Get started buttons inside
+   .nav-links. It was only hidden inside @media(max-width:980px), so on
+   desktop both sets rendered side by side. Hidden by default now; the
+   mobile drawer re-shows it. */
+.mobile-auth{display:none}
+
 .nav-burger{display:none;flex-direction:column;gap:5px;background:none;border:0;cursor:pointer;padding:6px}
 .nav-burger span{width:24px;height:2px;background:var(--txt);border-radius:2px;transition:.3s}
 
