@@ -1,14 +1,14 @@
 {
-  "name": "arvcoin — Micro-investment super app",
+  "name": "arvcoin — Market Research Desk",
   "short_name": "arvcoin",
-  "description": "Pay via UPI, auto-invest into crypto & Indian stocks. Chhoti UPI payment, bada future.",
+  "description": "Market research aur investor education — stocks, F&O options, commodity, currency aur crypto. Levels calculator free.",
   "start_url": "index.html",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#05060f",
   "theme_color": "#05060f",
-  "orientation": "portrait",
-  "categories": ["finance", "productivity"],
-  "lang": "en-IN",
+  "categories": ["finance", "education"],
   "icons": [
     {
       "src": "favicon.svg",
@@ -18,8 +18,27 @@
     }
   ],
   "shortcuts": [
-    { "name": "Dashboard", "url": "dashboard.html" },
-    { "name": "Log in", "url": "login.html" },
-    { "name": "Sign up", "url": "signup.html" }
+    {
+      "name": "Levels calculator",
+      "short_name": "Levels",
+      "description": "Support, resistance aur pivot points nikaalo",
+      "url": "levels.html"
+    },
+    {
+      "name": "Research feed",
+      "short_name": "Research",
+      "description": "Levels analysis aur market recap",
+      "url": "calls.html"
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "dashboard.html"
+    },
+    {
+      "name": "Log in",
+      "short_name": "Log in",
+      "url": "login.html"
+    }
   ]
 }

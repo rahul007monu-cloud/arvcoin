@@ -1,14 +1,38 @@
 # arvcoin — Apache config (Hostinger)
 
-# Web3Auth/Google login POPUP ko opener (arvcoin.com) se baat karne do.
-# Bina iske "Verify your Google account" pe hang hota hai (COOP window.closed block).
+# Google / popup logins ko chalne dene ke liye
 <IfModule mod_headers.c>
-  Header set Cross-Origin-Opener-Policy "same-origin-allow-popups"
+  Header always set Cross-Origin-Opener-Policy "same-origin-allow-popups"
 </IfModule>
 
-# sw.js + wallet-bundle.js hamesha fresh mile (purana cache/SW toड़ta hai)
+# Service worker aur config files kabhi cache na hon —
+# warna users purana code pakad ke baith jaate hain
 <IfModule mod_headers.c>
-  <FilesMatch "(sw|wallet-bundle)\.js$">
+  <FilesMatch "^(sw\.js|firebase-config\.js|arv-config\.js|emailjs-config\.js)$">
     Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
   </FilesMatch>
+</IfModule>
+
+# Static assets ko thoda cache karo
+<IfModule mod_headers.c>
+  <FilesMatch "\.(svg|png|jpg|jpeg|gif|webp|woff2?)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+</IfModule>
+
+# Compression
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/plain text/xml application/javascript application/json image/svg+xml
+</IfModule>
+
+# Custom 404
+ErrorDocument 404 /404.html
+
+# Purane crypto/wallet pages -> naye pages pe bhejo
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^kyc\.html$ /dashboard.html [R=301,L]
+  RewriteRule ^wallet\.html$ /dashboard.html [R=301,L]
 </IfModule>
