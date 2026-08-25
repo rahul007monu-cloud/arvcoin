@@ -97,10 +97,30 @@ service cloud.firestore {
 
     /* ---------- payments ----------
        Razorpay orders. Client apna order padh sakta hai, likh nahi sakta —
-       webhook signature server pe verify hoti hai. */
+       order Cloud Function banata hai aur webhook signature server pe
+       verify hoti hai. Client "success" pe kabhi trust nahi. */
     match /payments/{orderId} {
-      allow read:  if signedIn() && resource.data.uid == request.auth.uid;
+      allow read:  if isAdmin() ||
+                      (signedIn() && resource.data.uid == request.auth.uid);
       allow write: if false;
+    }
+
+    /* ---------- accessRequests (manual/offline grant ke liye) ----------
+       User request BANA sakta hai par status khud nahi badal sakta —
+       warna koi bhi apne aap ko 'paid' mark kar leta. */
+    match /accessRequests/{reqId} {
+      allow read: if isAdmin() ||
+                     (signedIn() && resource.data.uid == request.auth.uid);
+
+      allow create: if signedIn()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.planId is string
+                    && request.resource.data.code is string;
+
+      // Sirf admin grant/reject kar sakta hai
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /* ---------- plans (public catalogue) ---------- */
@@ -150,6 +170,38 @@ service cloud.firestore {
       allow read:  if isAnalyst() || subCovers(get(/databases/$(database)/documents/calls/$(callId)).data.segment);
       allow create: if isAnalyst();
       allow update, delete: if false;
+    }
+
+    /* ---------- analysis (levels + structure) ----------
+       Calculator ka output + analyst ka structural observation.
+       Koi buy/sell action, entry, target ya stop-loss field NAHI —
+       isliye RA registration ka gate yahan lagu nahi hota.
+
+       ⚠️ Is schema me kabhi bhi action/entry/target/stopLoss
+       fields NA add karna. Field add karte hi ye recommendation
+       ban jaayega aur registration ke bina illegal ho jaayega. */
+    match /analysis/{docId} {
+      allow read: if resource.data.free == true || subActive() || isAnalyst();
+
+      allow create: if isAnalyst()
+                    && request.resource.data.instrument is string
+                    && request.resource.data.segment in
+                       ['equity','options','commodity','currency','crypto']
+                    && request.resource.data.observation is string
+                    && request.resource.data.observation.size() >= 20
+                    // recommendation fields blocked at the rules layer
+                    && !request.resource.data.keys().hasAny(
+                         ['action','entry','targets','target','stopLoss','sl',
+                          'recommendation','rating','callType','expectedReturn']);
+
+      allow update: if isAnalyst()
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+                         ['instrument','segment','levels','publishedAt'])
+                    && !request.resource.data.keys().hasAny(
+                         ['action','entry','targets','target','stopLoss','sl',
+                          'recommendation','rating','callType','expectedReturn']);
+
+      allow delete: if isAdmin();
     }
 
     /* ---------- lessons (education, free + gated) ---------- */

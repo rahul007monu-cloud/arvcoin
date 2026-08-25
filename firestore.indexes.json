@@ -42,11 +42,35 @@
       ]
     },
     {
-      "collectionGroup": "payments",
+      "collectionGroup": "accessRequests",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "uid", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "accessRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "analysis",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "segment", "order": "ASCENDING" },
+        { "fieldPath": "publishedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "analysis",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "free", "order": "ASCENDING" },
+        { "fieldPath": "publishedAt", "order": "DESCENDING" }
       ]
     },
     {

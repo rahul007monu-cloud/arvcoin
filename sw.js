@@ -1,5 +1,5 @@
 /* arvcoin — service worker (offline cache) */
-var CACHE = "arvcoin-v19";
+var CACHE = "arvcoin-v20";
 var ASSETS = [
   "index.html",
   "styles.css",
@@ -33,7 +33,14 @@ var ASSETS = [
   "calls.css",
   "calls.js",
   "admin.html",
-  "admin.js"
+  "admin.js",
+  "lux.css",
+  "lux.js",
+  "home.js",
+  "pricing.js",
+  "levels.html",
+  "levels.js",
+  "levels-ui.js"
 ];
 
 self.addEventListener("install", function (e) {

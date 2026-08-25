@@ -12,9 +12,9 @@
    collection se aata hai. Matlab blur cosmetic nahi, asli hai.
    ========================================================= */
 import {
-  ready, onUser, requireAuth, getWallet, watchWallet, watchSubscription,
-  entitlement, listCalls, listTeasers, listLessons, listRecaps,
-  performanceStats, inr, arv, when
+  ready, onUser, requireAuth, watchSubscription,
+  entitlement, listCalls, listTeasers, listLessons, listRecaps, listAnalysis,
+  performanceStats, inr, when
 } from "./arv-core.js";
 
 var CFG = window.ARV_CONFIG;
@@ -27,6 +27,7 @@ var state = {
   teasers: [],
   lessons: [],
   recaps: [],
+  analysis: [],
   loading: true
 };
 
@@ -66,10 +67,10 @@ function paintModeBanner() {
     $("mb-ico").textContent = "🎓";
     $("mb-title").textContent = "Education mode chalu hai.";
     $("mb-text").textContent =
-      "Buy/sell recommendations dene ke liye SEBI Research Analyst registration zaroori hai " +
-      "(RA Regulations, 2014). Registration aane tak yahan sirf educational content aur " +
-      "market recap milta hai — koi call publish nahi hoti.";
-    $("ph-sub").textContent = "Market concepts, daily recap aur case studies — samajhne ke liye.";
+      "Yahan levels analysis, market recap aur lessons milte hain — computed support/resistance " +
+      "aur structural observations ke saath. Buy/sell recommendations ke liye SEBI Research " +
+      "Analyst registration zaroori hai (RA Regulations, 2014), wo aane par unlock hongi.";
+    $("ph-sub").textContent = "Levels analysis, daily recap aur market concepts.";
   }
 }
 
@@ -102,10 +103,18 @@ function paintTabs() {
 /* ---------------------------------------------------------
    Header pills
 --------------------------------------------------------- */
-function paintPills(wallet) {
-  if (wallet) {
-    $("pill-credits").innerHTML = "<b>" + Number(wallet.arvBalance || 0).toLocaleString("en-IN") + "</b> ARV";
-    $("pill-credits").className = "pill-stat" + ((wallet.arvBalance || 0) > 0 ? " ok" : "");
+function paintPills() {
+  // segment coverage pill
+  var cov = $("pill-credits");
+  if (cov) {
+    if (state.ent.active) {
+      cov.innerHTML = "<b>" + state.ent.segments.length + "</b> / " +
+                      CFG.SEGMENT_ORDER.length + " segments";
+      cov.className = "pill-stat ok";
+    } else {
+      cov.innerHTML = '<a href="pricing.html" style="color:var(--cyan)">Upgrade</a>';
+      cov.className = "pill-stat";
+    }
   }
   var p = $("pill-plan");
   if (state.ent.active) {
@@ -209,6 +218,48 @@ function lockedCard(t) {
     '</article>';
 }
 
+function analysisCard(a) {
+  var seg = CFG.SEGMENTS[a.segment] || { name: a.segment, icon: "🧮", color: "#00e0ff" };
+  var lv = a.levels || {};
+  var toneCls = lv.biasTone === "up" ? "target_hit" : (lv.biasTone === "down" ? "sl_hit" : "closed");
+
+  return '' +
+    '<article class="call-card">' +
+      '<div class="cc-top">' +
+        '<span class="cc-inst">' + esc(a.instrument) + '</span>' +
+        (lv.biasLabel ? '<span class="cc-status ' + toneCls + '">' + esc(lv.biasLabel) + '</span>' : "") +
+        '<span class="cc-when">' + when(a.publishedAt) + '</span>' +
+      '</div>' +
+
+      '<div class="cc-meta">' +
+        '<span class="chip" style="color:' + seg.color + '">' + seg.icon + " " + esc(seg.name) + '</span>' +
+        '<span class="chip">' + esc(a.timeframe || "daily") + '</span>' +
+        (lv.cprShape ? '<span class="chip">CPR ' + esc(lv.cprShape) + '</span>' : "") +
+        (a.free ? '<span class="chip">Free</span>' : "") +
+      '</div>' +
+
+      '<div class="cc-levels">' +
+        '<div class="lvl s"><small>Support S1</small><b>' + num(lv.s1) + '</b></div>' +
+        '<div class="lvl s"><small>Support S2</small><b>' + num(lv.s2) + '</b></div>' +
+        '<div class="lvl"><small>Pivot</small><b>' + num(lv.pivot) + '</b></div>' +
+        '<div class="lvl t"><small>Resistance R1</small><b>' + num(lv.r1) + '</b></div>' +
+      '</div>' +
+      '<div class="cc-levels">' +
+        '<div class="lvl t"><small>Resistance R2</small><b>' + num(lv.r2) + '</b></div>' +
+        '<div class="lvl"><small>CPR top</small><b>' + num(lv.cprTop) + '</b></div>' +
+        '<div class="lvl"><small>CPR bottom</small><b>' + num(lv.cprBottom) + '</b></div>' +
+        '<div class="lvl"><small>Range</small><b>' + num(lv.range) + '</b></div>' +
+      '</div>' +
+
+      (a.observation ? '<div class="cc-why"><b>Structural observation</b>' + esc(a.observation) + '</div>' : "") +
+
+      '<div class="cc-ra">' +
+        '<b>Levels calculation</b> Classic pivots + CPR · ' +
+        'Ye computed analysis hai, koi buy/sell recommendation nahi.' +
+      '</div>' +
+    '</article>';
+}
+
 function lessonCard(l) {
   var seg = CFG.SEGMENTS[l.segment] || { name: l.segment || "General", icon: "🎓" };
   return '' +
@@ -257,19 +308,20 @@ function paintFeed() {
     return;
   }
 
-  /* ---- education mode ---- */
+  /* ---- education mode: analysis + recap + lessons ---- */
   if (!REGISTERED) {
     $("perf-strip").style.display = "none";
     var eduHtml = "";
 
+    state.analysis.forEach(function (a) { eduHtml += analysisCard(a); });
     state.recaps.forEach(function (r) { eduHtml += recapCard(r); });
     state.lessons.forEach(function (l) { eduHtml += lessonCard(l); });
 
     if (!eduHtml) {
-      eduHtml = emptyState("🎓", "Content jaldi aa raha hai",
-        "Market basics, options concepts, commodity aur currency lessons publish ho rahe hain. " +
-        "Daily recap bhi shuru hone wala hai.",
-        '<a href="pricing.html" class="btn btn-primary">Plans dekho</a>');
+      eduHtml = emptyState("🧮", "Analysis jaldi aa raha hai",
+        "Levels analysis, market recap aur lessons publish ho rahe hain. " +
+        "Tab tak free Levels Calculator use karo — kisi bhi instrument ke support/resistance nikaalo.",
+        '<a href="levels.html" class="btn btn-primary">Levels calculator →</a>');
     }
     feed.innerHTML = eduHtml;
     return;
@@ -289,6 +341,7 @@ function paintFeed() {
 
   var html = "";
   state.calls.forEach(function (c) { html += callCard(c); });
+  state.analysis.forEach(function (a) { html += analysisCard(a); });
 
   // Jo calls subscription cover nahi karti — teaser (locked)
   var seenIds = {};
@@ -322,11 +375,13 @@ function load() {
 
   if (!REGISTERED) {
     Promise.all([
+      listAnalysis({ segment: seg, limit: 40 }),
       listRecaps(5),
       listLessons({ segment: seg, limit: 40 })
     ]).then(function (r) {
-      state.recaps = r[0];
-      state.lessons = r[1];
+      state.analysis = r[0];
+      state.recaps = r[1];
+      state.lessons = r[2];
       state.loading = false;
       paintFeed();
     });
@@ -335,10 +390,12 @@ function load() {
 
   Promise.all([
     listCalls({ segment: seg, limit: 60 }),
-    listTeasers({ segment: seg, limit: 40 })
+    listTeasers({ segment: seg, limit: 40 }),
+    listAnalysis({ segment: seg, limit: 40 })
   ]).then(function (r) {
     state.calls = r[0];
     state.teasers = r[1];
+    state.analysis = r[2];
     state.loading = false;
     paintFeed();
   });
@@ -358,12 +415,9 @@ if (!ready) {
   requireAuth("login.html").then(function (u) {
     if (!u) return;
 
-    getWallet().then(paintPills);
-    watchWallet(paintPills);
-
     watchSubscription(function (sub) {
       state.ent = entitlement(sub);
-      paintPills(null);
+      paintPills();
       paintTabs();
       load();
     });

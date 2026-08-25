@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#05060f" />
+  <title>Levels Calculator — Support, Resistance & Pivots | arvcoin</title>
+  <meta name="description" content="Free levels calculator — kisi bhi stock, index, commodity ya currency ke major support, resistance, pivot points aur CPR nikaalo. Classic, Fibonacci, Camarilla aur Woodie formulas." />
+  <link rel="canonical" href="https://arvcoin.com/levels.html" />
+  <meta property="og:title" content="Levels Calculator — arvcoin" />
+  <meta property="og:description" content="Support, resistance, pivot points aur CPR — math se, seedha." />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="lux.css" />
+  <link rel="stylesheet" href="calls.css" />
+  <style>
+    .lv-grid{display:grid;grid-template-columns:.85fr 1.15fr;gap:22px;align-items:start}
+    @media(max-width:900px){.lv-grid{grid-template-columns:1fr}}
+
+    /* ladder */
+    .ladder{display:flex;flex-direction:column;gap:5px}
+    .rung{display:flex;align-items:center;gap:12px;padding:11px 16px;border-radius:12px;
+      background:rgba(255,255,255,.03);border:1px solid var(--stroke);
+      transition:transform .3s var(--ease-lux),border-color .3s}
+    .rung:hover{transform:translateX(4px);border-color:var(--stroke-strong)}
+    .rung .lbl{font-family:var(--font-alt);font-size:12px;font-weight:700;letter-spacing:.06em;
+      width:42px;flex-shrink:0}
+    .rung .val{font-family:var(--font-alt);font-size:17px;font-weight:700;margin-left:auto}
+    .rung .gap{font-size:11.5px;color:var(--muted-2);width:66px;text-align:right}
+    .rung.res{background:rgba(255,93,108,.07);border-color:rgba(255,93,108,.2)}
+    .rung.res .lbl,.rung.res .val{color:var(--down)}
+    .rung.sup{background:rgba(47,224,138,.07);border-color:rgba(47,224,138,.2)}
+    .rung.sup .lbl,.rung.sup .val{color:var(--up)}
+    .rung.piv{background:linear-gradient(100deg,rgba(124,92,255,.18),rgba(0,224,255,.07));
+      border-color:var(--stroke-strong)}
+    .rung.piv .lbl,.rung.piv .val{color:var(--txt)}
+    .rung.cprb{background:rgba(0,224,255,.06);border-color:rgba(0,224,255,.18)}
+    .rung.cprb .lbl,.rung.cprb .val{color:var(--cyan)}
+
+    /* bias badge */
+    .bias-box{padding:20px 22px;border-radius:18px;margin-bottom:18px}
+    .bias-box.up{background:rgba(47,224,138,.1);border:1px solid rgba(47,224,138,.28)}
+    .bias-box.down{background:rgba(255,93,108,.09);border:1px solid rgba(255,93,108,.26)}
+    .bias-box.flat{background:rgba(255,255,255,.04);border:1px solid var(--stroke)}
+    .bias-box .bb-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+    .bias-box .bb-lbl{font-family:var(--font-alt);font-size:19px;font-weight:800}
+    .bias-box.up .bb-lbl{color:var(--up)}
+    .bias-box.down .bb-lbl{color:var(--down)}
+    .bias-box .bb-pct{font-size:13px;color:var(--muted);padding:4px 11px;border-radius:999px;
+      background:rgba(255,255,255,.06);border:1px solid var(--stroke)}
+    .bias-box p{font-size:13.8px;color:var(--muted);line-height:1.65;margin-top:4px}
+
+    /* formula tabs */
+    .f-tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px}
+    .f-tab{padding:9px 16px;border-radius:999px;cursor:pointer;background:var(--panel);
+      border:1px solid var(--stroke);color:var(--muted);font-family:var(--font);
+      font-weight:600;font-size:13px;transition:.2s}
+    .f-tab.active{background:linear-gradient(100deg,rgba(124,92,255,.24),rgba(0,224,255,.1));
+      color:var(--txt);border-color:var(--stroke-strong)}
+
+    .mini-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+    .mini{padding:13px 15px;border-radius:13px;background:rgba(255,255,255,.03);border:1px solid var(--stroke)}
+    .mini small{display:block;font-size:10.5px;color:var(--muted-2);text-transform:uppercase;
+      letter-spacing:.06em;margin-bottom:4px}
+    .mini b{font-family:var(--font-alt);font-size:15.5px}
+    @media(max-width:560px){.mini-stats{grid-template-columns:1fr 1fr}}
+
+    .quick-pick{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px}
+    .qp{padding:6px 13px;border-radius:999px;cursor:pointer;background:rgba(255,255,255,.04);
+      border:1px solid var(--stroke);color:var(--muted);font-size:12.5px;font-family:var(--font);
+      transition:.2s}
+    .qp:hover{color:var(--txt);border-color:var(--stroke-strong)}
+  </style>
+</head>
+<body>
+  <canvas id="bg-canvas"></canvas>
+  <div class="aurora"><span class="a1"></span><span class="a2"></span><span class="a3"></span></div>
+  <div class="grid-overlay"></div>
+  <div class="grain"></div>
+
+  <header class="nav scrolled" id="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 40 40" width="30" height="30">
+            <defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#7c5cff"/><stop offset="0.5" stop-color="#00e0ff"/><stop offset="1" stop-color="#00ffa3"/>
+            </linearGradient></defs>
+            <circle cx="20" cy="20" r="18" fill="none" stroke="url(#lg1)" stroke-width="2.5"/>
+            <path d="M13 26 L20 12 L27 26 M15.6 21 H24.4" fill="none" stroke="url(#lg1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="brand-name">arv<span>coin</span></span>
+      </a>
+      <div class="nav-cta">
+        <a href="calls.html" class="btn btn-ghost">Research</a>
+        <a href="pricing.html" class="btn btn-primary">Plans</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="lux-wrap lux-page" style="padding-bottom:80px">
+
+    <div class="lux-head" style="text-align:left;margin-bottom:30px">
+      <span class="lux-eyebrow"><span class="dot"></span> Free tool · no login</span>
+      <h1 class="lux-h1" style="font-size:clamp(30px,5vw,54px)">Levels <span class="shimmer">calculator</span></h1>
+      <p class="lux-lead" style="margin-top:16px">
+        Kisi bhi stock, index, commodity ya currency ka <b style="color:var(--txt)">major support</b>,
+        <b style="color:var(--txt)">major resistance</b>, pivot points aur CPR nikaalo.
+        Previous session ka High, Low, Close daalo — baaki math kar dega.
+      </p>
+    </div>
+
+    <div class="lux-note info" style="margin-bottom:28px">
+      <span class="n-ico">🧮</span>
+      <div>
+        <b>Ye ek calculator hai, recommendation nahi.</b> Levels standard public formulas
+        (Classic, Fibonacci, Camarilla, Woodie, CPR) se compute hote hain. Same input pe
+        sabko same output milta hai. Ye batata hai ki <b>math ke hisaab se</b> levels kahan
+        hain — ye nahi ki aapko kya karna chahiye. Sirf education aur analysis ke liye.
+      </div>
+    </div>
+
+    <div class="lv-grid">
+
+      <!-- ============ INPUT ============ -->
+      <div class="lux card" style="padding:26px">
+        <h2 style="font-size:18px;font-weight:700;margin-bottom:4px">Previous session data</h2>
+        <p style="color:var(--muted-2);font-size:13px;margin-bottom:20px">
+          Pichle din (ya pichle candle) ka OHLC daalo.
+        </p>
+
+        <div class="fld">
+          <label for="i-symbol">Instrument (optional)</label>
+          <input id="i-symbol" placeholder="RELIANCE / NIFTY / GOLD / COPPER / USDINR" autocomplete="off" />
+          <div class="quick-pick" style="margin-top:9px">
+            <button type="button" class="qp" data-sym="NIFTY">NIFTY</button>
+            <button type="button" class="qp" data-sym="BANKNIFTY">BANKNIFTY</button>
+            <button type="button" class="qp" data-sym="GOLD">GOLD</button>
+            <button type="button" class="qp" data-sym="SILVER">SILVER</button>
+            <button type="button" class="qp" data-sym="COPPER">COPPER</button>
+            <button type="button" class="qp" data-sym="CRUDEOIL">CRUDE</button>
+            <button type="button" class="qp" data-sym="USDINR">USDINR</button>
+          </div>
+        </div>
+
+        <div class="fld-row">
+          <div class="fld">
+            <label for="i-high">High <span style="color:var(--down)">*</span></label>
+            <input id="i-high" type="number" step="any" inputmode="decimal" placeholder="1450.00" />
+          </div>
+          <div class="fld">
+            <label for="i-low">Low <span style="color:var(--down)">*</span></label>
+            <input id="i-low" type="number" step="any" inputmode="decimal" placeholder="1395.00" />
+          </div>
+        </div>
+
+        <div class="fld-row">
+          <div class="fld">
+            <label for="i-close">Close <span style="color:var(--down)">*</span></label>
+            <input id="i-close" type="number" step="any" inputmode="decimal" placeholder="1432.00" />
+          </div>
+          <div class="fld">
+            <label for="i-open">Open</label>
+            <input id="i-open" type="number" step="any" inputmode="decimal" placeholder="1402.00" />
+            <p class="hint">Woodie pivots ke liye</p>
+          </div>
+        </div>
+
+        <div class="fld">
+          <label for="i-ltp">Current LTP (optional)</label>
+          <input id="i-ltp" type="number" step="any" inputmode="decimal" placeholder="1438.00" />
+          <p class="hint">Daalo to levels ke saath live distance dikhega</p>
+        </div>
+
+        <button type="button" class="btn-lux" id="btn-calc" style="width:100%;justify-content:center">
+          Levels nikaalo →
+        </button>
+        <button type="button" class="btn-glass" id="btn-clear" style="width:100%;justify-content:center;margin-top:10px">
+          Clear
+        </button>
+
+        <div class="adm-msg" id="err" style="margin-top:16px"></div>
+      </div>
+
+      <!-- ============ OUTPUT ============ -->
+      <div>
+        <div id="out" style="display:none">
+          <!-- bias -->
+          <div class="bias-box" id="bias-box">
+            <div class="bb-top">
+              <span class="bb-lbl" id="bb-lbl"></span>
+              <span class="bb-pct" id="bb-pct"></span>
+            </div>
+            <p id="bb-note"></p>
+            <p id="bb-strength"></p>
+          </div>
+
+          <!-- mini stats -->
+          <div class="mini-stats">
+            <div class="mini"><small>Range</small><b id="m-range"></b></div>
+            <div class="mini"><small>Range %</small><b id="m-rangepct"></b></div>
+            <div class="mini"><small>CPR width</small><b id="m-cpr"></b></div>
+          </div>
+
+          <div class="lux-note" id="cpr-note" style="margin-bottom:18px">
+            <span class="n-ico">◫</span>
+            <div><b>CPR:</b> <span id="cpr-mean"></span></div>
+          </div>
+
+          <!-- formula tabs -->
+          <div class="lux" style="padding:22px">
+            <h2 style="font-size:17px;font-weight:700;margin-bottom:14px">Support &amp; Resistance</h2>
+            <div class="f-tabs" id="f-tabs">
+              <button type="button" class="f-tab active" data-f="classic">Classic</button>
+              <button type="button" class="f-tab" data-f="fibonacci">Fibonacci</button>
+              <button type="button" class="f-tab" data-f="camarilla">Camarilla</button>
+              <button type="button" class="f-tab" data-f="woodie">Woodie</button>
+            </div>
+            <div class="ladder" id="ladder"></div>
+          </div>
+
+          <!-- extent -->
+          <div class="lux" style="padding:22px;margin-top:18px">
+            <h2 style="font-size:17px;font-weight:700;margin-bottom:6px">Computed extent</h2>
+            <p style="color:var(--muted-2);font-size:12.5px;margin-bottom:16px">
+              Formula ke hisaab se sabse door ke levels. Ye prediction nahi — calculation hai.
+            </p>
+            <div class="lux-table">
+              <div class="tr"><span>Nearest resistance (R1)</span><b id="e-r1"></b></div>
+              <div class="tr"><span>Upper-most computed level (R4)</span><b id="e-r4"></b></div>
+              <div class="tr"><span>Nearest support (S1)</span><b id="e-s1"></b></div>
+              <div class="tr"><span>Lower-most computed level (S4)</span><b id="e-s4"></b></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- empty -->
+        <div class="empty" id="empty">
+          <div class="e-ico">🧮</div>
+          <h3>Data daalo, levels aayenge</h3>
+          <p>Previous session ka High, Low aur Close bharo — Classic, Fibonacci, Camarilla,
+             Woodie pivots aur CPR sab ek saath mil jaayenge.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- how to read -->
+    <section class="lux-sec" style="padding-bottom:20px">
+      <h2 class="lux-h2" style="font-size:clamp(22px,3vw,32px);margin-bottom:26px">
+        Inhe <span class="shimmer">kaise padhte</span> hain
+      </h2>
+      <div class="lux-grid g3">
+        <div class="lux lux-card lux-tilt">
+          <div class="ico">◈</div>
+          <h3>Pivot point</h3>
+          <p>Previous session ke High, Low, Close ka average. Ye wo reference level hai
+             jiske aas-paas se baaki sab levels nikalte hain.</p>
+        </div>
+        <div class="lux lux-card lux-tilt">
+          <div class="ico">▲</div>
+          <h3>Resistance (R1–R4)</h3>
+          <p>Pivot ke upar ke computed levels. Formula ke hisaab se yahan tak upar
+             ka scope calculate hota hai.</p>
+        </div>
+        <div class="lux lux-card lux-tilt">
+          <div class="ico">▼</div>
+          <h3>Support (S1–S4)</h3>
+          <p>Pivot ke neeche ke computed levels. Formula ke hisaab se yahan tak neeche
+             ka scope calculate hota hai.</p>
+        </div>
+        <div class="lux lux-card lux-tilt">
+          <div class="ico">◫</div>
+          <h3>CPR</h3>
+          <p>Central Pivot Range — Pivot, TC aur BC ka band. Narrow CPR aur wide CPR
+             ka historical behaviour alag hota hai.</p>
+        </div>
+        <div class="lux lux-card lux-tilt">
+          <div class="ico">∑</div>
+          <h3>Chaar formulas kyun?</h3>
+          <p>Classic, Fibonacci, Camarilla aur Woodie — har ek alag math use karta hai.
+             Jahan multiple formulas ek hi level pe milte hain, wo cluster analysts
+             ke liye interesting hota hai.</p>
+        </div>
+        <div class="lux lux-card lux-tilt">
+          <div class="ico">⚠️</div>
+          <h3>Limitation</h3>
+          <p>Ye pure math hai — news, results, global cues, liquidity kuch bhi account
+             me nahi hai. Levels guarantee nahi hain, sirf reference points hain.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="disclosure" id="disc"></div>
+
+    <a href="index.html" class="back-link">← Home</a>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="arv-config.js"></script>
+  <script src="levels.js"></script>
+  <script src="3d.js" defer></script>
+  <script src="lux.js" defer></script>
+  <script src="levels-ui.js" defer></script>
+</body>
+</html>

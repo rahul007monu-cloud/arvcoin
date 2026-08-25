@@ -9,7 +9,7 @@ import {
   GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, updateProfile
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  getFirestore, doc, setDoc, serverTimestamp
+  getFirestore, doc, setDoc, getDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 var cfg = window.ARV_FIREBASE_CONFIG;
@@ -42,6 +42,14 @@ function saveProfile(uid, data) {
   if (!db || !uid) return Promise.resolve();
   return setDoc(doc(db, "users", uid), Object.assign({}, data, { updatedAt: serverTimestamp() }), { merge: true })
     .catch(function (e) { console.warn("[arvcoin] firestore save fail:", e); });
+}
+
+/* Email ek hi baar verify hoti hai. Uske baad OTP dobara NAHI maangte. */
+function isVerified(uid) {
+  if (!db || !uid) return Promise.resolve(true);
+  return getDoc(doc(db, "users", uid))
+    .then(function (s) { return !!(s.exists() && s.data().emailVerified); })
+    .catch(function () { return true; }); // read fail ho to user ko rok nahi rahe
 }
 
 function friendlyError(e) {
@@ -199,8 +207,26 @@ if (loginForm) {
       .then(function (cred) {
         var u = cred.user;
         saveLocal({ name: u.displayName || "", email: u.email, mobile: "", at: Date.now() });
-        msg("ok", "\uD83D\uDD13 Welcome back! Dashboard khul raha hai\u2026");
-        setTimeout(function () { window.location.href = "dashboard.html"; }, 900);
+
+        /* Email pehle se verified hai -> seedha dashboard, koi OTP nahi.
+           Sirf pehli baar (unverified account) OTP maangte hain. */
+        return isVerified(u.uid).then(function (ok) {
+          if (ok) {
+            msg("ok", "\uD83D\uDD13 Welcome back! Dashboard khul raha hai\u2026");
+            setTimeout(function () { window.location.href = "dashboard.html"; }, 800);
+            return;
+          }
+
+          var code = genOtp();
+          setPending({
+            name: u.displayName || "", email: u.email, mobile: "", uid: u.uid,
+            code: code, exp: Date.now() + 15 * 60 * 1000, sentAt: Date.now()
+          });
+          msg("ok", "Ek baar email verify karni hai \u2014 code bhej rahe hain\u2026");
+          return sendOtpEmail(u.email, u.displayName || "there", code).then(function () {
+            setTimeout(function () { window.location.href = "verify.html"; }, 800);
+          });
+        });
       })
       .catch(function (err) {
         if (btn) btn.disabled = false;
@@ -218,7 +244,11 @@ function googleLogin(btn) {
   signInWithPopup(auth, provider)
     .then(function (res) {
       var u = res.user;
-      return saveProfile(u.uid, { name: u.displayName || "", email: u.email || "", provider: "google", createdAt: serverTimestamp() })
+      /* Google already email verify kar chuka hai -> OTP kabhi nahi maangte. */
+      return saveProfile(u.uid, {
+        name: u.displayName || "", email: u.email || "", provider: "google",
+        emailVerified: true, createdAt: serverTimestamp()
+      })
         .then(function () {
           saveLocal({ name: u.displayName || "Google User", email: u.email || "", mobile: "", at: Date.now() });
           window.location.href = "dashboard.html";

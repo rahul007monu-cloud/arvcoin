@@ -65,7 +65,8 @@
 
     <!-- what to publish -->
     <div class="seg-tabs" id="kind-tabs">
-      <button class="seg-tab active" data-kind="call"><i>◹</i> Research call</button>
+      <button class="seg-tab active" data-kind="analysis"><i>🧮</i> Levels analysis <span class="lock">✓ live</span></button>
+      <button class="seg-tab" data-kind="call"><i>◹</i> Research call</button>
       <button class="seg-tab" data-kind="lesson"><i>🎓</i> Lesson</button>
       <button class="seg-tab" data-kind="recap"><i>≣</i> Market recap</button>
     </div>
@@ -77,8 +78,83 @@
         <div class="adm-msg" id="msg"></div>
         <div class="lint-out" id="lint"></div>
 
+        <!-- ---------- ANALYSIS FORM (RA gate se free) ---------- -->
+        <form id="form-analysis">
+          <h2>Levels analysis</h2>
+          <p class="card-sub">
+            H/L/C daalo — levels khud compute ho jaayenge. Registration ki zaroorat nahi,
+            turant publish hota hai.
+          </p>
+
+          <div class="lux-note good" style="margin-bottom:20px;font-size:13.5px">
+            <span class="n-ico">✓</span>
+            <div>
+              Ye <b>calculator output + aapka structural view</b> hai. Isme koi
+              buy/sell action, entry, target ya stop-loss field nahi hai — isliye ye
+              RA registration ke bina publish ho jaata hai aur subscribers ko turant dikhta hai.
+            </div>
+          </div>
+
+          <div class="fld-row">
+            <div class="fld">
+              <label for="a-segment">Segment</label>
+              <select id="a-segment"></select>
+            </div>
+            <div class="fld">
+              <label for="a-instrument">Instrument</label>
+              <input id="a-instrument" placeholder="RELIANCE / NIFTY / GOLD / COPPER" autocomplete="off" />
+            </div>
+          </div>
+
+          <div class="fld-row-3">
+            <div class="fld">
+              <label for="a-high">Prev High</label>
+              <input id="a-high" type="number" step="any" inputmode="decimal" placeholder="1450" />
+            </div>
+            <div class="fld">
+              <label for="a-low">Prev Low</label>
+              <input id="a-low" type="number" step="any" inputmode="decimal" placeholder="1395" />
+            </div>
+            <div class="fld">
+              <label for="a-close">Prev Close</label>
+              <input id="a-close" type="number" step="any" inputmode="decimal" placeholder="1432" />
+            </div>
+          </div>
+
+          <div id="a-levels-out" style="display:none;margin-bottom:18px"></div>
+
+          <div class="fld">
+            <label for="a-observation">Structural observation (min 20 chars)</label>
+            <textarea id="a-observation" placeholder="Price computed pivot ke upar hai, CPR narrow hai. Volume previous session me average se zyada tha. R1 ke aas-paas supply zone dikh raha hai..."></textarea>
+            <p class="hint">
+              Structure, volume, CPR, level clusters — kya observe kiya. "Buy karo", "target",
+              "SL" jaisi bhasha auto-block ho jaayegi.
+            </p>
+          </div>
+
+          <div class="fld-row">
+            <div class="fld">
+              <label for="a-timeframe">Timeframe</label>
+              <select id="a-timeframe">
+                <option value="intraday">Intraday</option>
+                <option value="daily" selected>Daily</option>
+                <option value="weekly">Weekly</option>
+              </select>
+            </div>
+            <div class="fld">
+              <label for="a-free">Access</label>
+              <select id="a-free">
+                <option value="false">Subscribers only</option>
+                <option value="true">Free (SEO + funnel)</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-lg" id="btn-analysis">Publish analysis</button>
+        </form>
+
         <!-- ---------- CALL FORM ---------- -->
-        <form id="form-call">
+        <form id="form-call" style="display:none">
           <h2>New research call</h2>
           <p class="card-sub">Rationale zaroori hai — bina research ke bare tip research nahi hoti.</p>
 
@@ -283,6 +359,7 @@
   <script src="firebase-config.js"></script>
   <script src="arv-config.js"></script>
   <script src="compliance-lint.js"></script>
+  <script src="levels.js"></script>
   <script type="module" src="admin.js"></script>
 </body>
 </html>
