@@ -1,90 +1,106 @@
 /* =========================================================
-   arvcoin — DNA double helix
+   arvcoin — DNA double helix (high fidelity)
 
-   A single helix runs the full height of the document. It lives on a
-   fixed, full-viewport canvas behind the content, so as you scroll the
-   page you travel down the strand — it rotates and rises continuously
-   from the top of the site to the bottom.
+   A single strand runs from just below the hero to the bottom of the
+   document, on a fixed full-viewport canvas behind the content. Scroll
+   travels you down it while it rotates.
 
-   Structure:
-     - two intertwined strands, phase-offset by PI
-     - rungs joining them, like base pairs
-     - glowing service nodes spaced along the strand; when a node passes
-       the viewport centre it flares and the caption updates
+   Quality approach — r128 from a CDN has no post-processing addons, so
+   bloom is faked with layered additive shells rather than an
+   EffectComposer pass:
+
+     - each backbone is three concentric tubes: an emissive core, a
+       translucent mid shell, and a wide additive halo
+     - high segment counts, ACES filmic tone mapping, high pixel ratio
+     - label plates render at 2x and are mipmapped for crisp text
+     - travelling sparks ride the strand to catch the eye
 
    Guards: skips without THREE, static under prefers-reduced-motion,
-   pauses when the tab is hidden, lighter geometry on small screens.
+   pauses when hidden, and steps geometry down on small screens.
    ========================================================= */
 (function () {
   "use strict";
 
   if (typeof THREE === "undefined") return;
-
-  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (reduced) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
   var CFG = window.ARV_CONFIG || {};
   var S = CFG.SEGMENTS || {};
 
   /* ---------------------------------------------------------
-     Service nodes carried on the strand
+     Service beads carried on the strand
   --------------------------------------------------------- */
   var NODES = [
-    { label: "Stocks",     sub: "NSE · BSE",       color: 0x7c5cff,
+    { label: "Stocks",    sub: "NSE · BSE",      color: 0x8b6cff,
       body: (S.equity && S.equity.blurb) || "Cash equity across large, mid and small caps." },
-    { label: "F&O",        sub: "Derivatives",     color: 0x00e0ff,
+    { label: "F&O",       sub: "Derivatives",    color: 0x33e6ff,
       body: (S.options && S.options.blurb) || "Index and stock derivatives." },
-    { label: "Commodity",  sub: "MCX · NCDEX",     color: 0xffb020,
+    { label: "Commodity", sub: "MCX · NCDEX",    color: 0xffc247,
       body: (S.commodity && S.commodity.blurb) || "Metals, energy and agri contracts." },
-    { label: "Currency",   sub: "INR pairs",       color: 0x00ffa3,
+    { label: "Currency",  sub: "INR pairs",      color: 0x33ffb4,
       body: (S.currency && S.currency.blurb) || "Exchange-traded currency derivatives." },
-    { label: "Crypto",     sub: "Digital assets",  color: 0xf7931a,
+    { label: "Crypto",    sub: "Digital assets", color: 0xffa53d,
       body: (S.crypto && S.crypto.blurb) || "Major digital assets." },
-    { label: "Levels",     sub: "Free tool",       color: 0x00e0ff,
+    { label: "Levels",    sub: "Free tool",      color: 0x4de4ff,
       body: "Support, resistance, pivots and CPR for any instrument. Free, no login." },
-    { label: "Recap",      sub: "Daily",           color: 0xdfe6ff,
+    { label: "Recap",     sub: "Daily",          color: 0xe8ecff,
       body: "A factual summary of what moved, and why." },
-    { label: "Lessons",    sub: "Education",       color: 0xe8c98a,
+    { label: "Lessons",   sub: "Education",      color: 0xf0d79a,
       body: "Market concepts from the basics to advanced." }
   ];
 
-  var isSmall = window.innerWidth < 760;
-  var DPR = Math.min(window.devicePixelRatio || 1, isSmall ? 1.4 : 1.9);
+  var W0 = window.innerWidth;
+  var isSmall = W0 < 760;
+  var isMid = W0 < 1100;
+
+  /* Crisp on retina and 4K. Capped so a 4K panel does not melt the GPU. */
+  var DPR = Math.min(window.devicePixelRatio || 1, isSmall ? 2 : 2.5);
 
   /* ---------------------------------------------------------
-     Canvas — fixed, behind the content
+     Renderer
   --------------------------------------------------------- */
   var canvas = document.createElement("canvas");
   canvas.id = "helix-canvas";
   document.body.appendChild(canvas);
 
-  var renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: !isSmall });
+  var renderer = new THREE.WebGLRenderer({
+    canvas: canvas, alpha: true, antialias: true, powerPreference: "high-performance"
+  });
   renderer.setPixelRatio(DPR);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.18;
+  if ("outputEncoding" in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
 
   var scene = new THREE.Scene();
-  var camera = new THREE.PerspectiveCamera(50, 1, 0.1, 400);
-  camera.position.set(0, 0, 26);
+  scene.fog = new THREE.FogExp2(0x05060f, 0.0075);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-  var l1 = new THREE.PointLight(0x7c5cff, 2.4, 120); l1.position.set(-16, 12, 24); scene.add(l1);
-  var l2 = new THREE.PointLight(0x00e0ff, 2.0, 120); l2.position.set(16, -10, 20); scene.add(l2);
-  var l3 = new THREE.PointLight(0x00ffa3, 1.3, 90);  l3.position.set(0, -18, 6);   scene.add(l3);
+  var camera = new THREE.PerspectiveCamera(48, 1, 0.1, 500);
+  camera.position.set(0, 0, 27);
 
-  /* the whole strand lives in one group we translate and spin */
+  /* ---------------------------------------------------------
+     Lighting — key, fill, rim, plus a travelling accent
+  --------------------------------------------------------- */
+  scene.add(new THREE.AmbientLight(0xffffff, 0.42));
+
+  var key  = new THREE.PointLight(0x8b6cff, 3.0, 150); key.position.set(-18, 14, 26);
+  var fill = new THREE.PointLight(0x33e6ff, 2.6, 150); fill.position.set(18, -12, 22);
+  var rim  = new THREE.PointLight(0x33ffb4, 1.7, 110); rim.position.set(0, -20, -10);
+  var accent = new THREE.PointLight(0xffffff, 1.4, 60);
+  scene.add(key, fill, rim, accent);
+
   var helix = new THREE.Group();
   scene.add(helix);
 
   /* ---------------------------------------------------------
-     Geometry
-     The strand is built once, tall enough to cover the document.
-     TURNS controls how tightly it coils.
+     Geometry parameters
   --------------------------------------------------------- */
-  var R = isSmall ? 3.4 : 4.6;          // helix radius
-  var SPAN = 260;                        // virtual strand length in world units
-  var TURNS = isSmall ? 7 : 9;           // full rotations across the span
-  var STEPS = isSmall ? 200 : 320;       // sample points per strand
+  var R = isSmall ? 3.6 : 5.0;
+  var SPAN = 300;
+  var TURNS = isSmall ? 8 : 11;
+  var STEPS = isSmall ? 320 : 560;          // curve resolution
+  var RADIAL = isSmall ? 12 : 20;           // tube cross-section
 
-  function strandPoints(phase) {
+  function strandCurve(phase) {
     var pts = [];
     for (var i = 0; i <= STEPS; i++) {
       var t = i / STEPS;
@@ -95,101 +111,154 @@
         Math.sin(a) * R
       ));
     }
-    return pts;
+    return new THREE.CatmullRomCurve3(pts);
   }
 
-  /* ---- the two backbones, as tubes so they catch light ---- */
-  var strandMats = [
-    new THREE.MeshStandardMaterial({
-      color: 0x1a1740, metalness: 0.9, roughness: 0.3,
-      emissive: 0x7c5cff, emissiveIntensity: 0.4
-    }),
-    new THREE.MeshStandardMaterial({
-      color: 0x0d2436, metalness: 0.9, roughness: 0.3,
-      emissive: 0x00e0ff, emissiveIntensity: 0.35
-    })
+  /* ---------------------------------------------------------
+     Backbones — three concentric tubes each, for fake bloom
+  --------------------------------------------------------- */
+  var STRANDS = [
+    { phase: 0,       core: 0x6d4dff, glow: 0x8b6cff },
+    { phase: Math.PI, core: 0x00c8e6, glow: 0x33e6ff }
   ];
 
-  [0, Math.PI].forEach(function (phase, si) {
-    var curve = new THREE.CatmullRomCurve3(strandPoints(phase));
-    var tube = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, STEPS, isSmall ? 0.11 : 0.14, 8, false),
-      strandMats[si]
+  var strandParts = [];
+
+  STRANDS.forEach(function (sp) {
+    var curve = strandCurve(sp.phase);
+
+    // 1. emissive core — the bright filament
+    var core = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, STEPS, isSmall ? 0.075 : 0.1, RADIAL, false),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff, metalness: 0.2, roughness: 0.15,
+        emissive: sp.glow, emissiveIntensity: 2.4
+      })
     );
-    helix.add(tube);
+    helix.add(core);
+
+    // 2. mid shell — gives the strand body and catches the lights
+    var shell = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, STEPS, isSmall ? 0.17 : 0.23, RADIAL, false),
+      new THREE.MeshStandardMaterial({
+        color: sp.core, metalness: 0.95, roughness: 0.22,
+        emissive: sp.glow, emissiveIntensity: 0.5,
+        transparent: true, opacity: 0.62
+      })
+    );
+    helix.add(shell);
+
+    // 3. wide additive halo — stands in for a bloom pass
+    var halo = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, Math.floor(STEPS * 0.6), isSmall ? 0.42 : 0.58, 10, false),
+      new THREE.MeshBasicMaterial({
+        color: sp.glow, transparent: true, opacity: 0.13,
+        blending: THREE.AdditiveBlending, depthWrite: false
+      })
+    );
+    helix.add(halo);
+
+    strandParts.push({ core: core, shell: shell, halo: halo, curve: curve });
   });
 
-  /* ---- rungs (base pairs) ---- */
-  var RUNGS = isSmall ? 44 : 68;
+  /* ---------------------------------------------------------
+     Rungs — base pairs, with a glowing centre
+  --------------------------------------------------------- */
+  var RUNGS = isSmall ? 56 : 92;
   var rungs = [];
-  var rungGeo = new THREE.CylinderGeometry(0.035, 0.035, R * 2, 6);
+  var rungGeo = new THREE.CylinderGeometry(0.05, 0.05, R * 2, 10);
+  var rungGlowGeo = new THREE.CylinderGeometry(0.13, 0.13, R * 2, 8);
 
   for (var i = 0; i < RUNGS; i++) {
     var t = i / (RUNGS - 1);
     var a = t * TURNS * Math.PI * 2;
     var y = -t * SPAN + SPAN / 2;
+    var col = i % 2 ? 0x33e6ff : 0x8b6cff;
 
-    var mat = new THREE.MeshBasicMaterial({
-      color: i % 2 ? 0x00e0ff : 0x7c5cff,
-      transparent: true, opacity: 0.3
-    });
+    var g = new THREE.Group();
+    g.position.set(0, y, 0);
+    g.rotation.z = Math.PI / 2;
+    g.rotation.y = -a;
 
-    var rung = new THREE.Mesh(rungGeo, mat);
-    rung.position.set(0, y, 0);
-    rung.rotation.z = Math.PI / 2;
-    rung.rotation.y = -a;
-    helix.add(rung);
-    rungs.push({ mesh: rung, y: y, mat: mat });
+    var solid = new THREE.Mesh(rungGeo, new THREE.MeshStandardMaterial({
+      color: 0xffffff, metalness: 0.6, roughness: 0.3,
+      emissive: col, emissiveIntensity: 1.1,
+      transparent: true, opacity: 0.5
+    }));
+    g.add(solid);
+
+    var glow = new THREE.Mesh(rungGlowGeo, new THREE.MeshBasicMaterial({
+      color: col, transparent: true, opacity: 0.07,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    }));
+    g.add(glow);
+
+    helix.add(g);
+    rungs.push({ group: g, y: y, solid: solid.material, glow: glow.material });
   }
 
   /* ---------------------------------------------------------
-     Service nodes — labelled beads riding the strand
+     Bead labels — rendered at 2x for crisp text
   --------------------------------------------------------- */
-  function nodeTexture(n) {
+  function beadTexture(n) {
+    var SC = 2;
+    var W = 420 * SC, H = 150 * SC;
     var c = document.createElement("canvas");
-    c.width = 384; c.height = 192;
+    c.width = W; c.height = H;
     var g = c.getContext("2d");
     var hex = "#" + n.color.toString(16).padStart(6, "0");
 
-    g.clearRect(0, 0, 384, 192);
+    g.scale(SC, SC);
+    var w = 420, h = 150;
 
-    // pill
-    var r = 26, w = 384, h = 96, y0 = 48;
-    g.fillStyle = "rgba(8,10,24,0.9)";
-    g.strokeStyle = hex;
-    g.lineWidth = 3;
+    // rounded plate
+    var r = 30, y0 = 30, ph = 90;
     g.beginPath();
     g.moveTo(r, y0);
     g.lineTo(w - r, y0);
     g.quadraticCurveTo(w, y0, w, y0 + r);
-    g.lineTo(w, y0 + h - r);
-    g.quadraticCurveTo(w, y0 + h, w - r, y0 + h);
-    g.lineTo(r, y0 + h);
-    g.quadraticCurveTo(0, y0 + h, 0, y0 + h - r);
+    g.lineTo(w, y0 + ph - r);
+    g.quadraticCurveTo(w, y0 + ph, w - r, y0 + ph);
+    g.lineTo(r, y0 + ph);
+    g.quadraticCurveTo(0, y0 + ph, 0, y0 + ph - r);
     g.lineTo(0, y0 + r);
     g.quadraticCurveTo(0, y0, r, y0);
     g.closePath();
+
+    var grad = g.createLinearGradient(0, y0, w, y0 + ph);
+    grad.addColorStop(0, "rgba(10,12,28,0.94)");
+    grad.addColorStop(1, "rgba(16,20,44,0.9)");
+    g.fillStyle = grad;
     g.fill();
+
+    g.strokeStyle = hex;
+    g.lineWidth = 2.5;
     g.stroke();
 
+    // colour flash on the left edge
+    g.fillStyle = hex;
+    g.fillRect(0, y0 + 16, 5, ph - 32);
+
     g.textAlign = "left";
-    g.fillStyle = "#fff";
-    g.font = "800 40px Sora, sans-serif";
-    g.fillText(n.label, 28, y0 + 44);
+    g.fillStyle = "#ffffff";
+    g.font = "800 40px Sora, system-ui, sans-serif";
+    g.fillText(n.label, 26, y0 + 44);
 
     g.fillStyle = hex;
-    g.font = "600 22px 'Space Grotesk', sans-serif";
-    g.fillText(n.sub, 28, y0 + 76);
+    g.font = "600 21px 'Space Grotesk', monospace";
+    g.fillText(n.sub.toUpperCase(), 26, y0 + 72);
 
     var tex = new THREE.CanvasTexture(c);
-    tex.anisotropy = 4;
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy
+      ? renderer.capabilities.getMaxAnisotropy() : 8;
+    tex.generateMipmaps = true;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
     return tex;
   }
 
-  var nodes = [];
+  var beads = [];
   NODES.forEach(function (n, i) {
-    // spread the nodes down the strand, avoiding the very ends
-    var t = 0.06 + (i / (NODES.length - 1)) * 0.88;
+    var t = 0.07 + (i / (NODES.length - 1)) * 0.86;
     var a = t * TURNS * Math.PI * 2;
     var y = -t * SPAN + SPAN / 2;
 
@@ -197,36 +266,88 @@
     holder.position.set(Math.cos(a) * R, y, Math.sin(a) * R);
     helix.add(holder);
 
-    // glowing bead
-    var bead = new THREE.Mesh(
-      new THREE.SphereGeometry(isSmall ? 0.4 : 0.52, 20, 16),
+    var rr = isSmall ? 0.44 : 0.58;
+
+    // inner bright core
+    var core = new THREE.Mesh(
+      new THREE.SphereGeometry(rr, 32, 24),
       new THREE.MeshStandardMaterial({
-        color: n.color, metalness: 0.6, roughness: 0.2,
-        emissive: n.color, emissiveIntensity: 0.9
+        color: 0xffffff, metalness: 0.1, roughness: 0.1,
+        emissive: n.color, emissiveIntensity: 2.2
       })
     );
-    holder.add(bead);
+    holder.add(core);
 
-    // halo
-    var halo = new THREE.Mesh(
-      new THREE.SphereGeometry(isSmall ? 0.78 : 1.0, 16, 12),
-      new THREE.MeshBasicMaterial({ color: n.color, transparent: true, opacity: 0.14 })
+    // glass shell
+    var shell = new THREE.Mesh(
+      new THREE.SphereGeometry(rr * 1.5, 28, 20),
+      new THREE.MeshStandardMaterial({
+        color: n.color, metalness: 0.9, roughness: 0.12,
+        transparent: true, opacity: 0.3
+      })
     );
-    holder.add(halo);
+    holder.add(shell);
 
-    // label plate, always facing the camera
+    // additive halos, two layers
+    var halo1 = new THREE.Mesh(
+      new THREE.SphereGeometry(rr * 2.3, 20, 16),
+      new THREE.MeshBasicMaterial({ color: n.color, transparent: true, opacity: 0.16,
+        blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    var halo2 = new THREE.Mesh(
+      new THREE.SphereGeometry(rr * 3.6, 16, 12),
+      new THREE.MeshBasicMaterial({ color: n.color, transparent: true, opacity: 0.07,
+        blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    holder.add(halo1, halo2);
+
+    // orbiting ring for a sense of scale
+    var ring = new THREE.Mesh(
+      new THREE.TorusGeometry(rr * 2.1, 0.014, 8, 64),
+      new THREE.MeshBasicMaterial({ color: n.color, transparent: true, opacity: 0.5 })
+    );
+    ring.rotation.x = Math.PI / 2.6;
+    holder.add(ring);
+
     var plate = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: nodeTexture(n), transparent: true, opacity: 0.9, depthWrite: false
+      map: beadTexture(n), transparent: true, opacity: 0.92, depthWrite: false
     }));
-    plate.scale.set(isSmall ? 4.6 : 5.8, isSmall ? 2.3 : 2.9, 1);
-    plate.position.set(0, isSmall ? 1.4 : 1.7, 0);
+    var pw = isSmall ? 4.9 : 6.2;
+    plate.scale.set(pw, pw * (150 / 420), 1);
+    plate.position.set(0, isSmall ? 1.5 : 1.9, 0);
     holder.add(plate);
 
-    nodes.push({ holder: holder, bead: bead, halo: halo, plate: plate, data: n, y: y, t: t });
+    beads.push({
+      holder: holder, core: core, shell: shell,
+      halo1: halo1, halo2: halo2, ring: ring, plate: plate,
+      data: n, y: y
+    });
   });
 
   /* ---------------------------------------------------------
-     Caption sync (optional — only if the section exists)
+     Travelling sparks along the strand
+  --------------------------------------------------------- */
+  var SPARKS = isSmall ? 14 : 26;
+  var sparks = [];
+  var sparkGeo = new THREE.SphereGeometry(isSmall ? 0.07 : 0.09, 10, 8);
+
+  for (var s = 0; s < SPARKS; s++) {
+    var strand = strandParts[s % 2];
+    var m = new THREE.Mesh(sparkGeo, new THREE.MeshBasicMaterial({
+      color: s % 2 ? 0x33e6ff : 0xb9a6ff,
+      transparent: true, opacity: 0.9,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    }));
+    helix.add(m);
+    sparks.push({
+      mesh: m, curve: strand.curve,
+      u: Math.random(),
+      speed: 0.00006 + Math.random() * 0.00012
+    });
+  }
+
+  /* ---------------------------------------------------------
+     Caption sync
   --------------------------------------------------------- */
   var elTitle = document.getElementById("helix-title");
   var elBody = document.getElementById("helix-body");
@@ -252,7 +373,7 @@
   }
 
   /* ---------------------------------------------------------
-     Size
+     Sizing and horizontal placement
   --------------------------------------------------------- */
   function size() {
     var w = window.innerWidth, h = window.innerHeight;
@@ -260,9 +381,10 @@
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
 
-    // shift the strand to one side on wide screens so text stays clear
-    helix.position.x = w > 1100 ? R + 4.5 : 0;
-    camera.position.x = w > 1100 ? R + 4.5 : 0;
+    // on wide screens the strand sits right of centre so copy stays clear
+    var offset = w > 1100 ? R + 5.5 : 0;
+    helix.position.x = offset;
+    camera.position.x = offset;
   }
   size();
 
@@ -273,71 +395,125 @@
   });
 
   /* ---------------------------------------------------------
-     Scroll — drives travel down the strand and its spin
+     Scroll — starts BELOW the hero, not at the top of the page
   --------------------------------------------------------- */
+  var startY = 0;
+
+  function measureStart() {
+    var hero = document.querySelector(".lux-hero");
+    if (hero) {
+      var r = hero.getBoundingClientRect();
+      // strand begins as the hero leaves the viewport
+      startY = r.top + window.scrollY + r.height * 0.78;
+    } else {
+      startY = window.innerHeight * 0.7;
+    }
+  }
+  measureStart();
+  window.addEventListener("load", measureStart);
+  window.addEventListener("resize", function () { setTimeout(measureStart, 200); });
+
   var prog = 0, targetProg = 0;
+  var fade = 0, targetFade = 0;
 
   function computeProgress() {
-    var max = document.documentElement.scrollHeight - window.innerHeight;
-    targetProg = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+    var docH = document.documentElement.scrollHeight;
+    var vh = window.innerHeight;
+    var span = Math.max(1, docH - vh - startY);
+    var past = window.scrollY - startY;
+
+    targetProg = Math.min(1, Math.max(0, past / span));
+
+    // fade in over the first 55vh past the hero, so it arrives rather
+    // than popping into existence
+    targetFade = Math.min(1, Math.max(0, (past + vh * 0.25) / (vh * 0.55)));
   }
   computeProgress();
   window.addEventListener("scroll", computeProgress, { passive: true });
   window.addEventListener("load", computeProgress);
 
   /* ---------------------------------------------------------
+     Pointer lean
+  --------------------------------------------------------- */
+  var pX = 0, pSX = 0, pY = 0, pSY = 0;
+  window.addEventListener("pointermove", function (e) {
+    pX = (e.clientX / window.innerWidth) * 2 - 1;
+    pY = (e.clientY / window.innerHeight) * 2 - 1;
+  }, { passive: true });
+
+  /* ---------------------------------------------------------
      Loop
   --------------------------------------------------------- */
-  var ptrX = 0, ptrSX = 0;
-  window.addEventListener("pointermove", function (e) {
-    ptrX = (e.clientX / window.innerWidth) * 2 - 1;
-  }, { passive: true });
+  var tmp = new THREE.Vector3();
 
   function frame(t) {
     requestAnimationFrame(frame);
     if (document.hidden) return;
 
-    prog += (targetProg - prog) * 0.07;
-    ptrSX += (ptrX - ptrSX) * 0.05;
+    prog += (targetProg - prog) * 0.065;
+    fade += (targetFade - fade) * 0.07;
+    pSX += (pX - pSX) * 0.045;
+    pSY += (pY - pSY) * 0.045;
 
-    /* Travel: the strand rises as you scroll, so you move down it.
-       Spin: scrolling also rotates it, which is what makes the double
-       helix read as a helix rather than a flat wave. */
-    var travel = prog * (SPAN - 40);
-    helix.position.y = travel - SPAN / 2 + 20;
-    helix.rotation.y = prog * Math.PI * 2.4 + t * 0.00003;
+    canvas.style.opacity = (fade * (isMid ? 0.5 : 0.92)).toFixed(3);
 
-    // gentle float, independent of scroll
-    helix.position.y += Math.sin(t * 0.0004) * 0.7;
-    helix.rotation.z = Math.sin(t * 0.00028) * 0.035 + ptrSX * 0.05;
+    // nothing to draw before the hero has cleared
+    if (fade < 0.01) return;
 
-    // nodes: flare as they pass the viewport centre (world y ~ 0)
+    var travel = prog * (SPAN - 46);
+    helix.position.y = travel - SPAN / 2 + 22 + Math.sin(t * 0.00038) * 0.8;
+    helix.rotation.y = prog * Math.PI * 2.6 + t * 0.000028;
+    helix.rotation.z = Math.sin(t * 0.00026) * 0.03 + pSX * 0.045;
+    helix.rotation.x = pSY * 0.02;
+
+    // beads flare as they cross the viewport centre
     var best = -1, bestD = 1e9;
-    nodes.forEach(function (n, i) {
-      var wy = n.y + helix.position.y;
+    beads.forEach(function (b, i) {
+      var wy = b.y + helix.position.y;
       var d = Math.abs(wy);
       if (d < bestD) { bestD = d; best = i; }
 
-      var near = Math.max(0, 1 - d / 16);
-      n.bead.material.emissiveIntensity = 0.5 + near * 1.6;
-      n.halo.material.opacity = 0.06 + near * 0.3;
-      n.halo.scale.setScalar(1 + near * 0.5 + Math.sin(t * 0.002 + i) * 0.04);
-      n.plate.material.opacity = 0.2 + near * 0.8;
+      var near = Math.max(0, 1 - d / 18);
+      var pulse = 1 + Math.sin(t * 0.0022 + i) * 0.045;
 
-      // beads counter-rotate so labels stay legible
-      n.holder.rotation.y = -helix.rotation.y;
+      b.core.material.emissiveIntensity = 1.1 + near * 2.6;
+      b.shell.material.opacity = 0.16 + near * 0.3;
+      b.halo1.material.opacity = 0.07 + near * 0.26;
+      b.halo2.material.opacity = 0.03 + near * 0.13;
+      b.halo1.scale.setScalar(pulse * (1 + near * 0.34));
+      b.halo2.scale.setScalar(pulse * (1 + near * 0.5));
+      b.plate.material.opacity = 0.12 + near * 0.88;
+      b.ring.material.opacity = 0.16 + near * 0.5;
+      b.ring.rotation.z += 0.006 + near * 0.012;
+
+      // counter-rotate so labels always face front
+      b.holder.rotation.y = -helix.rotation.y;
     });
 
-    if (bestD < 30) setActive(best);
+    if (bestD < 34) setActive(best);
 
-    // rungs fade with distance from the viewport centre
+    // rungs fade with distance from centre
     rungs.forEach(function (r) {
       var wy = r.y + helix.position.y;
-      r.mat.opacity = Math.max(0.04, 0.34 - Math.abs(wy) / 90);
+      var f = Math.max(0, 1 - Math.abs(wy) / 70);
+      r.solid.opacity = 0.1 + f * 0.55;
+      r.glow.opacity = 0.02 + f * 0.12;
     });
 
-    l1.position.y = -travel * 0.1 + 12;
-    l2.position.y = -travel * 0.1 - 10;
+    // sparks run along the strands
+    sparks.forEach(function (sp) {
+      sp.u += sp.speed * 16;
+      if (sp.u > 1) sp.u -= 1;
+      sp.curve.getPointAt(sp.u, tmp);
+      sp.mesh.position.copy(tmp);
+      var wy = tmp.y + helix.position.y;
+      sp.mesh.material.opacity = Math.max(0, 0.9 - Math.abs(wy) / 60);
+    });
+
+    key.position.y = 14 - travel * 0.08;
+    fill.position.y = -12 - travel * 0.08;
+    accent.position.set(helix.position.x, 0, R + 6);
+    accent.intensity = 1.1 + Math.sin(t * 0.0012) * 0.3;
 
     renderer.render(scene, camera);
   }
