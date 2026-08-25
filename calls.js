@@ -12,9 +12,9 @@
    collection se aata hai. Matlab blur cosmetic nahi, asli hai.
    ========================================================= */
 import {
-  ready, onUser, requireAuth, getWallet, watchWallet, watchSubscription,
+  ready, onUser, requireAuth, watchSubscription,
   entitlement, listCalls, listTeasers, listLessons, listRecaps,
-  performanceStats, inr, arv, when
+  performanceStats, inr, when
 } from "./arv-core.js";
 
 var CFG = window.ARV_CONFIG;
@@ -102,10 +102,18 @@ function paintTabs() {
 /* ---------------------------------------------------------
    Header pills
 --------------------------------------------------------- */
-function paintPills(wallet) {
-  if (wallet) {
-    $("pill-credits").innerHTML = "<b>" + Number(wallet.arvBalance || 0).toLocaleString("en-IN") + "</b> ARV";
-    $("pill-credits").className = "pill-stat" + ((wallet.arvBalance || 0) > 0 ? " ok" : "");
+function paintPills() {
+  // segment coverage pill
+  var cov = $("pill-credits");
+  if (cov) {
+    if (state.ent.active) {
+      cov.innerHTML = "<b>" + state.ent.segments.length + "</b> / " +
+                      CFG.SEGMENT_ORDER.length + " segments";
+      cov.className = "pill-stat ok";
+    } else {
+      cov.innerHTML = '<a href="pricing.html" style="color:var(--cyan)">Upgrade</a>';
+      cov.className = "pill-stat";
+    }
   }
   var p = $("pill-plan");
   if (state.ent.active) {
@@ -358,12 +366,9 @@ if (!ready) {
   requireAuth("login.html").then(function (u) {
     if (!u) return;
 
-    getWallet().then(paintPills);
-    watchWallet(paintPills);
-
     watchSubscription(function (sub) {
       state.ent = entitlement(sub);
-      paintPills(null);
+      paintPills();
       paintTabs();
       load();
     });

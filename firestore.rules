@@ -97,10 +97,30 @@ service cloud.firestore {
 
     /* ---------- payments ----------
        Razorpay orders. Client apna order padh sakta hai, likh nahi sakta —
-       webhook signature server pe verify hoti hai. */
+       order Cloud Function banata hai aur webhook signature server pe
+       verify hoti hai. Client "success" pe kabhi trust nahi. */
     match /payments/{orderId} {
-      allow read:  if signedIn() && resource.data.uid == request.auth.uid;
+      allow read:  if isAdmin() ||
+                      (signedIn() && resource.data.uid == request.auth.uid);
       allow write: if false;
+    }
+
+    /* ---------- accessRequests (manual/offline grant ke liye) ----------
+       User request BANA sakta hai par status khud nahi badal sakta —
+       warna koi bhi apne aap ko 'paid' mark kar leta. */
+    match /accessRequests/{reqId} {
+      allow read: if isAdmin() ||
+                     (signedIn() && resource.data.uid == request.auth.uid);
+
+      allow create: if signedIn()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.planId is string
+                    && request.resource.data.code is string;
+
+      // Sirf admin grant/reject kar sakta hai
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /* ---------- plans (public catalogue) ---------- */

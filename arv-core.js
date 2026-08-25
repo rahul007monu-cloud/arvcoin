@@ -237,6 +237,80 @@ export function entitlement(sub) {
 }
 
 /* =========================================================
+   ACCESS REQUESTS — Telegram / WhatsApp funnel
+
+   Website pe koi payment nahi. Flow:
+     1. User "Unlock" dabata hai
+     2. accessRequests/{id} doc banta hai — uid, plan, readable code
+     3. Telegram/WhatsApp pe redirect, message me code prefilled
+     4. Aap wahan charges batate ho, payment lete ho
+     5. Admin panel se grant -> subscriptions/{uid} active
+   ========================================================= */
+
+/** Access request banao aur Telegram/WhatsApp ka URL wapas do. */
+export function requestAccess(planId, channel) {
+  if (!ready || !_user) return Promise.reject(new Error("Pehle login karo"));
+
+  var p = CFG.plan(planId);
+  if (!p) return Promise.reject(new Error("Plan nahi mila: " + planId));
+
+  var code = CFG.newRequestCode();
+  var email = _user.email || "";
+
+  return addDoc(collection(db, "accessRequests"), {
+    uid: _user.uid,
+    email: email,
+    name: _user.displayName || "",
+    planId: p.id,
+    planName: p.name,
+    priceInr: p.priceInr,
+    durationDays: p.durationDays,
+    segments: p.segments,
+    code: code,
+    channel: channel || CFG.ACCESS.mode,
+    status: "pending",
+    createdAt: serverTimestamp()
+  }).then(function (ref) {
+    var url = (channel === "whatsapp")
+      ? CFG.whatsappUrl(p.name, code, email)
+      : CFG.telegramUrl(p.name, code, email);
+    return { id: ref.id, code: code, url: url, plan: p };
+  });
+}
+
+/** User ke apne pending requests. */
+export function myAccessRequests(max) {
+  if (!ready || !_user) return Promise.resolve([]);
+  var q = query(
+    collection(db, "accessRequests"),
+    where("uid", "==", _user.uid),
+    orderBy("createdAt", "desc"),
+    qLimit(max || 10)
+  );
+  return getDocs(q).then(function (snap) {
+    var out = [];
+    snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data())); });
+    return out;
+  }).catch(function () { return []; });
+}
+
+/** Admin: saare pending requests. */
+export function pendingAccessRequests(max) {
+  if (!ready || !isAdmin()) return Promise.resolve([]);
+  var q = query(
+    collection(db, "accessRequests"),
+    where("status", "==", "pending"),
+    orderBy("createdAt", "desc"),
+    qLimit(max || 50)
+  );
+  return getDocs(q).then(function (snap) {
+    var out = [];
+    snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data())); });
+    return out;
+  }).catch(function () { return []; });
+}
+
+/* =========================================================
    CALLS (research recommendations)
 
    Full call sirf active + covering subscription pe readable hai
