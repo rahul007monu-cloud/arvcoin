@@ -1,0 +1,208 @@
+rules_version = '2';
+
+/* =========================================================
+   arvcoin — Firestore security rules
+
+   ASLI GATING YAHAN HOTI HAI. Client-side check sirf UX ke liye hai —
+   koi bhi DevTools kholke bypass kar sakta hai. Paid calls sirf tab
+   readable hain jab is file ke hisaab se subscription active ho.
+
+   Golden rules:
+     - wallets / subscriptions / ledger  -> client se NEVER writable
+       (sirf Cloud Functions admin SDK se, verified payment ke baad)
+     - calls (full detail)               -> active + covering subscription chahiye
+     - callTeasers                       -> public (SEO + funnel)
+   ========================================================= */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ---------- helpers ---------- */
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMe(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Admin/analyst role custom claim se aata hai (Cloud Function set karta hai).
+    // Firestore doc se role padhna insecure hai — user apna doc edit kar sakta hai.
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    function isAnalyst() {
+      return signedIn() && (request.auth.token.analyst == true || isAdmin());
+    }
+
+    function subDoc() {
+      return get(/databases/$(database)/documents/subscriptions/$(request.auth.uid)).data;
+    }
+
+    function hasSubDoc() {
+      return signedIn() &&
+             exists(/databases/$(database)/documents/subscriptions/$(request.auth.uid));
+    }
+
+    function subActive() {
+      return hasSubDoc() &&
+             subDoc().status == 'active' &&
+             subDoc().activeTill > request.time;
+    }
+
+    // Subscription is segment ko cover karta hai?
+    function subCovers(seg) {
+      return subActive() && subDoc().segments.hasAny([seg]);
+    }
+
+    /* ---------- users ----------
+       Apna profile padh/likh sakte ho, par role/entitlement fields
+       ko client se chhoo nahi sakte. */
+    match /users/{uid} {
+      allow read: if isMe(uid) || isAdmin();
+      allow create: if isMe(uid)
+                    && !request.resource.data.keys().hasAny(
+                         ['role','admin','analyst','arvBalance','subscription','founderMember']);
+      allow update: if (isMe(uid)
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+                         ['role','admin','analyst','arvBalance','subscription','founderMember','createdAt']))
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    /* ---------- wallets (ARV credits) ----------
+       Balance sirf Cloud Function badalta hai. Agar client likh paata
+       to koi bhi apne aap ko infinite credits de deta. */
+    match /wallets/{uid} {
+      allow read:  if isMe(uid) || isAdmin();
+      allow write: if false;      // admin SDK bypasses rules
+    }
+
+    /* ---------- ledger (append-only audit trail) ----------
+       Har credit/debit ka record. Client kuch nahi kar sakta. */
+    match /ledger/{entryId} {
+      allow read:  if signedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    /* ---------- subscriptions ----------
+       Entitlement ka source of truth. Client se writable hona
+       ka matlab hota free subscription sabke liye. */
+    match /subscriptions/{uid} {
+      allow read:  if isMe(uid) || isAdmin();
+      allow write: if false;
+    }
+
+    /* ---------- payments ----------
+       Razorpay orders. Client apna order padh sakta hai, likh nahi sakta —
+       webhook signature server pe verify hoti hai. */
+    match /payments/{orderId} {
+      allow read:  if signedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    /* ---------- plans (public catalogue) ---------- */
+    match /plans/{planId} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+
+    /* ---------- callTeasers (PUBLIC) ----------
+       Sirf title + segment + date. Koi entry/target/SL nahi.
+       SEO aur funnel ke liye — Google index kar sake. */
+    match /callTeasers/{callId} {
+      allow read:  if true;
+      allow write: if false;      // calls publish hone pe function likhta hai
+    }
+
+    /* ---------- calls (PAID, gated) ----------
+       Poora research call: entry, targets, SL, rationale.
+       Do condition: subscription active HO, aur us segment ko cover kare. */
+    match /calls/{callId} {
+      allow read: if isAnalyst() || subCovers(resource.data.segment);
+
+      // Publish sirf analyst/admin kar sakta hai, aur RA registration
+      // details mandatory hain (SEBI requirement).
+      allow create: if isAnalyst()
+                    && request.resource.data.raNumber is string
+                    && request.resource.data.raNumber.size() >= 6
+                    && request.resource.data.analystName is string
+                    && request.resource.data.analystName.size() > 0
+                    && request.resource.data.rationale is string
+                    && request.resource.data.rationale.size() >= 20
+                    && request.resource.data.segment in
+                       ['equity','options','commodity','currency','crypto'];
+
+      // Append-only spirit: status/exit update ho sakta hai, par
+      // original recommendation immutable hai — loss chhupaya na ja sake.
+      allow update: if isAnalyst()
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+                         ['segment','instrument','action','entry','targets','stopLoss',
+                          'raNumber','analystName','publishedAt']);
+
+      allow delete: if false;     // calls kabhi delete nahi hote
+    }
+
+    /* ---------- call revisions (audit trail) ---------- */
+    match /calls/{callId}/revisions/{revId} {
+      allow read:  if isAnalyst() || subCovers(get(/databases/$(database)/documents/calls/$(callId)).data.segment);
+      allow create: if isAnalyst();
+      allow update, delete: if false;
+    }
+
+    /* ---------- lessons (education, free + gated) ---------- */
+    match /lessons/{lessonId} {
+      allow read: if resource.data.free == true || subActive() || isAnalyst();
+      allow write: if isAnalyst();
+    }
+
+    /* ---------- market recap (free, daily) ---------- */
+    match /recaps/{recapId} {
+      allow read:  if true;
+      allow write: if isAnalyst();
+    }
+
+    /* ---------- growth metrics (public, platform activity only) ----------
+       Subscribers / calls published / community size.
+       NOTE: ye ARV ka price chart NAHI hai. Yahan koi ₹ value na daalo. */
+    match /growth/{docId} {
+      allow read:  if true;
+      allow write: if false;      // function aggregate karta hai
+    }
+
+    /* ---------- paper trading (user ka apna simulator) ---------- */
+    match /paperTrades/{uid}/trades/{tradeId} {
+      allow read, write: if isMe(uid);
+    }
+
+    /* ---------- Q&A (moderated) ---------- */
+    match /questions/{qId} {
+      allow read:   if subActive() || isAnalyst();
+      allow create: if subActive()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.status == 'pending';
+      allow update: if isAnalyst();
+      allow delete: if isAdmin();
+    }
+
+    /* ---------- referrals ---------- */
+    match /referrals/{code} {
+      allow read:  if signedIn();
+      allow write: if false;      // function handle karta hai
+    }
+
+    /* ---------- waitlist (public form) ---------- */
+    match /waitlist/{entryId} {
+      allow create: if request.resource.data.email is string
+                    && request.resource.data.email.size() < 200;
+      allow read, update, delete: if isAdmin();
+    }
+
+    /* ---------- default deny ---------- */
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
