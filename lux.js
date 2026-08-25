@@ -336,12 +336,21 @@
     var tracked = items.map(function (el, i) {
       el.style.willChange = "transform";
       var isSection = el.classList.contains("lux-wrap") || el.classList.contains("lux-narrow");
+
+      /* Entrance direction alternates by column, so a grid unfolds
+         rather than swinging as one slab. */
+      var col = parseFloat(el.dataset.floatSeed || 0);
+      var dir = (i % 2 === 0) ? 1 : -1;
+
       return {
         el: el,
         seed: parseFloat(el.dataset.floatSeed || ((i % 5) * 0.28)),
-        // sections drift gently; cards move a lot so the effect is visible
         depth: isSection ? 0.3 : 1,
         isSection: isSection,
+        dir: dir,
+        bobPhase: (i % 7) * 0.9,          // desynchronise the idle float
+        bobAmp: isSection ? 0 : 3 + (i % 3),
+        entered: false,
         cy: 0, ch: 0,
         y: 0, ty: 0,
         r: 0, tr: 0,
@@ -378,20 +387,50 @@
           t.tRy = 0;
           t.ts = 1;
         } else {
-          // Cards: pronounced rise, 3D tilt, a touch of yaw, and a
-          // settle-into-place scale. Seed offsets stagger each column
-          // so a grid floats in a rhythm rather than as one slab.
-          var stagger = 1 + t.seed * 0.5;
+          /* Cards get three layered motions:
 
-          t.ty = -d * 76 * stagger + Math.sin(t.seed * 3.1) * 4;
-          t.tr = d * 9;                              // rotateX — the lift
-          t.tRy = Math.sin(d * 1.7 + t.seed) * 5;    // rotateY — the rotation
-          t.ts = 1 - Math.min(0.07, ad * 0.055);     // settles as it centres
+             1. Entrance rotation — while below the fold a card is turned
+                away in 3D and rotates flat as it rises into view. This is
+                the "rotating" read; a pure translate never feels 3D.
+             2. Scroll drift — it keeps rising as you scroll past.
+             3. Idle bob — a slow sine so nothing is ever fully static.
+
+             `enter` goes 1 (far below) -> 0 (at or above centre), so the
+             rotation resolves exactly as the card reaches reading position. */
+          var stagger = 1 + t.seed * 0.5;
+          var enter = Math.max(0, Math.min(1, -d));          // 0..1 below centre
+          var ease = enter * enter;                          // slow start, fast finish
+
+          t.ty = -d * 62 * stagger + ease * 34;
+          t.tr = d * 6 + ease * 9;                           // rotateX: lift + entrance
+          t.tRy = t.dir * ease * 17 + Math.sin(d * 1.4 + t.seed) * 3;
+          t.ts = 1 - ease * 0.055 - Math.min(0.03, ad * 0.02);
         }
       });
     }
 
     var running = false;
+    var idleRAF = null;
+
+    /* The idle bob has to keep running after scrolling stops, otherwise
+       the page freezes solid the moment you let go of the wheel. It is
+       cheap — one sine per card, no layout reads. */
+    function idle(now) {
+      idleRAF = requestAnimationFrame(idle);
+      if (running || document.hidden) return;
+
+      tracked.forEach(function (t) {
+        if (!t.bobAmp) return;
+        var bob = Math.sin(now * 0.00055 + t.bobPhase) * t.bobAmp;
+        t.el.style.transform =
+          "perspective(1200px) translate3d(0," + (t.y + bob).toFixed(2) + "px,0)" +
+          " rotateX(" + t.r.toFixed(3) + "deg)" +
+          " rotateY(" + t.ry.toFixed(3) + "deg)" +
+          " scale(" + t.s.toFixed(4) + ")";
+      });
+    }
+    idleRAF = requestAnimationFrame(idle);
+
     function loop() {
       var moving = false;
 

@@ -25,6 +25,23 @@ import {
 var CFG = window.ARV_CONFIG;
 var $ = function (id) { return document.getElementById(id); };
 
+/* Defensive helpers.
+   admin.js and admin.html are cached separately by the service worker, so a
+   browser can end up running a new script against an older page. Any
+   unguarded $("id").addEventListener then throws, the module dies, and
+   visibly unrelated things break - the segment dropdown silently stays
+   empty, for example. These make a version mismatch degrade instead. */
+function on(id, evt, fn) {
+  var el = $(id);
+  if (el) el.addEventListener(evt, fn);
+  else console.warn("[arvcoin] admin: #" + id + " missing (stale cached HTML?)");
+  return el;
+}
+function show(id, visible) {
+  var el = $(id);
+  if (el) el.style.display = visible ? "block" : "none";
+}
+
 var REGISTERED = CFG.isRegistered();
 var kind = "analysis";
 var lastLevels = null;
@@ -35,9 +52,15 @@ var lastLevels = null;
 function fillSegments(sel) {
   var el = $(sel);
   if (!el) return;
+  if (!CFG || !CFG.SEGMENT_ORDER) {
+    console.error("[arvcoin] admin: arv-config.js did not load — segment list unavailable");
+    el.innerHTML = '<option value="">Config not loaded — reload the page</option>';
+    return;
+  }
   el.innerHTML = CFG.SEGMENT_ORDER.map(function (id) {
-    var s = CFG.SEGMENTS[id];
-    return '<option value="' + id + '">' + s.icon + " " + s.name + "</option>";
+    var s = CFG.SEGMENTS[id] || {};
+    return '<option value="' + id + '">' +
+           ((s.icon || "") + " " + (s.name || id)).trim() + "</option>";
   }).join("");
 }
 
@@ -78,12 +101,12 @@ function showLint(res) {
 --------------------------------------------------------- */
 function switchKind(k) {
   kind = k;
-  $("form-analysis").style.display = k === "analysis" ? "block" : "none";
-  $("form-call").style.display = k === "call" ? "block" : "none";
-  $("form-lesson").style.display = k === "lesson" ? "block" : "none";
-  $("form-recap").style.display = k === "recap" ? "block" : "none";
-  $("form-pricing").style.display = k === "pricing" ? "block" : "none";
-  $("form-approvals").style.display = k === "approvals" ? "block" : "none";
+  show("form-analysis", k === "analysis");
+  show("form-call",     k === "call");
+  show("form-lesson",   k === "lesson");
+  show("form-recap",    k === "recap");
+  show("form-pricing",  k === "pricing");
+  show("form-approvals", k === "approvals");
 
   if (k === "pricing") paintPricingEditors();
   if (k === "approvals") loadApprovals();
@@ -102,8 +125,8 @@ document.querySelectorAll("#kind-tabs .seg-tab").forEach(function (b) {
 /* ---------------------------------------------------------
    Currency warning
 --------------------------------------------------------- */
-$("c-segment").addEventListener("change", function () {
-  $("fx-warn").style.display = this.value === "currency" ? "block" : "none";
+on("c-segment", "change", function () {
+  show("fx-warn", this.value === "currency");
   renderPreview();
 });
 
@@ -312,7 +335,7 @@ function computeAnalysisLevels() {
   if (el) el.addEventListener("input", function () { computeAnalysisLevels(); renderPreview(); });
 });
 
-$("form-analysis").addEventListener("submit", function (e) {
+on("form-analysis", "submit", function (e) {
   e.preventDefault();
   clearMsg();
 
@@ -365,7 +388,7 @@ $("form-analysis").addEventListener("submit", function (e) {
 /* ---------------------------------------------------------
    Publish: CALL
 --------------------------------------------------------- */
-$("form-call").addEventListener("submit", function (e) {
+on("form-call", "submit", function (e) {
   e.preventDefault();
   clearMsg();
 
@@ -405,7 +428,7 @@ $("form-call").addEventListener("submit", function (e) {
 /* ---------------------------------------------------------
    Publish: LESSON
 --------------------------------------------------------- */
-$("form-lesson").addEventListener("submit", function (e) {
+on("form-lesson", "submit", function (e) {
   e.preventDefault();
   clearMsg();
 
@@ -449,7 +472,7 @@ $("form-lesson").addEventListener("submit", function (e) {
 /* ---------------------------------------------------------
    Publish: RECAP
 --------------------------------------------------------- */
-$("form-recap").addEventListener("submit", function (e) {
+on("form-recap", "submit", function (e) {
   e.preventDefault();
   clearMsg();
 
@@ -568,7 +591,7 @@ function paintQrPreview() {
   if (el) el.addEventListener("input", paintQrPreview);
 });
 
-$("form-pricing").addEventListener("submit", function (e) {
+on("form-pricing", "submit", function (e) {
   e.preventDefault();
   clearMsg();
 
