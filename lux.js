@@ -262,9 +262,50 @@
   }
 
   /* =========================================================
+     10) SERVICE WORKER — register + force update
+     ---------------------------------------------------------
+     Ye har page pe chalta hai (lux.js sab pages me load hota hai).
+     Pehle sirf index.html register karta tha — us wajah se purana
+     SW browser me atka reh jaata tha aur naya code dikhta hi nahi tha.
+
+     Naya SW milte hi turant activate ho jaata hai (sw.js me
+     skipWaiting + clients.claim hai) aur page reload ho jaata hai.
+     ========================================================= */
+  function initSW() {
+    if (!("serviceWorker" in navigator)) return;
+    if (location.protocol === "file:") return;
+
+    navigator.serviceWorker.register("sw.js").then(function (reg) {
+      // Har page load pe check karo ki naya SW aaya hai kya
+      reg.update().catch(function () {});
+
+      reg.addEventListener("updatefound", function () {
+        var sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener("statechange", function () {
+          if (sw.state === "installed" && navigator.serviceWorker.controller) {
+            console.log("[arvcoin] naya version mila, reload kar rahe hain");
+          }
+        });
+      });
+    }).catch(function (e) {
+      console.warn("[arvcoin] SW register fail:", e);
+    });
+
+    // Naya SW control lene pe ek baar reload — taaki fresh code turant dikhe
+    var reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
+  }
+
+  /* =========================================================
      Boot
      ========================================================= */
   function boot() {
+    initSW();
     initSpotlight();
     initTilt();
     initReveal();

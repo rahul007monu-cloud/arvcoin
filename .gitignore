@@ -18,6 +18,13 @@ android/
 .env.*
 !.env.example
 
+# Firebase service account keys — NEVER commit these.
+# Ye keys poore project ka full admin access deti hain.
+serviceAccountKey.json
+**/serviceAccountKey.json
+*-firebase-adminsdk-*.json
+firebase-adminsdk*.json
+
 # logs
 npm-debug.*
 yarn-debug.*
