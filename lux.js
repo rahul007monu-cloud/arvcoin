@@ -523,3 +523,85 @@
 
   window.ARVLux = { boot: boot, reduced: reduced };
 })();
+
+
+/* =========================================================
+   arvcoin — Firebase config guard
+
+   If firebase-config.js still holds placeholders or partial values,
+   pages fail with a cryptic auth/invalid-api-key in the console and a
+   blank screen. This surfaces a clear, actionable banner instead.
+
+   Loaded from lux.js so it runs on every page.
+   ========================================================= */
+(function () {
+  "use strict";
+
+  var cfg = window.ARV_FIREBASE_CONFIG;
+  var REQUIRED = ["apiKey", "authDomain", "projectId", "appId"];
+
+  function looksUnset(v) {
+    if (!v) return true;
+    var s = String(v);
+    return s.indexOf("PASTE") > -1 || s.indexOf("YOUR_") > -1 || s.length < 6;
+  }
+
+  var missing = [];
+  if (!cfg) {
+    missing = REQUIRED.slice();
+  } else {
+    REQUIRED.forEach(function (k) {
+      if (looksUnset(cfg[k])) missing.push(k);
+    });
+  }
+
+  if (!missing.length) return;
+
+  // Pages that genuinely need Firebase — a static page should not shout
+  var needsAuth = /(dashboard|admin|calls|checkout|login|signup|verify)\.html$/i
+    .test(location.pathname) || location.pathname === "/";
+
+  function show() {
+    if (document.getElementById("cfg-banner")) return;
+
+    var b = document.createElement("div");
+    b.id = "cfg-banner";
+    b.setAttribute("role", "alert");
+    b.style.cssText = [
+      "position:fixed", "left:16px", "right:16px", "bottom:16px", "z-index:9999",
+      "max-width:640px", "margin:0 auto", "padding:18px 20px", "border-radius:16px",
+      "background:rgba(255,93,108,.14)", "border:1px solid rgba(255,93,108,.4)",
+      "backdrop-filter:blur(18px)", "color:#eef1ff",
+      "font-family:Sora,system-ui,sans-serif", "font-size:14px", "line-height:1.6",
+      "box-shadow:0 30px 70px -25px rgba(0,0,0,.85)"
+    ].join(";");
+
+    b.innerHTML =
+      '<div style="display:flex;gap:13px;align-items:flex-start">' +
+        '<span style="font-size:19px;line-height:1.3">⚙️</span>' +
+        '<div style="flex:1">' +
+          '<b style="display:block;margin-bottom:5px">Firebase is not connected yet</b>' +
+          '<span style="color:#9aa3c7">Missing config: <code style="color:#00e0ff">' +
+            missing.join(", ") + '</code>. ' +
+            'Sign-in, research and the dashboard stay offline until this is set. ' +
+            'See <b>SETUP.md</b> in the repo.</span>' +
+        '</div>' +
+        '<button type="button" aria-label="Dismiss" style="background:none;border:0;' +
+          'color:#9aa3c7;font-size:20px;cursor:pointer;line-height:1;padding:0 2px">&times;</button>' +
+      '</div>';
+
+    b.querySelector("button").addEventListener("click", function () { b.remove(); });
+    document.body.appendChild(b);
+  }
+
+  if (!needsAuth) {
+    console.warn("[arvcoin] Firebase config incomplete:", missing.join(", "));
+    return;
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", show);
+  } else {
+    show();
+  }
+})();

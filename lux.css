@@ -590,11 +590,12 @@ body::after{
   position:fixed;inset:0;width:100vw;height:100vh;
   z-index:-1;                /* above .aurora (-2), below content */
   pointer-events:none;
-  opacity:.85;
-}
-@media(max-width:1100px){
-  /* centred behind content on narrow screens — dial it back so text stays readable */
-  #helix-canvas{opacity:.4}
+  /* Starts hidden. helix.js sets inline opacity, fading the strand in
+     once the hero has scrolled away, and caps it lower on narrow
+     screens where it sits behind the copy. */
+  opacity:0;
+  transition:opacity .25s linear;
+  will-change:opacity;
 }
 
 /* caption block that tracks the active node */
