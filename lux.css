@@ -579,3 +579,99 @@ body::after{
 @media(prefers-reduced-motion:reduce){
   body::after{background:radial-gradient(60% 40% at 50% 10%,rgba(124,92,255,.12),transparent 70%)}
 }
+
+
+/* =========================================================
+   SCROLL-DRIVEN CHAIN
+   A tall section with a sticky stage. Scrolling through it
+   rotates the 3D chain and swaps the caption.
+   ========================================================= */
+.chain-section{position:relative;height:420vh}
+@media(max-width:760px){.chain-section{height:360vh}}
+
+.chain-sticky{
+  position:sticky;top:0;height:100svh;
+  display:grid;place-items:center;overflow:hidden;
+}
+
+#chain-canvas{
+  position:absolute;inset:0;width:100%;height:100%;
+  display:block;pointer-events:none;
+}
+
+/* caption sits over the chain */
+.chain-ui{
+  position:relative;z-index:2;
+  width:min(560px,90vw);text-align:center;
+  padding:clamp(22px,3vw,32px);
+  pointer-events:none;
+}
+.chain-eyebrow{
+  display:inline-flex;align-items:center;gap:9px;
+  font-family:var(--font-alt);font-size:11px;font-weight:600;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--lux-plat);
+  padding:8px 16px;border-radius:999px;margin-bottom:18px;
+  background:rgba(232,201,138,.08);border:1px solid rgba(232,201,138,.24);
+  backdrop-filter:blur(14px);
+}
+.chain-index{
+  font-family:var(--font-alt);font-size:12.5px;letter-spacing:.16em;
+  color:var(--muted-2);margin-bottom:12px;
+}
+.chain-title{
+  font-size:clamp(28px,4.6vw,52px);font-weight:800;letter-spacing:-.03em;
+  line-height:1.06;margin-bottom:14px;
+  background:linear-gradient(100deg,#fff,var(--cyan) 55%,var(--mint));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.chain-body{
+  color:var(--muted);font-size:clamp(14.5px,1.6vw,17px);line-height:1.7;
+  max-width:44ch;margin:0 auto;
+}
+
+/* progress dots */
+.chain-dots{
+  display:flex;gap:9px;justify-content:center;margin-top:26px;
+}
+.chain-dots .cd{
+  width:7px;height:7px;border-radius:50%;
+  background:rgba(255,255,255,.18);
+  transition:background .45s var(--ease-lux),transform .45s var(--ease-lux),
+             box-shadow .45s var(--ease-lux);
+}
+.chain-dots .cd.on{
+  background:var(--mint);transform:scale(1.6);
+  box-shadow:0 0 14px var(--mint);
+}
+
+/* scroll hint, fades once you start */
+.chain-hint{
+  position:absolute;bottom:30px;left:50%;transform:translateX(-50%);
+  z-index:2;display:flex;flex-direction:column;align-items:center;gap:8px;
+  font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted-2);pointer-events:none;
+}
+.chain-hint .bar{
+  width:1px;height:34px;
+  background:linear-gradient(180deg,transparent,var(--cyan));
+  animation:hintPulse 2.1s var(--ease-soft) infinite;
+}
+@keyframes hintPulse{0%,100%{opacity:.25}50%{opacity:1}}
+
+/* reduced-motion / no-WebGL fallback */
+.chain-section.chain-fallback{height:auto}
+.chain-section.chain-fallback .chain-sticky{position:static;height:auto;padding:0 0 40px}
+.chain-section.chain-fallback #chain-canvas,
+.chain-section.chain-fallback .chain-hint,
+.chain-section.chain-fallback .chain-dots,
+.chain-section.chain-fallback .chain-index{display:none}
+#chain-fallback-grid{display:none}
+.chain-section.chain-fallback #chain-fallback-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+  gap:18px;max-width:1180px;margin:34px auto 0;
+  padding:0 clamp(18px,3.4vw,32px);
+}
+
+@media(prefers-reduced-motion:reduce){
+  .chain-hint .bar{animation:none}
+}
