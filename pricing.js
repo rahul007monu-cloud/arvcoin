@@ -1,6 +1,6 @@
 /* =========================================================
    arvcoin — pricing page
-   Plans, coverage table, segment detail — sab arv-config.js se.
+   Plans, coverage table and segment detail — all from arv-config.js.
    ========================================================= */
 (function () {
   "use strict";

@@ -1,16 +1,16 @@
 /* =========================================================
    arvcoin — Levels Calculator (LTP / pivot engine)
 
-   Ye ek DETERMINISTIC CALCULATOR hai, recommendation nahi.
-   Aap OHLC daalte ho, ye formula se levels nikaalta hai.
-   Same input -> same output, sabke liye. Koi curation nahi,
-   koi "buy karo" nahi.
+   This is a DETERMINISTIC CALCULATOR, not a recommendation.
+   You supply OHLC and it derives levels from formulas.
+   Same input -> same output, for everyone. No curation,
+   no "buy this".
 
-   Formulas standard aur public hain:
+   The formulas are standard and public:
      Classic / Fibonacci / Camarilla pivots, CPR, Woodie.
 
-   ⚠️ Output me "buy", "sell", "target", "stop loss" jaisi
-   bhasha NA daalna. Sirf computed levels aur math-derived bias.
+   ⚠️ Never put "buy", "sell", "target" or "stop loss" wording in
+   the output. Computed levels and a maths-derived bias only.
    ========================================================= */
 (function () {
   "use strict";
@@ -95,7 +95,7 @@
 
   /* ---------------------------------------------------------
      CPR — Central Pivot Range
-     Width se pata chalta hai din trending hoga ya rangebound.
+     Width indicates whether a session tends to trend or stay rangebound.
   --------------------------------------------------------- */
   function cpr(h, l, c) {
     var p = (h + l + c) / 3;
@@ -119,19 +119,19 @@
   }
 
   /* ---------------------------------------------------------
-     BIAS — purely computed, no advice
-     Sirf ye batata hai ki price pivot ke kahan hai aur
-     range me kahan close hua. Koi action suggest nahi.
+     BIAS — purely computed, no advice.
+     States only where price sits relative to the pivot and where it
+     closed within the range. Suggests no action.
   --------------------------------------------------------- */
   function bias(h, l, c, ltp) {
     var p = (h + l + c) / 3;
     var ref = (ltp == null ? c : ltp);
     var range = h - l;
 
-    // close ka position previous range me (0 = low, 1 = high)
+    // where the close sat in the previous range (0 = low, 1 = high)
     var posInRange = range > 0 ? (c - l) / range : 0.5;
 
-    // ref price pivot se kitna door (% me)
+    // how far the reference price is from the pivot, as a percentage
     var distPct = p ? ((ref - p) / p) * 100 : 0;
 
     var label, tone, note;
@@ -218,7 +218,7 @@
     };
   }
 
-  /* CPR shape ka plain-language matlab (educational, no action) */
+  /* Plain-language meaning of the CPR shape (educational, no action) */
   function cprMeaning(shape) {
     switch (shape) {
       case "very-narrow":

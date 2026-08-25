@@ -106,9 +106,9 @@
       <p id="d-crypto"></p>
 
       <h3>8. Conflict of interest</h3>
-      <p>Hum broker, exchange, depository, clearing member ya custodian <b>nahi</b> hain. Hum
-         aapka paisa, securities ya assets kabhi hold nahi karte. Hum aapke naam par koi trade
-         execute nahi karte aur aapke trading ya demat account ka access nahi lete.</p>
+      <p>We are <b>not</b> a broker, exchange, depository or clearing member, nor a custodian.
+         We never hold your money, securities or assets. We do not execute trades on your
+         behalf and we do not access your trading or demat account.</p>
 
       <h3>9. Fees</h3>
       <p id="d-fees"></p>
@@ -375,7 +375,7 @@
       } else {
         box.className = "lux-note";
         box.innerHTML = '<span class="n-ico">🎓</span><div><b>Not registered with SEBI</b><br />' +
-          'arvcoin abhi SEBI ke saath Research Analyst ya Investment Adviser ke roop me registered nahi hai.</div>';
+          'arvcoin is not currently registered with SEBI as a Research Analyst or Investment Adviser.</div>';
         $("d-reg-text").textContent = D.notRegistered;
       }
 
@@ -388,7 +388,7 @@
       $("d-fees").textContent = (D.paymentNote || "") +
         " SEBI Research Analyst regulations ke tehat research fee ki limit " +
         (CFG.inrFmt ? CFG.inrFmt(CFG.ANNUAL_FEE_CAP_INR) : "₹1,51,000") +
-        " per year per family hai. Humare saare plans is limit ke andar hain.";
+        " per year per family. All our plans sit within that limit.";
 
       /* grievance */
       $("g-name").textContent = RA.analystName || "Grievance Officer";
@@ -397,17 +397,17 @@
 
       if (reg) {
         $("g-sebi").innerHTML = 'If a resolution is not reached within 15 working days you may raise a complaint on SEBI ' +
-          'SCORES platform par complaint kar sakte ho: <a href="' + RA.scoresUrl + '" target="_blank" rel="noopener">' +
+          'SCORES: <a href="' + RA.scoresUrl + '" target="_blank" rel="noopener">' +
           RA.scoresUrl + '</a>. Online Dispute Resolution ke liye: <a href="' + RA.odrUrl +
           '" target="_blank" rel="noopener">' + RA.odrUrl + '</a>.';
-        $("g-note").innerHTML = 'SEBI-registered intermediaries ke liye SCORES aur ODR mechanism available hai.';
+        $("g-note").innerHTML = 'The SCORES and ODR mechanisms are available for SEBI-registered intermediaries.';
       } else {
         $("g-sebi").innerHTML = 'SEBI SCORES aur ODR mechanism SEBI-registered intermediaries ke ' +
-          'liye hote hain. Kyunki arvcoin abhi SEBI-registered nahi hai, aap consumer forum ' +
+          'only. As arvcoin is not yet SEBI-registered, you may approach a consumer forum ' +
           'ya National Consumer Helpline (1915, <a href="https://consumerhelpline.gov.in" target="_blank" rel="noopener">consumerhelpline.gov.in</a>) ' +
-          'par ja sakte ho.';
-        $("g-note").innerHTML = 'Registration complete hone par SCORES aur ODR details yahan ' +
-          'update kar di jaayengi.';
+          'instead.';
+        $("g-note").innerHTML = 'Once registration is complete, the SCORES and ODR details will be ' +
+          'updated here.';
       }
 
       /* tabs */

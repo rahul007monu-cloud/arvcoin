@@ -3,8 +3,8 @@
    3D tilt, cursor spotlight, scroll reveal, parallax,
    FAQ accordion, counters, nav state.
 
-   Sab kuch progressive hai — JS fail ho to page normal dikhta hai.
-   prefers-reduced-motion respect karta hai.
+   Everything is progressive — if the JS fails the page still renders.
+   Honours prefers-reduced-motion.
    ========================================================= */
 (function () {
   "use strict";
@@ -265,19 +265,19 @@
   /* =========================================================
      10) SERVICE WORKER — register + force update
      ---------------------------------------------------------
-     Ye har page pe chalta hai (lux.js sab pages me load hota hai).
-     Pehle sirf index.html register karta tha — us wajah se purana
-     SW browser me atka reh jaata tha aur naya code dikhta hi nahi tha.
+     This runs on every page (lux.js loads everywhere).
+     Previously only index.html registered it, which left a stale
+     worker installed and new code never appeared.
 
-     Naya SW milte hi turant activate ho jaata hai (sw.js me
-     skipWaiting + clients.claim hai) aur page reload ho jaata hai.
+     A new worker activates immediately (sw.js calls skipWaiting and
+     clients.claim) and the page reloads once.
      ========================================================= */
   function initSW() {
     if (!("serviceWorker" in navigator)) return;
     if (location.protocol === "file:") return;
 
     navigator.serviceWorker.register("sw.js").then(function (reg) {
-      // Har page load pe check karo ki naya SW aaya hai kya
+      // On every page load, check for a newer worker
       reg.update().catch(function () {});
 
       reg.addEventListener("updatefound", function () {
@@ -293,7 +293,7 @@
       console.warn("[arvcoin] SW register fail:", e);
     });
 
-    // Naya SW control lene pe ek baar reload — taaki fresh code turant dikhe
+    // Reload once when a new worker takes control, so fresh code appears
     var reloaded = false;
     navigator.serviceWorker.addEventListener("controllerchange", function () {
       if (reloaded) return;

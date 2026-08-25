@@ -2,9 +2,9 @@
    arvcoin — Firebase config
 
    console.firebase.google.com -> apna project -> Project settings
-   -> "Your apps" (Web </>) -> SDK config -> yahan values paste karo.
+   -> "Your apps" (Web </>) -> SDK config -> paste the values here.
 
-   NOTE: ye values PUBLIC hain (frontend me hoti hi hain) — safe hai.
+   NOTE: these values are PUBLIC by design (they ship in the frontend) — that is expected.
    ========================================================= */
 window.ARV_FIREBASE_CONFIG = {
   apiKey: "AIzaSyBgHoVA8VBOwSJ9vmS9Wv9i5gM1vypEspw",

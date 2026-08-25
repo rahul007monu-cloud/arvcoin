@@ -1,14 +1,14 @@
 /* =========================================================
    arvcoin — core data layer (ES module)
 
-   Ek hi jagah Firebase init hota hai, aur saare read/write helpers
-   yahan se aate hain. Pages isko import karte hain:
+   Firebase is initialised in one place, and all read/write helpers
+   live here. Pages import it like this:
 
      import { onUser, requireAuth, getWallet, getSubscription,
               listCalls, entitlement } from "./arv-core.js";
 
-   ⚠️ Yaad rakho: yahan ke checks UX ke liye hain. Asli gating
-   firestore.rules me hai. Client pe kabhi trust nahi.
+   ⚠️ Remember: the checks here are for UX only. The real gating lives
+   in firestore.rules. Never trust the client.
    ========================================================= */
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
@@ -62,7 +62,7 @@ if (ready) {
   });
 }
 
-/** Auth state subscribe karo. Turant current state bhi mil jaata hai. */
+/** Subscribe to auth state. The current state is delivered immediately. */
 export function onUser(cb) {
   _userCbs.push(cb);
   if (_user !== null || _claims !== null) cb(_user, _claims);
@@ -78,8 +78,8 @@ export function isAdmin() { return !!claims().admin; }
 export function isAnalyst() { return !!(claims().analyst || claims().admin); }
 
 /**
- * Page guard. Login nahi hai to redirect.
- * localStorage pe bharosa NAHI — asli Firebase auth state check karta hai.
+ * Page guard. Redirects when not signed in.
+ * Does NOT trust localStorage — it checks real Firebase auth state.
  */
 export function requireAuth(redirectTo) {
   redirectTo = redirectTo || "login.html";
@@ -137,7 +137,7 @@ export function getProfile(uid) {
 
 export function updateProfileDoc(data) {
   if (!ready || !_user) return Promise.reject(new Error("not signed in"));
-  // Protected fields client se nahi ja sakte (rules bhi block karte hain).
+  // Protected fields cannot be sent from the client (rules block them too).
   var clean = Object.assign({}, data);
   ["role", "admin", "analyst", "arvBalance", "subscription", "founderMember", "createdAt"]
     .forEach(function (k) { delete clean[k]; });
@@ -148,8 +148,8 @@ export function updateProfileDoc(data) {
 /* =========================================================
    ARV CREDITS (wallet)
 
-   ⚠️ Balance client se NEVER likha jaata. Sirf Cloud Function
-   verified payment ke baad mint karta hai. Ye read-only hai.
+   ⚠️ Balance is NEVER written from the client. Only a Cloud Function
+   credits it after a verified payment. This is read-only.
    ========================================================= */
 
 export function getWallet(uid) {
@@ -168,7 +168,7 @@ export function watchWallet(cb) {
   }, function (e) { console.warn("[arvcoin] wallet watch:", e); });
 }
 
-/** Credit/debit history — audit trail. */
+/** Credit and debit history — the audit trail. */
 export function getLedger(max) {
   if (!ready || !_user) return Promise.resolve([]);
   var q = query(
@@ -214,7 +214,7 @@ function toMillis(v) {
 
 /**
  * Entitlement snapshot — UI decide karne ke liye.
- * Server-side rules isko dobara enforce karte hain.
+ * Server-side rules enforce this again.
  */
 export function entitlement(sub) {
   var now = Date.now();
@@ -239,15 +239,15 @@ export function entitlement(sub) {
 /* =========================================================
    ACCESS REQUESTS — Telegram / WhatsApp funnel
 
-   Website pe koi payment nahi. Flow:
-     1. User "Unlock" dabata hai
-     2. accessRequests/{id} doc banta hai — uid, plan, readable code
-     3. Telegram/WhatsApp pe redirect, message me code prefilled
-     4. Aap wahan charges batate ho, payment lete ho
-     5. Admin panel se grant -> subscriptions/{uid} active
+   Flow:
+     1. The user taps Unlock
+     2. an accessRequests/{id} document is created — uid, plan, readable code
+     3. redirect to Telegram or WhatsApp with the code prefilled
+     4. you confirm the charges and take payment there
+     5. grant from the admin panel -> subscriptions/{uid} becomes active
    ========================================================= */
 
-/** Access request banao aur Telegram/WhatsApp ka URL wapas do. */
+/** Create an access request and return the Telegram or WhatsApp URL. */
 export function requestAccess(planId, channel) {
   if (!ready || !_user) return Promise.reject(new Error("Please sign in first"));
 
@@ -278,7 +278,7 @@ export function requestAccess(planId, channel) {
   });
 }
 
-/** User ke apne pending requests. */
+/** The signed-in user's own pending requests. */
 export function myAccessRequests(max) {
   if (!ready || !_user) return Promise.resolve([]);
   var q = query(
@@ -294,7 +294,7 @@ export function myAccessRequests(max) {
   }).catch(function () { return []; });
 }
 
-/** Admin: saare pending requests. */
+/** Admin: all pending requests. */
 export function pendingAccessRequests(max) {
   if (!ready || !isAdmin()) return Promise.resolve([]);
   var q = query(
@@ -313,12 +313,12 @@ export function pendingAccessRequests(max) {
 /* =========================================================
    CALLS (research recommendations)
 
-   Full call sirf active + covering subscription pe readable hai
-   (firestore.rules). Bina subscription ke query permission-denied
-   degi — isliye teasers alag collection me hain.
+   A full note is readable only with an active, covering subscription
+   (firestore.rules). Without one the query returns permission-denied,
+   which is why teasers live in a separate collection.
    ========================================================= */
 
-/** Paid calls. Subscription na ho to error catch karke [] milta hai. */
+/** Paid notes. Without a subscription the error is caught and [] returned. */
 export function listCalls(opts) {
   opts = opts || {};
   if (!ready) return Promise.resolve([]);
@@ -352,7 +352,7 @@ export function watchCalls(opts, cb) {
   }, function (e) { cb([], e); });
 }
 
-/** Public teasers — no entry/target/SL. SEO + locked-state UI. */
+/** Public teasers — no entry, target or SL. For SEO and the locked-state UI. */
 export function listTeasers(opts) {
   opts = opts || {};
   if (!ready) return Promise.resolve([]);
@@ -375,9 +375,9 @@ export function getCall(callId) {
 }
 
 /**
- * Call publish — sirf analyst/admin.
- * RA registration mandatory: bina number ke publish nahi hoga
- * (yahan bhi, aur firestore.rules me bhi).
+ * Publish a note — analyst/admin only.
+ * RA registration is mandatory: without a number nothing publishes
+ * (enforced here and in firestore.rules).
  */
 export function publishCall(data) {
   if (!ready) return Promise.reject(new Error("Firebase is not ready"));
@@ -392,7 +392,7 @@ export function publishCall(data) {
     ));
   }
 
-  // Banned-phrase check (guaranteed returns waghera)
+  // Blocked-phrase check (guaranteed returns and similar)
   if (window.ARVLint) {
     var lint = window.ARVLint.check([data.title, data.rationale, data.notes].join("\n"));
     if (!lint.ok) {
@@ -419,7 +419,7 @@ export function publishCall(data) {
     rationale: data.rationale,
     notes: data.notes || "",
     status: "active",
-    // SEBI-mandated attribution — har call pe dikhta hai
+    // SEBI-mandated attribution — shown on every note
     raNumber: ra.number,
     analystName: ra.analystName || data.analystName || "",
     entityName: ra.entityName || "",
@@ -431,9 +431,9 @@ export function publishCall(data) {
 }
 
 /**
- * Call outcome update (target hit / SL hit / closed).
- * Original recommendation immutable hai — rules bhi rokte hain.
- * Performance stats me har call ginti hai, cherry-picking nahi.
+ * Update a note's outcome (target hit / SL hit / closed).
+ * The original recommendation is immutable — rules enforce this too.
+ * Performance stats count every note; no cherry-picking.
  */
 export function updateCallStatus(callId, patch) {
   if (!ready || !isAnalyst()) return Promise.reject(new Error("Not allowed"));
@@ -450,7 +450,7 @@ export function updateCallStatus(callId, patch) {
 }
 
 /* =========================================================
-   PERFORMANCE — poori history se, filtered nahi
+   PERFORMANCE — from the full history, unfiltered
    ========================================================= */
 
 export function performanceStats(calls) {
@@ -466,7 +466,7 @@ export function performanceStats(calls) {
     wins: wins,
     losses: losses,
     neutral: closed.length - wins - losses,
-    // Disclosure: ye past performance hai, future guarantee nahi
+    // Disclosure: this is past performance, not a guarantee of the future
     note: (CFG.DISCLOSURES && CFG.DISCLOSURES.noGuarantee) || ""
   };
 }
@@ -476,9 +476,9 @@ export function performanceStats(calls) {
    ========================================================= */
 
 /* =========================================================
-   ANALYSIS — levels + structural observation
-   RA registration ke bina publish hota hai (koi action/entry/
-   target/SL field nahi). Free wale sabko, baaki subscribers ko.
+   ANALYSIS — levels plus a structural observation.
+   Publishes without RA registration (there is no action, entry,
+   target or SL field). Free items are public; the rest need a subscription.
    ========================================================= */
 export function listAnalysis(opts) {
   opts = opts || {};
@@ -540,8 +540,8 @@ export function listRecaps(max) {
 
 /* =========================================================
    GROWTH METRICS
-   Platform activity — subscribers, calls published, community.
-   ⚠️ Ye ARV ka price chart NAHI hai. Koi ₹ value nahi.
+   Platform activity — subscribers, notes published, community size.
+   ⚠️ This is NOT a price chart. No currency values here.
    ========================================================= */
 
 export function getGrowth() {

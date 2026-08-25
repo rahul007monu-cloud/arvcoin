@@ -1,15 +1,15 @@
 /* =========================================================
    arvcoin — research calls feed
 
-   Do mode:
-     1) RA registration set NAHI hai  -> education mode
-        (lessons + daily recap dikhte hain, koi call nahi)
-     2) RA registration set hai       -> research mode
-        (calls dikhte hain, subscription ke hisaab se locked/unlocked)
+   Two modes:
+     1) RA registration NOT set -> education mode
+        (lessons and daily recaps only, no research notes)
+     2) RA registration set     -> research mode
+        (notes shown, locked or unlocked by subscription)
 
-   Locked calls ka full detail client pe aata hi NAHI —
-   firestore.rules permission-denied deta hai. Teaser alag
-   collection se aata hai. Matlab blur cosmetic nahi, asli hai.
+   The full detail of a locked note never reaches the client —
+   firestore.rules returns permission-denied. Teasers come from a
+   separate collection, so the blur is real, not cosmetic.
    ========================================================= */
 import {
   ready, onUser, requireAuth, watchSubscription,
@@ -343,7 +343,7 @@ function paintFeed() {
   state.calls.forEach(function (c) { html += callCard(c); });
   state.analysis.forEach(function (a) { html += analysisCard(a); });
 
-  // Jo calls subscription cover nahi karti — teaser (locked)
+  // Notes the subscription does not cover render as locked teasers
   var seenIds = {};
   state.calls.forEach(function (c) { seenIds[c.id] = 1; });
   state.teasers.forEach(function (t) {

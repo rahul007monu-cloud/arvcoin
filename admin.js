@@ -1,14 +1,14 @@
 /* =========================================================
    arvcoin — admin publishing panel
 
-   Teen cheezein publish hoti hain:
-     call   -> RA registration ZAROORI (gate lagi hai)
-     lesson -> education, registration nahi chahiye
-     recap  -> education, registration nahi chahiye
+   Three content types can be published:
+     note   -> RA registration REQUIRED (gated)
+     lesson -> educational, no registration needed
+     recap  -> educational, no registration needed
 
-   Access: sirf analyst/admin custom claim wale users.
-   firestore.rules bhi yahi enforce karti hain — ye page
-   chhup jaana sirf UX hai, security rules me hai.
+   Access: users with an analyst/admin custom claim only.
+   firestore.rules enforces the same thing — hiding this page is
+   only UX; the real security is in the rules.
    ========================================================= */
 import {
   ready, requireAnalyst, isAdmin, isAnalyst, db, currentUser,
@@ -235,7 +235,7 @@ function renderPreview() {
 });
 
 /* ---------------------------------------------------------
-   ANALYSIS — levels auto-compute + publish (RA gate se free)
+   ANALYSIS — auto-compute levels and publish (outside the RA gate)
 --------------------------------------------------------- */
 function computeAnalysisLevels() {
   var L = window.ARVLevels;
@@ -327,8 +327,8 @@ $("form-analysis").addEventListener("submit", function (e) {
   btn.disabled = true;
   msg("ok", "Publish ho raha hai…");
 
-  /* ⚠️ Is payload me action/entry/targets/stopLoss KABHI na add karna.
-     firestore.rules bhi inhe reject karti hain. */
+  /* ⚠️ NEVER add action/entry/targets/stopLoss to this payload.
+     firestore.rules rejects them too. */
   addDoc(collection(db, "analysis"), {
     instrument: inst,
     segment: $("a-segment").value,
@@ -493,12 +493,12 @@ fillSegments("l-segment");
 $("r-date").value = new Date().toISOString().slice(0, 10);
 
 if (!ready) {
-  msg("bad", "Firebase config missing — firebase-config.js me daalo.");
+  msg("bad", "Firebase config missing — add it to firebase-config.js.");
 } else {
   requireAnalyst("dashboard.html").then(function (u) {
     if (!u) return;
     paintHeader();
-    switchKind("analysis");   // ye turant kaam karta hai, RA gate se free
+    switchKind("analysis");   // works immediately, outside the RA gate
     if (!REGISTERED) {
       $("btn-call").disabled = true;
       $("btn-call").textContent = "Publishing disabled — set the RA number";

@@ -1,9 +1,9 @@
 /* =========================================================
    arvcoin — dashboard (advisory)
 
-   Purana crypto-investing dashboard hata diya gaya hai.
-   Yahan koi fake portfolio, fake holdings, fake P&L nahi hai —
-   sirf asli data: aapka plan, coverage, aur published research.
+   The old crypto-investing dashboard has been removed.
+   There is no fake portfolio, no fake holdings and no fake P&L here —
+   only real data: your plan, your coverage, and published research.
    ========================================================= */
 import {
   ready, requireAuth, currentUser, isAnalyst, logout,

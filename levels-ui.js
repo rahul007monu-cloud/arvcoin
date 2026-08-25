@@ -1,6 +1,6 @@
 /* =========================================================
    arvcoin — Levels calculator UI
-   levels.js (math) ko page se jodta hai.
+   Wires levels.js (the maths) to the page.
    ========================================================= */
 (function () {
   "use strict";
@@ -26,7 +26,7 @@
   }
 
   /* ---------------------------------------------------------
-     Ladder — resistances upar se, supports neeche
+     Ladder — resistances at the top, supports below
   --------------------------------------------------------- */
   function paintLadder() {
     if (!result) return;
@@ -46,7 +46,7 @@
       if (s[k] != null) rows.push({ lbl: k.toUpperCase(), val: s[k], cls: "res" });
     });
 
-    // CPR band pivot ke around
+    // the CPR band around the pivot
     rows.push({ lbl: "TC", val: result.cpr.tc, cls: "cprb" });
     rows.push({ lbl: "PP", val: s.pivot, cls: "piv" });
     rows.push({ lbl: "BC", val: result.cpr.bc, cls: "cprb" });
@@ -169,7 +169,7 @@
     $(id).addEventListener("keydown", function (e) {
       if (e.key === "Enter") { e.preventDefault(); calc(); }
     });
-    // live recalc agar result already hai
+    // recalculate live once a result exists
     $(id).addEventListener("input", function () {
       if (result) calc();
     });
@@ -194,7 +194,7 @@
   });
 
   /* ---------------------------------------------------------
-     Disclosures + restore
+     Disclosures and restore
   --------------------------------------------------------- */
   if (CFG) {
     var D = CFG.DISCLOSURES;
