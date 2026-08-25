@@ -42,23 +42,41 @@ export { auth, db, ready };
 
 var _user = null;
 var _claims = null;
+var _roleDoc = null;      // from /admins/{uid}
 var _userCbs = [];
+
+/* Roles come from either source:
+     1. a custom auth claim (tools/grant-admin.js)
+     2. a document at /admins/{uid} — lets the owner grant access from
+        the Firebase Console without touching a terminal
+   /admins is never client-writable, so trusting it is safe. */
+function loadRole(u) {
+  if (!u) return Promise.resolve(null);
+  return getDoc(doc(db, "admins", u.uid))
+    .then(function (s) { return s.exists() ? s.data() : {}; })
+    .catch(function () { return {}; });   // read denied simply means no role
+}
 
 if (ready) {
   onAuthStateChanged(auth, function (u) {
     _user = u;
-    if (u) {
-      u.getIdTokenResult().then(function (r) {
-        _claims = r.claims || {};
-        _userCbs.forEach(function (cb) { cb(_user, _claims); });
-      }).catch(function () {
-        _claims = {};
-        _userCbs.forEach(function (cb) { cb(_user, _claims); });
-      });
-    } else {
+
+    if (!u) {
       _claims = null;
+      _roleDoc = null;
       _userCbs.forEach(function (cb) { cb(null, null); });
+      return;
     }
+
+    Promise.all([
+      u.getIdTokenResult().then(function (r) { return r.claims || {}; })
+                          .catch(function () { return {}; }),
+      loadRole(u)
+    ]).then(function (res) {
+      _claims = res[0];
+      _roleDoc = res[1] || {};
+      _userCbs.forEach(function (cb) { cb(_user, _claims); });
+    });
   });
 }
 
@@ -74,8 +92,23 @@ export function onUser(cb) {
 
 export function currentUser() { return _user; }
 export function claims() { return _claims || {}; }
-export function isAdmin() { return !!claims().admin; }
-export function isAnalyst() { return !!(claims().analyst || claims().admin); }
+export function roleDoc() { return _roleDoc || {}; }
+
+export function isAdmin() {
+  return !!(claims().admin || roleDoc().admin);
+}
+
+export function isAnalyst() {
+  return !!(claims().analyst || claims().admin ||
+            roleDoc().analyst || roleDoc().admin);
+}
+
+/** Where the role came from — shown in the admin panel header. */
+export function roleSource() {
+  if (claims().admin || claims().analyst) return "auth claim";
+  if (roleDoc().admin || roleDoc().analyst) return "admins collection";
+  return null;
+}
 
 /**
  * Page guard. Redirects when not signed in.

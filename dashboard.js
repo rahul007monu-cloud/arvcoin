@@ -286,6 +286,15 @@ if (!ready) {
           { day: "numeric", month: "short", year: "numeric" })
       : "—";
 
+    $("s-uid").textContent = u.uid;
+    var cu = $("copy-uid");
+    if (cu) cu.addEventListener("click", function () {
+      navigator.clipboard.writeText(u.uid).then(function () {
+        cu.textContent = "Copied ✓";
+        setTimeout(function () { cu.textContent = "Copy UID"; }, 1800);
+      }).catch(function () {});
+    });
+
     getProfile().then(function (p) {
       $("s-verified").textContent = (p && p.emailVerified) ? "Yes ✓" : "Pending";
     });
