@@ -186,25 +186,20 @@
     </div>
   </section>
 
-  <!-- ============ SCROLL-DRIVEN CHAIN ============ -->
-  <section class="chain-section" id="chain-section">
-    <div class="chain-sticky" id="chain-sticky">
-      <canvas id="chain-canvas"></canvas>
-
-      <div class="chain-ui">
-        <span class="chain-eyebrow">What we cover</span>
-        <div class="chain-index" id="chain-index">01 / 08</div>
-        <h2 class="chain-title" id="chain-title">Stocks</h2>
-        <p class="chain-body" id="chain-body">Cash equity across large, mid and small caps.</p>
-        <div class="chain-dots" id="chain-dots"></div>
+  <!-- ============ HELIX CAPTION ============
+       The DNA strand itself is a fixed, full-page canvas created by
+       helix.js. This section is the readable caption that tracks
+       whichever node is currently passing the viewport centre. -->
+  <section class="lux-sec helix-sec" id="helix-section">
+    <div class="lux-wrap">
+      <div class="helix-ui">
+        <span class="lux-eyebrow"><span class="dot"></span> What we cover</span>
+        <div class="helix-index" id="helix-index">01 / 08</div>
+        <h2 class="helix-title" id="helix-title">Stocks</h2>
+        <p class="helix-body" id="helix-body">Cash equity across large, mid and small caps.</p>
+        <div class="helix-dots" id="helix-dots"></div>
+        <p class="helix-hint">Keep scrolling — the strand runs the whole page</p>
       </div>
-
-      <div class="chain-hint">
-        <span>Scroll</span>
-        <span class="bar"></span>
-      </div>
-
-      <div id="chain-fallback-grid"></div>
     </div>
   </section>
 
@@ -470,7 +465,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="arv-config.js"></script>
   <script src="3d.js" defer></script>
-  <script src="chain.js" defer></script>
+  <script src="helix.js" defer></script>
   <script src="lux.js" defer></script>
   <script src="home.js" defer></script>
 </body>
