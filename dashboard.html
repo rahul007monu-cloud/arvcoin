@@ -5,16 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#05060f" />
   <title>Dashboard — arvcoin</title>
-  <meta name="description" content="Your arvcoin portfolio — crypto & stocks in one place." />
+  <meta name="description" content="Your arvcoin research dashboard — levels analysis, research calls, market recap." />
+  <meta name="robots" content="noindex" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="lux.css" />
   <link rel="stylesheet" href="dashboard.css" />
+  <link rel="stylesheet" href="calls.css" />
 </head>
 <body class="dash-body">
   <canvas id="bg-canvas"></canvas>
+  <div class="aurora"><span class="a1"></span><span class="a2"></span></div>
   <div class="grid-overlay"></div>
 
   <div class="dash-shell">
@@ -34,415 +39,161 @@
       </a>
 
       <nav class="side-nav">
-        <a class="side-link active" data-view="home"><i>▦</i> Dashboard</a>
-        <a class="side-link" data-view="collect"><i>❖</i> Collect (My QR)</a>
-        <a class="side-link" data-view="portfolio"><i>◈</i> Portfolio</a>
-        <a class="side-link" data-view="sip"><i>↻</i> Auto-invest (SIP)</a>
-        <a class="side-link" data-view="wallet"><i>▢</i> Wallet</a>
-        <a class="side-link" href="calls.html"><i>◹</i> Research calls</a>
-        <a class="side-link" data-view="markets"><i>◹</i> Markets</a>
-        <a class="side-link" data-view="activity"><i>≣</i> Activity</a>
-        <a class="side-link" data-view="rewards"><i>★</i> Rewards</a>
+        <a class="side-link active" data-view="home"><i>▦</i> Overview</a>
+        <a class="side-link" href="calls.html"><i>◹</i> Research feed</a>
+        <a class="side-link" href="levels.html"><i>🧮</i> Levels calculator</a>
+        <a class="side-link" data-view="recap"><i>≣</i> Market recap</a>
+        <a class="side-link" data-view="lessons"><i>🎓</i> Lessons</a>
+        <a class="side-link" data-view="plan"><i>◈</i> My plan</a>
         <a class="side-link" data-view="settings"><i>⚙</i> Settings</a>
+        <a class="side-link" id="admin-link" href="admin.html" style="display:none"><i>✎</i> Publish</a>
       </nav>
 
-      <div class="side-promo">
-        <p class="sp-title">Refer & earn</p>
-        <p class="sp-sub">Har friend pe ₹100 crypto. Invite karo!</p>
-        <button class="btn btn-primary sp-btn" id="promo-invite">Invite friends</button>
+      <div class="side-promo" id="side-promo" style="display:none">
+        <p class="sp-title">Upgrade karo</p>
+        <p class="sp-sub" id="sp-sub">Sab segments unlock karo — F&amp;O, commodity, currency.</p>
+        <a class="btn btn-primary sp-btn" href="pricing.html">Plans dekho</a>
       </div>
 
-      <a href="login.html" class="side-logout" id="logout"><i>⏻</i> Log out</a>
+      <a href="#" class="side-logout" id="logout"><i>⏻</i> Log out</a>
     </aside>
 
     <!-- ============ MAIN ============ -->
     <main class="dash-main">
-      <!-- topbar -->
       <header class="topbar">
         <button class="menu-btn" id="menu-btn" aria-label="Menu">☰</button>
         <div class="tb-hello">
-          <small>Good evening 👋</small>
+          <small id="greet">Welcome 👋</small>
           <h2 id="hello-name">Investor</h2>
         </div>
         <div class="tb-right">
-          <button class="tb-icon" aria-label="Search">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4-4"/></svg>
-          </button>
-          <div class="notif-wrap">
-            <button class="tb-icon" id="notif-btn" aria-label="Notifications">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-              <span class="dot-badge"></span>
-            </button>
-            <div class="notif-panel" id="notif-panel">
-              <div class="np-head"><b>Notifications</b><a id="np-clear">Mark all read</a></div>
-              <div class="np-list" id="np-list"></div>
-            </div>
-          </div>
-          <div class="tb-avatar" id="tb-avatar" data-view="settings">I</div>
+          <a class="pill-stat" id="plan-pill" href="pricing.html" style="text-decoration:none">—</a>
+          <div class="tb-avatar" id="tb-avatar" data-view="settings">A</div>
         </div>
       </header>
 
       <div class="dash-scroll">
-        <!-- ===== HOME VIEW ===== -->
+
+        <!-- ===== OVERVIEW ===== -->
         <section class="view active" data-view="home">
-          <!-- KYC banner -->
-          <div class="kyc-banner" id="kyc-banner">
-            <div class="kb-left">
-              <span class="kb-ico">🛡️</span>
+
+          <!-- education notice -->
+          <div class="lux-note" id="mode-note" style="margin-bottom:20px"></div>
+
+          <!-- plan status -->
+          <div class="lux" style="padding:26px;margin-bottom:20px">
+            <div style="display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:flex-start">
               <div>
-                <b>Complete your KYC</b>
-                <p>Investing shuru karne ke liye 2-min verification zaroori hai.</p>
+                <small style="color:var(--muted-2);font-size:12px;text-transform:uppercase;letter-spacing:.06em">Your plan</small>
+                <h2 style="font-size:26px;font-weight:800;margin:6px 0 4px" id="plan-name">No active plan</h2>
+                <p style="color:var(--muted);font-size:14px" id="plan-meta">Free account — levels calculator aur free content available hai.</p>
               </div>
-            </div>
-            <a href="kyc.html" class="btn btn-primary kb-btn">Verify now</a>
-          </div>
-
-          <div class="grid-2">
-            <!-- balance card -->
-            <div class="bal-card">
-              <div class="bal-top">
-                <span class="bal-cap">Total portfolio value</span>
-                <span class="pill-live"><span class="dot"></span> Live</span>
-              </div>
-              <div class="bal-value" id="bal-value">₹0</div>
-              <div class="bal-meta">
-                <span class="chg" id="bal-chg">▲ ₹0 (0.0%)</span>
-                <span class="invested" id="bal-invested">Invested ₹0</span>
-              </div>
-              <div class="bal-chart"><canvas id="port-chart" height="120"></canvas></div>
-              <div class="range-tabs" id="range-tabs">
-                <button data-r="1D" class="active">1D</button>
-                <button data-r="1W">1W</button>
-                <button data-r="1M">1M</button>
-                <button data-r="1Y">1Y</button>
-                <button data-r="ALL">ALL</button>
-              </div>
+              <a href="pricing.html" class="btn-lux" id="plan-cta">Plans dekho →</a>
             </div>
 
-            <!-- quick actions + allocation -->
-            <div class="side-col">
-              <div class="quick-card">
-                <h3>Quick invest</h3>
-                <div class="quick-amts" id="quick-amts">
-                  <button data-a="100">₹100</button>
-                  <button data-a="500">₹500</button>
-                  <button data-a="1000">₹1,000</button>
-                </div>
-                <button class="btn btn-primary full" id="open-invest">＋ Pay & Invest</button>
-                <button class="btn btn-ghost full" id="open-invest2">Scan QR</button>
-              </div>
-
-              <div class="alloc-card">
-                <h3>Allocation</h3>
-                <div class="alloc-bar" id="alloc-bar"></div>
-                <div class="alloc-legend" id="alloc-legend"></div>
-              </div>
+            <div style="margin-top:22px">
+              <small style="color:var(--muted-2);font-size:12px;text-transform:uppercase;letter-spacing:.06em">Segment coverage</small>
+              <div class="inst-chips" id="seg-chips" style="margin-top:10px"></div>
             </div>
           </div>
 
-          <!-- holdings -->
-          <div class="section-row">
-            <h3>Your holdings</h3>
-            <a class="link-more" data-view="portfolio">View all →</a>
-          </div>
-          <div class="hold-list" id="hold-list"></div>
-
-          <!-- activity preview -->
-          <div class="section-row">
-            <h3>Recent activity</h3>
-            <a class="link-more" data-view="activity">View all →</a>
-          </div>
-          <div class="act-list" id="act-list-home"></div>
-        </section>
-
-        <!-- ===== COLLECT (SHOPKEEPER QR) VIEW ===== -->
-        <section class="view" data-view="collect">
-          <h3 class="view-title">Collect payment</h3>
-          <p class="view-sub">Customer se QR pe payment lo — paisa auto crypto ban ke tumhare wallet me aa jaayega. 💰</p>
-
-          <div class="collect-grid">
-            <div class="qr-card">
-              <div class="qr-shop" id="qr-shop">My Shop</div>
-              <div class="qr-box" id="qr-box"></div>
-              <div class="qr-amt-line" id="qr-amt-line">Customer koi bhi amount daal sakta hai</div>
-              <div class="qr-amt-toggle">
-                <button class="active" data-qm="dynamic">Any amount</button>
-                <button data-qm="fixed">Fixed amount</button>
-              </div>
-              <input type="tel" id="qr-fixed-amt" class="qr-input" placeholder="Fixed ₹ amount" style="display:none" />
-              <div class="qr-actions">
-                <button class="btn btn-ghost" id="qr-download">⬇ Download</button>
-                <button class="btn btn-ghost" id="qr-share">↗ Share</button>
-                <button class="btn btn-ghost" id="qr-print">🖨 Print</button>
-              </div>
-              <div class="qr-note">🛡️ Auto-convert to crypto · Non-custodial · via Onramp.money</div>
-              <button class="btn btn-primary full" id="sim-pay" style="margin-top:12px">▶ Simulate customer payment (demo)</button>
-            </div>
-
-            <div class="collect-side">
-              <div class="collect-summary">
-                <div class="cs-glow"></div>
-                <span class="cs-label">Aaj ka collection</span>
-                <div class="cs-value" id="today-collection">₹0</div>
-                <div class="cs-sub"><span id="today-count">0</span> payments · auto → crypto</div>
-              </div>
-              <div class="setup-card">
-                <h3>Shop setup</h3>
-                <label class="fld-label">Shop name</label>
-                <input type="text" id="shop-name-inp" class="qr-input" placeholder="Tumhari shop ka naam" />
-                <label class="fld-label">UPI ID (collection)</label>
-                <input type="text" id="shop-upi-inp" class="qr-input" placeholder="shopname@upi" />
-                <button class="btn btn-primary full" id="save-shop" style="margin-top:14px">Save &amp; update QR</button>
-              </div>
-            </div>
+          <!-- quick actions -->
+          <div class="lux-grid g3" style="margin-bottom:20px">
+            <a href="levels.html" class="lux lux-card lux-tilt" style="text-decoration:none">
+              <div class="ico">🧮</div>
+              <h3>Levels calculator</h3>
+              <p>Kisi bhi instrument ka support, resistance, pivot aur CPR nikaalo. Free, hamesha.</p>
+            </a>
+            <a href="calls.html" class="lux lux-card lux-tilt" style="text-decoration:none">
+              <div class="ico">◹</div>
+              <h3>Research feed</h3>
+              <p>Levels analysis, structural observations aur market recap — sab ek jagah.</p>
+            </a>
+            <a href="pricing.html" class="lux lux-card lux-tilt" style="text-decoration:none">
+              <div class="ico">◈</div>
+              <h3>Coverage badhao</h3>
+              <p>Stocks, F&amp;O, commodity (gold, silver, copper), currency, crypto.</p>
+            </a>
           </div>
 
-          <div class="section-row"><h3>Received payments</h3><a class="link-more" id="withdraw-btn">Withdraw to bank →</a></div>
-          <div class="act-list" id="recv-list"></div>
-        </section>
-
-        <!-- ===== PORTFOLIO VIEW ===== -->
-        <section class="view" data-view="portfolio">
-          <h3 class="view-title">Portfolio</h3>
-          <div class="hold-list" id="hold-list-full"></div>
-        </section>
-
-        <!-- ===== MARKETS VIEW ===== -->
-        <section class="view" data-view="markets">
-          <h3 class="view-title">Markets</h3>
-          <div class="market-tabs" id="market-tabs">
-            <button class="active" data-t="all">All</button>
-            <button data-t="crypto">Crypto</button>
-            <button data-t="stock">Stocks & MF</button>
+          <!-- latest analysis -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <h2 style="font-size:19px;font-weight:700">Latest analysis</h2>
+            <a href="calls.html" style="color:var(--cyan);font-size:14px">View all →</a>
           </div>
-          <div class="market-list" id="market-list"></div>
-        </section>
-
-        <!-- ===== ACTIVITY VIEW ===== -->
-        <section class="view" data-view="activity">
-          <h3 class="view-title">Activity</h3>
-          <div class="act-list" id="act-list-full"></div>
-        </section>
-
-        <!-- ===== REWARDS VIEW ===== -->
-        <section class="view" data-view="rewards">
-          <h3 class="view-title">Rewards</h3>
-          <div class="reward-hero">
-            <div class="rh-glow"></div>
-            <span class="rh-emoji">🎁</span>
-            <h2>₹100 per referral</h2>
-            <p>Har friend jo arvcoin join karke first invest kare — dono ko ₹100 crypto.</p>
-            <div class="ref-code">
-              <span id="ref-code">ARV-RAHUL-7X9</span>
-              <button id="copy-code">Copy</button>
-            </div>
-          </div>
-          <div class="reward-stats">
-            <div class="rs"><b>0</b><small>Friends joined</small></div>
-            <div class="rs"><b>₹0</b><small>Earned</small></div>
-            <div class="rs"><b>3 mo</b><small>Zero fees</small></div>
+          <div class="call-list" id="latest-feed">
+            <div class="skel"></div><div class="skel"></div>
           </div>
         </section>
 
-        <!-- ===== SIP / AUTO-INVEST VIEW ===== -->
-        <section class="view" data-view="sip">
-          <h3 class="view-title">Auto-invest (SIP)</h3>
-          <p class="view-sub">Set karo aur bhool jao — arvcoin apne aap invest karta rahega. Chhoti bachat, badi wealth. 📈</p>
+        <!-- ===== RECAP ===== -->
+        <section class="view" data-view="recap">
+          <h2 style="font-size:22px;font-weight:800;margin-bottom:6px">Market recap</h2>
+          <p style="color:var(--muted);font-size:14.5px;margin-bottom:22px">
+            Jo ho gaya uska factual summary — kya hua aur kyun.
+          </p>
+          <div class="call-list" id="recap-feed"><div class="skel"></div></div>
+        </section>
 
-          <div class="sip-grid">
-            <div class="sip-setup">
-              <h3>New SIP banao</h3>
-              <label class="fld-label">Asset</label>
-              <div class="sip-assets" id="sip-assets"></div>
-              <label class="fld-label">Amount (₹)</label>
-              <div class="sip-amts" id="sip-amts">
-                <button data-a="100">₹100</button>
-                <button data-a="500" class="active">₹500</button>
-                <button data-a="1000">₹1,000</button>
-                <button data-a="2500">₹2,500</button>
-              </div>
-              <label class="fld-label">Frequency</label>
-              <div class="sip-freq" id="sip-freq">
-                <button data-f="Daily">Daily</button>
-                <button data-f="Weekly" class="active">Weekly</button>
-                <button data-f="Monthly">Monthly</button>
-              </div>
-              <button class="btn btn-primary full" id="create-sip" style="margin-top:18px">Start SIP</button>
-              <p class="sip-note">🔒 Auto-debit UPI mandate se (Razorpay). Kabhi bhi pause/cancel.</p>
-            </div>
+        <!-- ===== LESSONS ===== -->
+        <section class="view" data-view="lessons">
+          <h2 style="font-size:22px;font-weight:800;margin-bottom:6px">Lessons</h2>
+          <p style="color:var(--muted);font-size:14.5px;margin-bottom:22px">
+            Market concepts — basics se advanced tak.
+          </p>
+          <div class="call-list" id="lesson-feed"><div class="skel"></div></div>
+        </section>
 
-            <div class="sip-active">
-              <h3>Active SIPs</h3>
-              <div id="sip-list"></div>
+        <!-- ===== MY PLAN ===== -->
+        <section class="view" data-view="plan">
+          <h2 style="font-size:22px;font-weight:800;margin-bottom:22px">My plan</h2>
+          <div class="lux" style="padding:26px;margin-bottom:18px">
+            <div class="lux-table">
+              <div class="tr"><span>Plan</span><b id="p-name">—</b></div>
+              <div class="tr"><span>Status</span><b id="p-status">—</b></div>
+              <div class="tr"><span>Valid till</span><b id="p-till">—</b></div>
+              <div class="tr"><span>Days left</span><b id="p-days">—</b></div>
+              <div class="tr"><span>Segments</span><b id="p-segs">—</b></div>
             </div>
+            <div class="cta-row" style="margin-top:22px">
+              <a href="pricing.html" class="btn-lux">Upgrade / Renew</a>
+            </div>
+          </div>
+          <div class="lux-note info">
+            <span class="n-ico">ℹ️</span>
+            <div>Koi auto-renewal nahi hoti. Plan khatam hone pe access apne aap band ho jaata hai — koi silent charge nahi.</div>
           </div>
         </section>
 
-        <!-- ===== WALLET VIEW ===== -->
-        <section class="view" data-view="wallet">
-          <h3 class="view-title">Wallet</h3>
-          <p class="view-sub">Non-custodial — tum malik ho. Crypto seedha yahan aata hai (via Onramp.money).</p>
-
-          <div class="wallet-card">
-            <div class="wc-glow"></div>
-            <span class="wc-label">Your arvcoin wallet address</span>
-            <div class="wc-addr" id="wc-addr">0x0000…0000</div>
-            <div class="wc-actions">
-              <button class="btn btn-ghost" id="copy-addr">Copy address</button>
-              <button class="btn btn-primary" id="open-invest3">＋ Add crypto</button>
-            </div>
-            <div class="wc-secure">🛡️ Non-custodial · Secured by Onramp.money · FIU-registered</div>
-          </div>
-
-          <div class="section-row"><h3>Balances</h3></div>
-          <div class="hold-list" id="wallet-balances"></div>
-        </section>
-
-        <!-- ===== SETTINGS VIEW ===== -->
+        <!-- ===== SETTINGS ===== -->
         <section class="view" data-view="settings">
-          <h3 class="view-title">Settings</h3>
-
-          <div class="set-card">
-            <div class="set-profile">
-              <div class="set-avatar" id="set-avatar">I</div>
-              <div>
-                <b id="set-name">Investor</b>
-                <p id="set-email">investor@arvcoin.com</p>
-              </div>
+          <h2 style="font-size:22px;font-weight:800;margin-bottom:22px">Settings</h2>
+          <div class="lux" style="padding:26px;margin-bottom:18px">
+            <div class="lux-table">
+              <div class="tr"><span>Name</span><b id="s-name">—</b></div>
+              <div class="tr"><span>Email</span><b id="s-email">—</b></div>
+              <div class="tr"><span>Email verified</span><b id="s-verified">—</b></div>
+              <div class="tr"><span>Account created</span><b id="s-created">—</b></div>
             </div>
           </div>
-
-          <div class="set-group">
-            <h4>Account</h4>
-            <div class="set-row"><span>Full name</span><b id="set-name2">—</b></div>
-            <div class="set-row"><span>Mobile</span><b id="set-mobile">—</b></div>
-            <div class="set-row"><span>KYC status</span><b id="set-kyc" class="kyc-pill">Pending</b></div>
+          <div class="lux" style="padding:26px">
+            <h3 style="font-size:16px;font-weight:700;margin-bottom:14px">Account</h3>
+            <div class="cta-row">
+              <button class="btn-glass" id="btn-logout2">Log out</button>
+            </div>
           </div>
-
-          <div class="set-group">
-            <h4>Security</h4>
-            <div class="set-row toggle-row"><span>App lock (PIN)</span><label class="switch"><input type="checkbox" id="tg-pin"><span class="slider"></span></label></div>
-            <div class="set-row toggle-row"><span>Biometric login</span><label class="switch"><input type="checkbox" id="tg-bio" checked><span class="slider"></span></label></div>
-            <div class="set-row toggle-row"><span>Transaction alerts</span><label class="switch"><input type="checkbox" id="tg-alert" checked><span class="slider"></span></label></div>
-          </div>
-
-          <div class="set-group">
-            <h4>Preferences</h4>
-            <div class="set-row toggle-row"><span>Round-up savings</span><label class="switch"><input type="checkbox" id="tg-round"><span class="slider"></span></label></div>
-            <div class="set-row"><span>Currency</span><b>INR (₹)</b></div>
-            <div class="set-row"><span>Language</span><b>English / हिंदी</b></div>
-          </div>
-
-          <div class="set-group">
-            <h4>Support</h4>
-            <a class="set-row link" href="legal.html#privacy"><span>Privacy Policy</span><i>→</i></a>
-            <a class="set-row link" href="legal.html#terms"><span>Terms of Service</span><i>→</i></a>
-            <a class="set-row link" href="pricing.html"><span>Fees & Pricing</span><i>→</i></a>
-            <a class="set-row link" href="mailto:support@arvcoin.com"><span>Contact support</span><i>→</i></a>
-          </div>
-
-          <button class="btn btn-ghost full logout-btn" id="logout2">Log out</button>
-          <p class="app-ver">arvcoin · v1.0.0 · Powered by Onramp.money (FIU-registered)</p>
         </section>
+
+        <div class="disclosure" id="disc" style="margin-top:30px"></div>
       </div>
     </main>
   </div>
 
-  <!-- ============ INVEST MODAL ============ -->
-  <div class="modal-overlay" id="invest-modal">
-    <div class="modal">
-      <button class="modal-close" id="modal-close">✕</button>
-      <div class="modal-steps">
-        <!-- step 1: amount -->
-        <div class="mstep active" data-step="1">
-          <h3>Enter amount</h3>
-          <div class="amt-display">₹<span id="amt-val">0</span></div>
-          <div class="amt-quick">
-            <button data-a="100">₹100</button>
-            <button data-a="500">₹500</button>
-            <button data-a="1000">₹1,000</button>
-            <button data-a="5000">₹5,000</button>
-          </div>
-          <div class="method-toggle">
-            <button class="active" data-m="UPI">📱 UPI</button>
-            <button data-m="QR">▦ Scan QR</button>
-          </div>
-          <button class="btn btn-primary full" id="to-step2">Choose investment</button>
-        </div>
-        <!-- step 2: choose asset -->
-        <div class="mstep" data-step="2">
-          <h3>Choose investment</h3>
-          <div class="mtabs" id="mtabs">
-            <button class="active" data-t="crypto">Crypto</button>
-            <button data-t="stock">Stocks & MF</button>
-          </div>
-          <div class="masset-list" id="masset-list"></div>
-          <button class="btn btn-primary full" id="to-step3" disabled>Review order</button>
-        </div>
-        <!-- step 3: confirm -->
-        <div class="mstep" data-step="3">
-          <h3>Review order</h3>
-          <div class="review-box" id="review-box"></div>
-          <button class="btn btn-primary full" id="do-pay">Pay ₹0</button>
-        </div>
-        <!-- step 4: success -->
-        <div class="mstep" data-step="4">
-          <div class="success-wrap">
-            <div class="success-badge">✓</div>
-            <h3>Investment done! 🎉</h3>
-            <p id="success-text">Invested successfully.</p>
-            <button class="btn btn-primary full" id="success-done">Back to dashboard</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============ SELL MODAL ============ -->
-  <div class="modal-overlay" id="sell-modal">
-    <div class="modal">
-      <button class="modal-close" id="sell-close">✕</button>
-      <div class="modal-steps">
-        <div class="mstep active" data-sstep="1">
-          <h3>Sell crypto</h3>
-          <div class="sell-asset" id="sell-asset"></div>
-          <label class="fld-label">Sell amount (₹)</label>
-          <div class="amt-display">₹<span id="sell-amt">0</span></div>
-          <div class="amt-quick" id="sell-quick">
-            <button data-a="500">₹500</button>
-            <button data-a="1000">₹1,000</button>
-            <button data-p="50">50%</button>
-            <button data-p="100">Max</button>
-          </div>
-          <div class="review-box" id="sell-review"></div>
-          <button class="btn btn-primary full" id="do-sell">Sell &amp; withdraw to bank</button>
-        </div>
-        <div class="mstep" data-sstep="2">
-          <div class="success-wrap">
-            <div class="success-badge">✓</div>
-            <h3>Sell request placed! 💸</h3>
-            <p id="sell-success-text">INR tumhare bank account me aa jayega (minutes me).</p>
-            <button class="btn btn-primary full" id="sell-done">Back to dashboard</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="toast" id="toast"></div>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="arv-config.js"></script>
   <script src="3d.js" defer></script>
-  <script type="module">
-    // Onramp Web SDK (overlay modal). Load fail ho to onramp.js hosted-URL popup pe fallback karega.
-    import("https://cdn.jsdelivr.net/npm/@onramp.money/onramp-web-sdk/+esm")
-      .then(function (mod) { window.OnrampWebSDK = mod.OnrampWebSDK || (mod.default && mod.default.OnrampWebSDK) || mod.default; })
-      .catch(function (e) { console.warn("[arvcoin] onramp sdk load fail (fallback to popup):", e); });
-  </script>
-  <script src="onramp.js" defer></script>
-  <script src="wallet-bundle.js" defer></script>
-  <script src="wallet.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
-  <script src="dashboard.js" defer></script>
+  <script src="lux.js" defer></script>
+  <script type="module" src="dashboard.js"></script>
 </body>
 </html>

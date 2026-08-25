@@ -1,46 +1,41 @@
 /* arvcoin — service worker (offline cache) */
-var CACHE = "arvcoin-v20";
+var CACHE = "arvcoin-v21";
 var ASSETS = [
   "index.html",
   "styles.css",
-  "main.js",
+  "lux.css",
+  "lux.js",
+  "home.js",
   "3d.js",
   "auth.css",
   "auth.js",
   "firebase-config.js",
   "firebase-auth.js",
   "emailjs-config.js",
+  "arv-config.js",
+  "arv-core.js",
+  "compliance-lint.js",
   "login.html",
   "signup.html",
   "verify.html",
-  "kyc.html",
   "dashboard.html",
   "dashboard.css",
   "dashboard.js",
-  "onramp.js",
-  "wallet.js",
-  "wallet-bundle.js",
+  "calls.html",
+  "calls.css",
+  "calls.js",
+  "levels.html",
+  "levels.js",
+  "levels-ui.js",
+  "admin.html",
+  "admin.js",
   "pricing.html",
+  "pricing.js",
   "about.html",
   "legal.html",
   "404.html",
   "favicon.svg",
-  "manifest.json",
-  "arv-config.js",
-  "arv-core.js",
-  "compliance-lint.js",
-  "calls.html",
-  "calls.css",
-  "calls.js",
-  "admin.html",
-  "admin.js",
-  "lux.css",
-  "lux.js",
-  "home.js",
-  "pricing.js",
-  "levels.html",
-  "levels.js",
-  "levels-ui.js"
+  "manifest.json"
 ];
 
 self.addEventListener("install", function (e) {
@@ -73,7 +68,7 @@ self.addEventListener("fetch", function (e) {
   var url = new URL(e.request.url);
   var sameOrigin = url.origin === self.location.origin;
   // CODE files (html/js/css) + navigations -> NETWORK-FIRST (online pe hamesha fresh code).
-  // Baaki (images/fonts/svg/wallet-bundle) -> cache-first (fast).
+  // Baaki (images/fonts/svg) -> cache-first (fast).
   var isCode = e.request.mode === "navigate" || /\.(html|js|css)$/i.test(url.pathname);
 
   if (sameOrigin && isCode) {

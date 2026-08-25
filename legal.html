@@ -4,40 +4,42 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#05060f" />
-  <title>Legal — arvcoin</title>
-  <meta name="description" content="arvcoin legal — Privacy Policy, Terms of Service, and Risk Disclosure." />
+  <title>Legal & Disclosures — arvcoin</title>
+  <meta name="description" content="arvcoin legal — Disclosures, Privacy Policy, Terms of Service, Risk Disclosure aur Grievance Redressal." />
+  <link rel="canonical" href="https://arvcoin.com/legal.html" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="lux.css" />
   <style>
-    .legal-wrap{max-width:920px;margin:0 auto;padding:110px 24px 80px;position:relative;z-index:1}
-    .legal-head{text-align:center;margin-bottom:40px}
-    .legal-head h1{font-size:clamp(30px,5vw,48px);font-weight:800;letter-spacing:-.02em}
-    .legal-head p{color:var(--muted);margin-top:10px}
-    .legal-tabs{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:36px}
-    .legal-tabs button{padding:11px 22px;border-radius:999px;background:var(--panel);border:1px solid var(--stroke);color:var(--muted);font-family:var(--font);font-weight:600;font-size:14px;cursor:pointer;transition:.2s}
-    .legal-tabs button.active{background:linear-gradient(100deg,rgba(124,92,255,.22),rgba(0,224,255,.1));color:var(--txt);border-color:var(--stroke-strong)}
-    .legal-doc{display:none;animation:fadeUp .4s ease}
+    .legal-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:34px}
+    .legal-tabs button{padding:11px 20px;border-radius:999px;background:var(--panel);
+      border:1px solid var(--stroke);color:var(--muted);font-family:var(--font);
+      font-weight:600;font-size:13.5px;cursor:pointer;transition:.2s}
+    .legal-tabs button.active{background:linear-gradient(100deg,rgba(124,92,255,.24),rgba(0,224,255,.1));
+      color:var(--txt);border-color:var(--stroke-strong)}
+    .legal-doc{display:none;animation:fadeUp .45s var(--ease-lux)}
     .legal-doc.active{display:block}
-    @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-    .legal-doc h2{font-size:24px;font-weight:800;margin-bottom:6px}
-    .legal-doc .updated{color:var(--muted-2);font-size:13px;margin-bottom:24px}
-    .legal-doc h3{font-size:17px;font-weight:700;margin:26px 0 8px;color:var(--txt)}
-    .legal-doc p,.legal-doc li{color:var(--muted);font-size:15px;line-height:1.75}
-    .legal-doc ul{padding-left:22px;margin:8px 0}
-    .legal-doc li{margin:4px 0}
-    .risk-note{padding:18px 20px;border-radius:16px;background:rgba(255,176,32,.1);border:1px solid rgba(255,176,32,.3);color:var(--txt);margin:18px 0;font-size:14.5px;line-height:1.7}
-    .back-link{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:14px;margin-bottom:26px}
-    .back-link:hover{color:var(--txt)}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+    .legal-doc h2{font-size:25px;font-weight:800;margin-bottom:6px;letter-spacing:-.02em}
+    .legal-doc .updated{color:var(--muted-2);font-size:12.5px;margin-bottom:26px}
+    .legal-doc h3{font-size:17px;font-weight:700;margin:28px 0 9px;color:var(--txt)}
+    .legal-doc p,.legal-doc li{color:var(--muted);font-size:15px;line-height:1.78}
+    .legal-doc ul{padding-left:22px;margin:9px 0}
+    .legal-doc li{margin:5px 0}
+    .legal-doc b{color:var(--txt)}
+    .legal-doc a{color:var(--cyan)}
   </style>
 </head>
 <body>
   <canvas id="bg-canvas"></canvas>
+  <div class="aurora"><span class="a1"></span><span class="a2"></span></div>
   <div class="grid-overlay"></div>
+  <div class="grain"></div>
 
-  <!-- simple nav -->
   <header class="nav scrolled" id="nav">
     <div class="nav-inner">
       <a href="index.html" class="brand">
@@ -59,89 +61,371 @@
     </div>
   </header>
 
-  <div class="legal-wrap">
-    <div class="legal-head">
-      <h1>Legal & Policies</h1>
-      <p>Transparency first. Yahan sab kuch clearly likha hai.</p>
+  <div class="lux-narrow lux-page" style="padding-bottom:70px">
+    <div class="lux-head" style="text-align:left;margin-bottom:30px">
+      <span class="lux-eyebrow"><span class="dot"></span> Legal</span>
+      <h1 class="lux-h1" style="font-size:clamp(28px,4.6vw,48px)">Legal &amp; <span class="shimmer">Disclosures</span></h1>
+      <p class="lux-lead" style="margin-top:14px">Sab kuch saaf likha hai — kuch chhupaya nahi.</p>
     </div>
 
     <div class="legal-tabs">
-      <button class="active" data-doc="privacy">Privacy Policy</button>
+      <button class="active" data-doc="disclosures">Disclosures</button>
       <button data-doc="terms">Terms of Service</button>
+      <button data-doc="privacy">Privacy Policy</button>
       <button data-doc="risk">Risk Disclosure</button>
+      <button data-doc="refund">Refund Policy</button>
+      <button data-doc="grievance">Grievance</button>
     </div>
 
-    <!-- PRIVACY -->
-    <article class="legal-doc active" id="privacy">
+    <!-- ============ DISCLOSURES ============ -->
+    <article class="legal-doc active lux" id="disclosures" style="padding:clamp(24px,3.4vw,38px)">
+      <h2>Disclosures</h2>
+      <p class="updated">Last updated: <span class="upd"></span></p>
+
+      <div class="lux-note" id="d-reg-box" style="margin-bottom:22px"></div>
+
+      <h3>1. Registration status</h3>
+      <p id="d-reg-text"></p>
+
+      <h3>2. Nature of content</h3>
+      <p id="d-edu"></p>
+
+      <h3>3. No personalised advice</h3>
+      <p id="d-personal"></p>
+
+      <h3>4. No guaranteed returns</h3>
+      <p id="d-guar"></p>
+
+      <h3>5. Levels Calculator</h3>
+      <p id="d-tool"></p>
+
+      <h3>6. Currency / Forex restriction</h3>
+      <p id="d-forex"></p>
+
+      <h3>7. Crypto</h3>
+      <p id="d-crypto"></p>
+
+      <h3>8. Conflict of interest</h3>
+      <p>Hum broker, exchange, depository, clearing member ya custodian <b>nahi</b> hain. Hum
+         aapka paisa, securities ya assets kabhi hold nahi karte. Hum aapke naam par koi trade
+         execute nahi karte aur aapke trading ya demat account ka access nahi lete.</p>
+
+      <h3>9. Fees</h3>
+      <p id="d-fees"></p>
+    </article>
+
+    <!-- ============ TERMS ============ -->
+    <article class="legal-doc lux" id="terms" style="padding:clamp(24px,3.4vw,38px)">
+      <h2>Terms of Service</h2>
+      <p class="updated">Last updated: <span class="upd"></span></p>
+      <p>arvcoin use karke aap in terms se agree karte ho. Dhyaan se padho.</p>
+
+      <h3>1. Service kya hai</h3>
+      <p>arvcoin ek <b>market research aur investor education platform</b> hai. Hum analysis,
+         educational content aur calculation tools provide karte hain. Hum broker, exchange,
+         portfolio manager ya custodian <b>nahi</b> hain.</p>
+
+      <h3>2. Eligibility</h3>
+      <p>Aapki umar 18+ honi chahiye aur aapko legally contract karne ka adhikar hona chahiye.
+         Account ki jaankari sach honi chahiye.</p>
+
+      <h3>3. Content ka use</h3>
+      <p>Saara content sirf aapke <b>personal, non-commercial</b> use ke liye hai. Isko copy,
+         redistribute, resell, republish ya kisi group/channel me forward karna allowed nahi hai.
+         Aisa karne pe account bina refund band ho sakta hai.</p>
+
+      <h3>4. Account security</h3>
+      <p>Apna password apne paas rakho. Account sharing allowed nahi hai — ek subscription
+         ek vyakti ke liye. Multiple device pe alag-alag logo ka access detect hone pe
+         account suspend ho sakta hai.</p>
+
+      <h3>5. Subscription</h3>
+      <p>Subscription <b>fixed duration</b> ki hoti hai. <b>Koi auto-renewal nahi hoti</b> —
+         duration khatam hone pe access apne aap band ho jaata hai. Renew karna aapke haath me hai.
+         Charges par GST alag se lagta hai.</p>
+
+      <h3>6. Aapki zimmedari</h3>
+      <p>Aapke saare investment decisions <b>aapke apne</b> hain. Content sirf reference ke liye
+         hai. Trade karne se pehle apni research karo, apni risk capacity dekho, aur zaroorat ho
+         to SEBI-registered Investment Adviser se salah lo.</p>
+
+      <h3>7. Liability</h3>
+      <p>Market losses ke liye arvcoin zimmedar nahi hai. Hum data accuracy, uptime ya kisi
+         particular result ki guarantee nahi dete. Humari total liability aapke dwara pichle
+         30 din me diye gaye subscription amount tak seemit hai.</p>
+
+      <h3>8. Prohibited use</h3>
+      <ul>
+        <li>Content redistribute ya resell karna</li>
+        <li>Account share ya credentials becha</li>
+        <li>Scraping, automated data extraction, reverse engineering</li>
+        <li>Platform ko kisi illegal activity ke liye use karna</li>
+      </ul>
+
+      <h3>9. Termination</h3>
+      <p>Terms todne pe hum account bina notice band kar sakte hain. Aap kabhi bhi account
+         band karwa sakte ho.</p>
+
+      <h3>10. Governing law</h3>
+      <p>Ye terms Indian law ke under hain. Dispute Indian courts ke jurisdiction me aayenge.</p>
+
+      <h3>11. Changes</h3>
+      <p>Hum terms update kar sakte hain. Material changes pe email ya platform notice ke
+         through inform karenge.</p>
+    </article>
+
+    <!-- ============ PRIVACY ============ -->
+    <article class="legal-doc lux" id="privacy" style="padding:clamp(24px,3.4vw,38px)">
       <h2>Privacy Policy</h2>
-      <p class="updated">Last updated: demo version</p>
-      <p>arvcoin ("hum") tumhari privacy ko seriously leta hai. Yeh policy batati hai ki hum kaunsa data collect karte hain aur kaise use karte hain.</p>
+      <p class="updated">Last updated: <span class="upd"></span></p>
+      <p>Ye policy batati hai ki hum kaunsa data collect karte hain aur kaise use karte hain.</p>
+
       <h3>1. Data hum collect karte hain</h3>
       <ul>
-        <li>Account info: naam, email, mobile number</li>
-        <li>KYC data: PAN, Aadhaar (partner KYC ke liye, encrypted)</li>
-        <li>Transaction data: investment amount, assets, timestamps</li>
-        <li>Device & usage data: app performance behtar karne ke liye</li>
+        <li><b>Account:</b> naam, email, mobile number</li>
+        <li><b>Authentication:</b> Firebase Authentication ke through (password hash Google
+            ke servers pe, humare paas plaintext password kabhi nahi aata)</li>
+        <li><b>Subscription:</b> plan, duration, status</li>
+        <li><b>Usage:</b> kaunse pages dekhe, kaunse tools use kiye — product improve karne ke liye</li>
       </ul>
-      <h3>2. Data ka use</h3>
-      <p>Sirf service dene ke liye — account setup, KYC verification (partners ke through), transactions process karna, aur legal compliance. Hum tumhara data <b>bechte nahi</b>.</p>
-      <h3>3. Sharing</h3>
-      <p>Data sirf regulated partners (Razorpay, Onramp.money, CoinDCX, smallcase/brokers) ke saath share hota hai jitna transaction ke liye zaroori ho.</p>
-      <h3>4. Security</h3>
-      <p>256-bit encryption at rest & in transit. Access strictly controlled.</p>
-      <h3>5. Tumhare rights</h3>
-      <p>Tum apna data access, correct ya delete karwa sakte ho — support se contact karke.</p>
+
+      <h3>2. Payment data</h3>
+      <p>Payment PCI-DSS compliant gateway (Razorpay) ke through hoti hai. <b>Aapke card
+         number, CVV, UPI PIN ya bank credentials humare server pe kabhi aate hi nahi
+         aur store nahi hote.</b> Hum sirf transaction ID aur status receive karte hain.</p>
+
+      <h3>3. Data ka use</h3>
+      <p>Sirf service dene ke liye — account chalana, subscription manage karna, content dena,
+         support dena, aur legal compliance. Hum aapka data <b>bechte nahi</b> aur advertisers
+         ko share nahi karte.</p>
+
+      <h3>4. Sharing</h3>
+      <p>Data sirf zaroori service providers ke saath share hota hai: Google Firebase
+         (authentication + database), Razorpay (payments), email delivery service. Har ek ko
+         sirf utna milta hai jitna kaam ke liye zaroori ho.</p>
+
+      <h3>5. Security</h3>
+      <p>Encryption at rest aur in transit. Database access server-side security rules se
+         controlled hai. Paid content sirf active subscription pe server-side verify hone
+         ke baad milta hai.</p>
+
+      <h3>6. Retention</h3>
+      <p>Account data tab tak rakhte hain jab tak account active hai. Account delete karne
+         par personal data hata dete hain, sirf wo records rakhte hain jo law ke tehat rakhna
+         zaroori hai (jaise transaction records).</p>
+
+      <h3>7. Aapke rights</h3>
+      <p>Aap apna data access, correct ya delete karwa sakte ho. Email karo
+         <a href="mailto:support@arvcoin.com" id="pv-email">support@arvcoin.com</a> — 30 din me respond karenge.</p>
+
+      <h3>8. Cookies</h3>
+      <p>Hum sirf zaroori cookies aur local storage use karte hain — login session aur aapki
+         preferences yaad rakhne ke liye. Koi third-party advertising tracker nahi.</p>
     </article>
 
-    <!-- TERMS -->
-    <article class="legal-doc" id="terms">
-      <h2>Terms of Service</h2>
-      <p class="updated">Last updated: demo version</p>
-      <p>arvcoin use karke tum in terms se agree karte ho. Dhyaan se padho.</p>
-      <h3>1. Service kya hai</h3>
-      <p>arvcoin ek technology platform hai jo tumhe regulated partners ke through crypto aur stocks/MF me invest karne me madad karta hai. Hum khud broker, exchange ya custodian <b>nahi</b> hain.</p>
-      <h3>2. Eligibility</h3>
-      <p>Tumhari umar 18+ honi chahiye aur valid KYC (PAN/Aadhaar) hona chahiye.</p>
-      <h3>3. Investments</h3>
-      <p>Sab investments partner platforms pe execute hote hain. Crypto tumhare wallet me, stocks tumhare demat/folio me jaate hain. arvcoin tumhara paisa hold nahi karta.</p>
-      <h3>4. Fees</h3>
-      <p>Ek transparent partner fee lagti hai (~0.5%), jo transaction se pehle dikhayi jaati hai.</p>
-      <h3>5. Liability</h3>
-      <p>Market losses ke liye arvcoin zimmedar nahi hai. Investments market risk ke adheen hain.</p>
-      <h3>6. Changes</h3>
-      <p>Hum terms update kar sakte hain; major changes pe notify karenge.</p>
-    </article>
-
-    <!-- RISK -->
-    <article class="legal-doc" id="risk">
+    <!-- ============ RISK ============ -->
+    <article class="legal-doc lux" id="risk" style="padding:clamp(24px,3.4vw,38px)">
       <h2>Risk Disclosure</h2>
-      <p class="updated">Last updated: demo version</p>
-      <div class="risk-note">⚠️ <b>Investments are subject to market risk.</b> Crypto aur stocks dono me paisa ghat bhi sakta hai. Sirf utna invest karo jitna afford kar sako.</div>
-      <h3>Crypto risk</h3>
-      <p>Crypto assets highly volatile hote hain. Prices short time me bahut upar-neeche ja sakti hain. Crypto India me evolving regulation ke under hai.</p>
-      <h3>Stock & MF risk</h3>
-      <p>Equity aur mutual funds market performance pe depend karte hain. Past returns future returns guarantee nahi karte.</p>
+      <p class="updated">Last updated: <span class="upd"></span></p>
+
+      <div class="lux-note" style="margin-bottom:22px">
+        <span class="n-ico">⚠️</span>
+        <div><b>Investments are subject to market risk.</b> Read all related documents carefully
+             before investing. Sirf utna paisa lagao jitna aap kho sakte ho.</div>
+      </div>
+
+      <h3>Equity (stocks)</h3>
+      <p>Share prices upar-neeche hoti hain. Company performance, sector trend, macro
+         conditions aur sentiment — sab asar karte hain. Capital ka nuksan ho sakta hai.</p>
+
+      <h3>Derivatives — F&amp;O, commodity, currency</h3>
+      <p><b>Derivatives me leverage hota hai. Iska matlab nuksan aapke initial margin se bahut
+         zyada ho sakta hai, aur poora capital doob sakta hai.</b> SEBI ke studies batate hain ki
+         F&amp;O me trade karne wale retail traders ka bada hissa nuksan me rehta hai. Options
+         expiry par worthless ho sakte hain.</p>
+
+      <h3>Commodity</h3>
+      <p>Gold, silver, copper, zinc, crude oil, natural gas aur agri contracts global supply-demand,
+         geopolitics, currency movement aur weather se affect hote hain. Volatility bahut
+         zyada ho sakti hai.</p>
+
+      <h3>Currency</h3>
+      <p>Currency derivatives central bank policy, interest rates aur global flows se move
+         karte hain. Indian residents sirf RBI-approved INR pairs me, recognised exchanges pe
+         trade kar sakte hain — offshore platforms FEMA ke against hain.</p>
+
+      <h3>Crypto (VDA)</h3>
+      <p>Crypto extremely volatile hai, SEBI ke dayre me nahi aata, aur India me investor
+         protection framework limited hai. 30% tax + 1% TDS lagta hai. Value zero tak ja sakti hai.</p>
+
+      <h3>Levels aur technical analysis ki limitation</h3>
+      <p>Calculated levels sirf historical price data ke math se aate hain. Ye news, results,
+         liquidity, gap openings ya kisi bhi unexpected event ko account me nahi lete.
+         Levels guarantee nahi hain — sirf reference points hain jo break ho sakte hain.</p>
+
       <h3>No guaranteed returns</h3>
-      <p>arvcoin koi fixed ya guaranteed return promise nahi karta. Sabhi decisions tumhari apni samajh se lo.</p>
-      <h3>Do your own research</h3>
-      <p>Invest karne se pehle apni research karo ya certified financial advisor se salah lo.</p>
+      <p>arvcoin koi fixed, assured ya guaranteed return promise nahi karta. Past performance
+         future results ki guarantee nahi hai.</p>
+
+      <h3>Apni research karo</h3>
+      <p>Koi bhi position lene se pehle apni analysis karo, apni risk capacity samjho, aur
+         zaroorat ho to SEBI-registered Investment Adviser se salah lo.</p>
     </article>
 
-    <a href="index.html" class="back-link" style="margin-top:30px">← Back to home</a>
+    <!-- ============ REFUND ============ -->
+    <article class="legal-doc lux" id="refund" style="padding:clamp(24px,3.4vw,38px)">
+      <h2>Refund Policy</h2>
+      <p class="updated">Last updated: <span class="upd"></span></p>
+
+      <h3>1. Nature of service</h3>
+      <p>Subscription <b>digital content aur research access</b> ke liye hai. Payment ke turant
+         baad access activate ho jaata hai aur content consume karna shuru ho jaata hai.</p>
+
+      <h3>2. Cancellation</h3>
+      <p>Aap kabhi bhi subscription cancel kar sakte ho. Cancel karne pe current duration ke
+         end tak access chalta rahega. <b>Koi auto-renewal nahi hoti</b>, isliye cancel karne
+         ki zaroorat aksar nahi padti — duration khatam hone pe apne aap band ho jaata hai.</p>
+
+      <h3>3. Refund kab milta hai</h3>
+      <ul>
+        <li><b>Technical failure:</b> Payment ho gaya par access activate nahi hua aur hum
+            48 ghante me fix nahi kar paaye — poora refund.</li>
+        <li><b>Duplicate payment:</b> Ek hi plan ka do baar charge ho gaya — extra amount refund.</li>
+        <li><b>Payment ke 24 ghante ke andar</b> request karo aur agar aapne koi paid content
+            access nahi kiya ho — poora refund.</li>
+      </ul>
+
+      <h3>4. Refund kab nahi milta</h3>
+      <ul>
+        <li>Paid content access karne ke baad</li>
+        <li>Market losses ya analysis expectation ke hisaab se na chalne par</li>
+        <li>Terms violation ki wajah se account band hone par</li>
+        <li>Subscription duration ke partially use hone par (pro-rata refund nahi)</li>
+      </ul>
+
+      <h3>5. Process</h3>
+      <p>Refund request <a href="mailto:support@arvcoin.com" id="rf-email">support@arvcoin.com</a>
+         par bhejo — order ID aur reason ke saath. Hum 7 working days me review karke jawab
+         denge. Approve hone par original payment method me 5–10 working days me credit ho jaata hai.</p>
+    </article>
+
+    <!-- ============ GRIEVANCE ============ -->
+    <article class="legal-doc lux" id="grievance" style="padding:clamp(24px,3.4vw,38px)">
+      <h2>Grievance Redressal</h2>
+      <p class="updated">Last updated: <span class="upd"></span></p>
+
+      <p>Koi bhi shikayat ho to hum sunenge. Process saaf hai:</p>
+
+      <h3>Step 1 — Support</h3>
+      <p>Email karo <a href="mailto:support@arvcoin.com" id="gr-email">support@arvcoin.com</a>.
+         Hum <b>48 working hours</b> me acknowledge karte hain aur <b>7 working days</b> me
+         resolve karne ki koshish karte hain.</p>
+
+      <h3>Step 2 — Escalation</h3>
+      <p>Jawab se santusht nahi ho to Grievance Officer ko escalate karo. Details neeche hain.
+         Response time: <b>15 working days</b>.</p>
+
+      <div class="lux-table" style="margin:18px 0">
+        <div class="tr"><span>Grievance Officer</span><b id="g-name">—</b></div>
+        <div class="tr"><span>Email</span><b id="g-email">—</b></div>
+        <div class="tr"><span>Phone</span><b id="g-phone">—</b></div>
+        <div class="tr"><span>Response time</span><b>15 working days</b></div>
+      </div>
+
+      <h3>Step 3 — SEBI SCORES / ODR</h3>
+      <p id="g-sebi"></p>
+
+      <div class="lux-note info" style="margin-top:20px">
+        <span class="n-ico">ℹ️</span>
+        <div id="g-note"></div>
+      </div>
+    </article>
+
+    <a href="index.html" class="back-link">← Home</a>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="arv-config.js"></script>
   <script src="3d.js" defer></script>
+  <script src="lux.js" defer></script>
   <script>
     (function () {
+      var CFG = window.ARV_CONFIG || {};
+      var D = CFG.DISCLOSURES || {};
+      var RA = CFG.RA_REGISTRATION || {};
+      var reg = CFG.isRegistered && CFG.isRegistered();
+      var $ = function (id) { return document.getElementById(id); };
+
+      /* updated date */
+      var today = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+      Array.prototype.forEach.call(document.querySelectorAll(".upd"), function (e) { e.textContent = today; });
+
+      /* emails */
+      var mail = (RA.grievanceEmail) || (CFG.BRAND && CFG.BRAND.supportEmail) || "support@arvcoin.com";
+      ["pv-email", "rf-email", "gr-email"].forEach(function (id) {
+        var e = $(id); if (e) { e.textContent = mail; e.href = "mailto:" + mail; }
+      });
+
+      /* disclosures */
+      var box = $("d-reg-box");
+      if (reg) {
+        box.className = "lux-note good";
+        box.innerHTML = '<span class="n-ico">✅</span><div><b>SEBI Registered Research Analyst</b><br />' +
+          'Reg. no. ' + RA.number + (RA.entityName ? " · " + RA.entityName : "") +
+          (RA.analystName ? "<br />Principal Analyst: " + RA.analystName : "") +
+          (RA.validTill ? "<br />Valid till: " + RA.validTill : "") +
+          (RA.bseEnlistment ? "<br />BSE Enlistment: " + RA.bseEnlistment : "") + '</div>';
+        $("d-reg-text").textContent = D.registeredNote + " Registration number: " + RA.number + ".";
+      } else {
+        box.className = "lux-note";
+        box.innerHTML = '<span class="n-ico">🎓</span><div><b>Not registered with SEBI</b><br />' +
+          'arvcoin abhi SEBI ke saath Research Analyst ya Investment Adviser ke roop me registered nahi hai.</div>';
+        $("d-reg-text").textContent = D.notRegistered;
+      }
+
+      $("d-edu").textContent = D.educationOnly || "";
+      $("d-personal").textContent = D.noPersonalAdvice || "";
+      $("d-guar").textContent = D.noGuarantee || "";
+      $("d-tool").textContent = D.toolNotAdvice || "";
+      $("d-forex").textContent = D.forexWarning || "";
+      $("d-crypto").textContent = D.cryptoTax || "";
+      $("d-fees").textContent = (D.paymentNote || "") +
+        " SEBI Research Analyst regulations ke tehat research fee ki limit " +
+        (CFG.inrFmt ? CFG.inrFmt(CFG.ANNUAL_FEE_CAP_INR) : "₹1,51,000") +
+        " per year per family hai. Humare saare plans is limit ke andar hain.";
+
+      /* grievance */
+      $("g-name").textContent = RA.analystName || "Grievance Officer";
+      var ge = $("g-email"); ge.textContent = mail;
+      $("g-phone").textContent = RA.grievancePhone || "—";
+
+      if (reg) {
+        $("g-sebi").innerHTML = 'Agar 15 working days me resolution na mile to aap SEBI ' +
+          'SCORES platform par complaint kar sakte ho: <a href="' + RA.scoresUrl + '" target="_blank" rel="noopener">' +
+          RA.scoresUrl + '</a>. Online Dispute Resolution ke liye: <a href="' + RA.odrUrl +
+          '" target="_blank" rel="noopener">' + RA.odrUrl + '</a>.';
+        $("g-note").innerHTML = 'SEBI-registered intermediaries ke liye SCORES aur ODR mechanism available hai.';
+      } else {
+        $("g-sebi").innerHTML = 'SEBI SCORES aur ODR mechanism SEBI-registered intermediaries ke ' +
+          'liye hote hain. Kyunki arvcoin abhi SEBI-registered nahi hai, aap consumer forum ' +
+          'ya National Consumer Helpline (1915, <a href="https://consumerhelpline.gov.in" target="_blank" rel="noopener">consumerhelpline.gov.in</a>) ' +
+          'par ja sakte ho.';
+        $("g-note").innerHTML = 'Registration complete hone par SCORES aur ODR details yahan ' +
+          'update kar di jaayengi.';
+      }
+
+      /* tabs */
       var tabs = document.querySelectorAll(".legal-tabs button");
       var docs = document.querySelectorAll(".legal-doc");
       function show(id) {
-        docs.forEach(function (d) { d.classList.toggle("active", d.id === id); });
-        tabs.forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-doc") === id); });
+        Array.prototype.forEach.call(docs, function (d) { d.classList.toggle("active", d.id === id); });
+        Array.prototype.forEach.call(tabs, function (t) {
+          t.classList.toggle("active", t.getAttribute("data-doc") === id);
+        });
       }
-      tabs.forEach(function (t) { t.addEventListener("click", function () { show(t.getAttribute("data-doc")); }); });
-      // open specific doc from hash (#privacy/#terms/#risk)
+      Array.prototype.forEach.call(tabs, function (t) {
+        t.addEventListener("click", function () { show(t.getAttribute("data-doc")); });
+      });
       var h = (location.hash || "").replace("#", "");
       if (h && document.getElementById(h)) show(h);
     })();
