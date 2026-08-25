@@ -27,14 +27,39 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
-    // Admin/analyst role custom claim se aata hai (Cloud Function set karta hai).
-    // Firestore doc se role padhna insecure hai — user apna doc edit kar sakta hai.
+    /* ---------- roles ----------
+       Two ways to be an admin/analyst:
+
+       1) A custom auth claim (set by tools/grant-admin.js). Fastest at
+          runtime — no extra document read.
+
+       2) A document in /admins/{uid}. This exists so the owner can grant
+          access from the Firebase Console with no terminal required.
+
+       Reading the role from /admins is SAFE because that collection is
+       never client-writable (see its rule below) — only the Console or
+       the Admin SDK can write there. Reading a role from /users/{uid}
+       would NOT be safe, since users can edit their own profile. */
+
+    function adminDoc() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     function isAdmin() {
-      return signedIn() && request.auth.token.admin == true;
+      return signedIn() && (
+        request.auth.token.admin == true ||
+        (adminDoc() &&
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.admin == true)
+      );
     }
 
     function isAnalyst() {
-      return signedIn() && (request.auth.token.analyst == true || isAdmin());
+      return signedIn() && (
+        request.auth.token.analyst == true ||
+        request.auth.token.admin == true ||
+        (adminDoc() &&
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.analyst == true)
+      );
     }
 
     function subDoc() {
@@ -282,6 +307,21 @@ service cloud.firestore {
       allow create: if request.resource.data.email is string
                     && request.resource.data.email.size() < 200;
       allow read, update, delete: if isAdmin();
+    }
+
+    /* ---------- admins ----------
+       Grants analyst/admin access without needing the CLI.
+
+       Document ID must be the user's Firebase Auth UID.
+       Fields: { analyst: true, admin: true }
+
+       Client can read only its own document, and can NEVER write here.
+       Writes come from the Firebase Console or the Admin SDK, both of
+       which bypass these rules. That is what makes it safe to read a
+       role from this collection. */
+    match /admins/{uid} {
+      allow read:  if isMe(uid);
+      allow write: if false;
     }
 
     /* ---------- default deny ---------- */
