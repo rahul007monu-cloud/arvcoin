@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#05060f" />
+  <title>Publish — arvcoin admin</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="calls.css" />
+</head>
+<body>
+  <canvas id="bg-canvas"></canvas>
+  <div class="grid-overlay"></div>
+
+  <header class="nav scrolled">
+    <div class="nav-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 40 40" width="30" height="30">
+            <defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#7c5cff"/><stop offset="0.5" stop-color="#00e0ff"/><stop offset="1" stop-color="#00ffa3"/>
+            </linearGradient></defs>
+            <circle cx="20" cy="20" r="18" fill="none" stroke="url(#lg1)" stroke-width="2.5"/>
+            <path d="M13 26 L20 12 L27 26 M15.6 21 H24.4" fill="none" stroke="url(#lg1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="brand-name">arv<span>coin</span></span>
+      </a>
+      <div class="nav-cta">
+        <a href="calls.html" class="btn btn-ghost">Feed</a>
+        <a href="dashboard.html" class="btn btn-ghost">Dashboard</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-wrap">
+    <div class="ph">
+      <div>
+        <h1>Publish <span class="grad">research</span></h1>
+        <p>Analyst control room. Har call compliance check se guzarta hai.</p>
+      </div>
+      <div class="ph-right">
+        <span class="pill-stat" id="pill-role">—</span>
+        <span class="pill-stat" id="pill-ra">RA: —</span>
+      </div>
+    </div>
+
+    <!-- RA registration gate -->
+    <div class="gate-warn" id="ra-gate" style="display:none">
+      <b>🚫 Publishing band hai — RA registration set nahi hai</b>
+      Fee lekar securities par buy/sell recommendation dene ke liye SEBI Research Analyst
+      registration zaroori hai (SEBI RA Regulations, 2014). Ye gate isliye hai ki galti se
+      bhi unregistered call publish na ho jaaye.<br><br>
+      <code>arv-config.js</code> → <code>RA_REGISTRATION.number</code> me apna registration
+      number daalo (ya partner RA/IA ka, revenue-share arrangement me). Number aane ke baad
+      publishing turant chalu ho jaayegi.<br><br>
+      Tab tak <b>Lesson</b> aur <b>Market recap</b> publish kar sakte ho — wo education
+      content hai, registration ki zaroorat nahi.
+    </div>
+
+    <!-- what to publish -->
+    <div class="seg-tabs" id="kind-tabs">
+      <button class="seg-tab active" data-kind="call"><i>◹</i> Research call</button>
+      <button class="seg-tab" data-kind="lesson"><i>🎓</i> Lesson</button>
+      <button class="seg-tab" data-kind="recap"><i>≣</i> Market recap</button>
+    </div>
+
+    <div class="adm-grid">
+
+      <!-- ===================== FORM ===================== -->
+      <div class="card">
+        <div class="adm-msg" id="msg"></div>
+        <div class="lint-out" id="lint"></div>
+
+        <!-- ---------- CALL FORM ---------- -->
+        <form id="form-call">
+          <h2>New research call</h2>
+          <p class="card-sub">Rationale zaroori hai — bina research ke bare tip research nahi hoti.</p>
+
+          <div class="fld-row">
+            <div class="fld">
+              <label for="c-segment">Segment</label>
+              <select id="c-segment"></select>
+            </div>
+            <div class="fld">
+              <label for="c-action">Action</label>
+              <select id="c-action">
+                <option value="BUY">BUY</option>
+                <option value="SELL">SELL</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="fld-row">
+            <div class="fld" id="f-inst">
+              <label for="c-instrument">Instrument</label>
+              <input id="c-instrument" placeholder="RELIANCE / NIFTY 24000 CE / GOLD" autocomplete="off" />
+            </div>
+            <div class="fld">
+              <label for="c-exchange">Exchange</label>
+              <select id="c-exchange">
+                <option>NSE</option><option>BSE</option><option>MCX</option>
+                <option>NCDEX</option><option>MSE</option><option>Crypto</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="fld" id="fx-warn" style="display:none">
+            <div class="gate-warn" style="margin:0">
+              <b>⚠️ Currency segment</b>
+              Sirf RBI-approved INR pairs, recognised Indian exchanges (NSE/BSE/MSE) par.
+              Offshore/OTC forex FEMA ke against hai — penalty transaction amount ke 3x tak.
+            </div>
+          </div>
+
+          <div class="fld-row-3">
+            <div class="fld" id="f-entry">
+              <label for="c-entry">Entry</label>
+              <input id="c-entry" type="number" step="any" placeholder="1420" />
+            </div>
+            <div class="fld" id="f-targets">
+              <label for="c-targets">Targets (comma)</label>
+              <input id="c-targets" placeholder="1465, 1490" autocomplete="off" />
+            </div>
+            <div class="fld" id="f-sl">
+              <label for="c-sl">Stop loss</label>
+              <input id="c-sl" type="number" step="any" placeholder="1385" />
+            </div>
+          </div>
+
+          <div class="fld-row-3">
+            <div class="fld">
+              <label for="c-entrytype">Entry type</label>
+              <select id="c-entrytype">
+                <option value="limit">Limit</option>
+                <option value="market">Market</option>
+                <option value="above">Buy above</option>
+                <option value="below">Sell below</option>
+              </select>
+            </div>
+            <div class="fld">
+              <label for="c-horizon">Horizon</label>
+              <select id="c-horizon">
+                <option value="intraday">Intraday</option>
+                <option value="short" selected>Short (1-4 wk)</option>
+                <option value="medium">Medium (1-6 mo)</option>
+                <option value="long">Long (6 mo+)</option>
+              </select>
+            </div>
+            <div class="fld">
+              <label for="c-risk">Risk</label>
+              <select id="c-risk">
+                <option value="low">Low</option>
+                <option value="moderate" selected>Moderate</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="fld" id="f-rationale">
+            <label for="c-rationale">Rationale (min 20 chars)</label>
+            <textarea id="c-rationale" placeholder="Research basis — technical setup, fundamentals, sector view, risk factors..."></textarea>
+            <p class="hint">Ye subscribers ko dikhta hai aur SEBI record ka hissa hai. "Guaranteed", "sure shot", "pakka profit" type language block ho jaayegi.</p>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-lg" id="btn-call">Publish call</button>
+        </form>
+
+        <!-- ---------- LESSON FORM ---------- -->
+        <form id="form-lesson" style="display:none">
+          <h2>New lesson</h2>
+          <p class="card-sub">Education content — registration ki zaroorat nahi.</p>
+
+          <div class="fld-row">
+            <div class="fld">
+              <label for="l-segment">Segment</label>
+              <select id="l-segment"></select>
+            </div>
+            <div class="fld">
+              <label for="l-level">Level</label>
+              <select id="l-level">
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="fld">
+            <label for="l-title">Title</label>
+            <input id="l-title" placeholder="Option Greeks — Delta kya hota hai" autocomplete="off" />
+          </div>
+
+          <div class="fld">
+            <label for="l-summary">Summary</label>
+            <textarea id="l-summary" placeholder="Is lesson me kya cover hoga..."></textarea>
+          </div>
+
+          <div class="fld">
+            <label for="l-body">Body (markdown chalega)</label>
+            <textarea id="l-body" style="min-height:180px" placeholder="Poora lesson content..."></textarea>
+          </div>
+
+          <div class="fld-row">
+            <div class="fld">
+              <label for="l-order">Order</label>
+              <input id="l-order" type="number" value="10" />
+            </div>
+            <div class="fld">
+              <label for="l-free">Access</label>
+              <select id="l-free">
+                <option value="true">Free (SEO + funnel)</option>
+                <option value="false">Subscribers only</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-lg" id="btn-lesson">Publish lesson</button>
+        </form>
+
+        <!-- ---------- RECAP FORM ---------- -->
+        <form id="form-recap" style="display:none">
+          <h2>Daily market recap</h2>
+          <p class="card-sub">Jo ho gaya uska factual summary. Aage kya hoga — wo nahi.</p>
+
+          <div class="fld">
+            <label for="r-date">Date</label>
+            <input id="r-date" type="date" />
+          </div>
+
+          <div class="fld">
+            <label for="r-summary">Aaj kya hua</label>
+            <textarea id="r-summary" placeholder="Nifty 0.6% up, banking led the gains, IT lagged..."></textarea>
+          </div>
+
+          <div class="fld">
+            <label for="r-why">Kyun hua</label>
+            <textarea id="r-why" placeholder="Factors — global cues, FII flows, sector news, macro data..."></textarea>
+            <p class="hint">Past tense me likho. "Kal kya hoga" wala forward view yahan nahi — wo recommendation ban jaata hai.</p>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-lg" id="btn-recap">Publish recap</button>
+        </form>
+      </div>
+
+      <!-- ===================== SIDE ===================== -->
+      <div>
+        <div class="card" style="margin-bottom:18px">
+          <h2>Live preview</h2>
+          <p class="card-sub">Subscriber ko aisa dikhega.</p>
+          <div class="preview-call">
+            <div class="pv-label">Preview</div>
+            <div id="preview"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Compliance reminders</h2>
+          <p class="card-sub">Har publish se pehle.</p>
+          <div class="disc-box" style="margin:0;border:0;padding:0;background:none">
+            <p>• Guaranteed / assured / fixed returns — kabhi nahi. Auto-block hai.</p>
+            <p>• Accuracy % sirf poori history se, cherry-picked winners se nahi.</p>
+            <p>• Publish ke baad call edit/delete nahi hota. Outcome update hota hai, audit trail ke saath.</p>
+            <p>• Personalised advice RA registration cover nahi karta (wo IA hai).</p>
+            <p>• Currency = sirf INR pairs, Indian exchanges.</p>
+            <p>• ARV Coin ko investment/appreciating asset kehna — kabhi nahi.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <a href="calls.html" class="back-link">← Feed</a>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="3d.js" defer></script>
+  <script src="firebase-config.js"></script>
+  <script src="arv-config.js"></script>
+  <script src="compliance-lint.js"></script>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>
