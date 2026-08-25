@@ -1,5 +1,5 @@
 /* arvcoin — service worker (offline cache) */
-var CACHE = "arvcoin-v18";
+var CACHE = "arvcoin-v19";
 var ASSETS = [
   "index.html",
   "styles.css",
@@ -25,7 +25,15 @@ var ASSETS = [
   "legal.html",
   "404.html",
   "favicon.svg",
-  "manifest.json"
+  "manifest.json",
+  "arv-config.js",
+  "arv-core.js",
+  "compliance-lint.js",
+  "calls.html",
+  "calls.css",
+  "calls.js",
+  "admin.html",
+  "admin.js"
 ];
 
 self.addEventListener("install", function (e) {

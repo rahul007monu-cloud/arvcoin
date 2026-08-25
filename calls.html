@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#05060f" />
+  <title>Research Calls — arvcoin</title>
+  <meta name="description" content="arvcoin research desk — equity, F&O, commodity, currency aur crypto par structured research. Education-first, transparent, poori history public." />
+  <link rel="canonical" href="https://arvcoin.com/calls.html" />
+  <meta property="og:title" content="Research Calls — arvcoin" />
+  <meta property="og:description" content="Structured market research — equity, F&O, commodity, currency, crypto." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://arvcoin.com/calls.html" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="calls.css" />
+</head>
+<body>
+  <canvas id="bg-canvas"></canvas>
+  <div class="grid-overlay"></div>
+
+  <header class="nav scrolled">
+    <div class="nav-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 40 40" width="30" height="30">
+            <defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#7c5cff"/><stop offset="0.5" stop-color="#00e0ff"/><stop offset="1" stop-color="#00ffa3"/>
+            </linearGradient></defs>
+            <circle cx="20" cy="20" r="18" fill="none" stroke="url(#lg1)" stroke-width="2.5"/>
+            <path d="M13 26 L20 12 L27 26 M15.6 21 H24.4" fill="none" stroke="url(#lg1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="brand-name">arv<span>coin</span></span>
+      </a>
+      <div class="nav-cta">
+        <a href="dashboard.html" class="btn btn-ghost">Dashboard</a>
+        <a href="pricing.html" class="btn btn-primary">Plans</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-wrap">
+
+    <!-- page head -->
+    <div class="ph">
+      <div>
+        <h1>Research <span class="grad">desk</span></h1>
+        <p id="ph-sub">Structured research — har call ke saath rationale aur poori history.</p>
+      </div>
+      <div class="ph-right" id="ph-right">
+        <span class="pill-stat" id="pill-credits">— ARV</span>
+        <span class="pill-stat" id="pill-plan">No plan</span>
+      </div>
+    </div>
+
+    <!-- education-only / live mode banner -->
+    <div class="mode-banner" id="mode-banner" style="display:none">
+      <span class="mb-ico" id="mb-ico">🎓</span>
+      <div><b id="mb-title"></b> <span id="mb-text"></span></div>
+    </div>
+
+    <!-- segment tabs -->
+    <div class="seg-tabs" id="seg-tabs"></div>
+
+    <!-- performance -->
+    <div class="perf-strip" id="perf-strip" style="display:none">
+      <div class="perf-cell"><small>Total calls</small><b id="pf-total">0</b></div>
+      <div class="perf-cell"><small>Active</small><b id="pf-active">0</b></div>
+      <div class="perf-cell up"><small>Target hit</small><b id="pf-wins">0</b></div>
+      <div class="perf-cell down"><small>SL hit</small><b id="pf-loss">0</b></div>
+    </div>
+
+    <!-- feed -->
+    <div class="call-list" id="feed">
+      <div class="skel"></div><div class="skel"></div><div class="skel"></div>
+    </div>
+
+    <!-- disclaimer -->
+    <div class="disc-box" id="disc-box">
+      <b>Important disclosures</b>
+      <p id="d-reg"></p>
+      <p id="d-risk"></p>
+      <p id="d-guar"></p>
+      <p id="d-personal"></p>
+      <p id="d-forex"></p>
+      <p id="d-arv"></p>
+    </div>
+
+    <a href="dashboard.html" class="back-link">← Dashboard</a>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="3d.js" defer></script>
+  <script src="firebase-config.js"></script>
+  <script src="arv-config.js"></script>
+  <script src="compliance-lint.js"></script>
+  <script type="module" src="calls.js"></script>
+</body>
+</html>
