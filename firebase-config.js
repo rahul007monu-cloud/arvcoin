@@ -1,17 +1,23 @@
 /* =========================================================
    arvcoin — Firebase config
 
-   console.firebase.google.com -> apna project -> Project settings
-   -> "Your apps" (Web </>) -> SDK config -> paste the values here.
+   Where these come from:
+     console.firebase.google.com -> your project -> Project settings
+     -> "Your apps" (Web </>) -> SDK setup and configuration
 
-   NOTE: these values are PUBLIC by design (they ship in the frontend) — that is expected.
+   NOTE: these values are PUBLIC by design. Every Firebase web app ships
+   them in its frontend — they identify the project, they do not grant
+   access. Access is controlled by firestore.rules and Firebase Auth.
+   The value that must never appear here is a service account key.
+
+   Full setup walkthrough: SETUP.md
    ========================================================= */
 window.ARV_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBgHoVA8VBOwSJ9vmS9Wv9i5gM1vypEspw",
-  authDomain: "arvcoin.firebaseapp.com",
-  projectId: "arvcoin",
-  storageBucket: "arvcoin.firebasestorage.app",
-  messagingSenderId: "730773726238",
-  appId: "1:730773726238:web:db378857f9a9279a34ba0f",
-  measurementId: "G-3226GWZJJD"
+  apiKey: "AIzaSyB1cFGZ_Ck08MZ6rMDlCb-3LFVHuIxGQjU",
+  authDomain: "arvcoin-fbd29.firebaseapp.com",
+  projectId: "arvcoin-fbd29",
+  storageBucket: "arvcoin-fbd29.firebasestorage.app",
+  messagingSenderId: "44275546012",
+  appId: "1:44275546012:web:779ac217d33d4c83bcfa59",
+  measurementId: "G-2WVXD25RFN"
 };
