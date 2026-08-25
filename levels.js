@@ -137,19 +137,19 @@
     var label, tone, note;
     if (distPct > 0.6) {
       label = "Above pivot"; tone = "up";
-      note = "Reference price computed pivot se upar hai.";
+      note = "The reference price sits above the computed pivot.";
     } else if (distPct < -0.6) {
       label = "Below pivot"; tone = "down";
-      note = "Reference price computed pivot se neeche hai.";
+      note = "The reference price sits below the computed pivot.";
     } else {
       label = "Near pivot"; tone = "flat";
-      note = "Reference price computed pivot ke aas-paas hai.";
+      note = "The reference price sits close to the computed pivot.";
     }
 
     var strength;
-    if (posInRange > 0.75) strength = "Previous session upper range me band hua";
-    else if (posInRange < 0.25) strength = "Previous session lower range me band hua";
-    else strength = "Previous session mid range me band hua";
+    if (posInRange > 0.75) strength = "The previous session closed in the upper part of its range";
+    else if (posInRange < 0.25) strength = "The previous session closed in the lower part of its range";
+    else strength = "The previous session closed mid-range";
 
     return {
       label: label, tone: tone, note: note,
@@ -170,10 +170,10 @@
     if (h == null) errs.push("High");
     if (l == null) errs.push("Low");
     if (c == null) errs.push("Close");
-    if (errs.length) return { ok: false, errors: errs, message: "Ye values chahiye: " + errs.join(", ") };
-    if (h < l) return { ok: false, errors: ["High/Low"], message: "High, Low se chhota nahi ho sakta." };
-    if (c > h || c < l) return { ok: false, errors: ["Close"], message: "Close, High-Low range ke andar hona chahiye." };
-    if (h === l) return { ok: false, errors: ["Range"], message: "High aur Low same hain — range zero hai." };
+    if (errs.length) return { ok: false, errors: errs, message: "These values are required: " + errs.join(", ") };
+    if (h < l) return { ok: false, errors: ["High/Low"], message: "High cannot be lower than low." };
+    if (c > h || c < l) return { ok: false, errors: ["Close"], message: "Close must fall within the high-low range." };
+    if (h === l) return { ok: false, errors: ["Range"], message: "High and low are identical — the range is zero." };
 
     var sets = {
       classic: classic(h, l, c),
@@ -222,13 +222,13 @@
   function cprMeaning(shape) {
     switch (shape) {
       case "very-narrow":
-        return "Bahut narrow CPR — historically aise din me range expansion dekhi jaati hai.";
+        return "Very narrow CPR — historically associated with range expansion.";
       case "narrow":
-        return "Narrow CPR — trending session ki possibility batayi jaati hai.";
+        return "Narrow CPR — often associated with a trending session.";
       case "moderate":
         return "Moderate CPR width — mixed structure.";
       default:
-        return "Wide CPR — historically rangebound / sideways sessions se associate ki jaati hai.";
+        return "Wide CPR — historically associated with rangebound or sideways sessions.";
     }
   }
 

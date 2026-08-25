@@ -1,215 +1,416 @@
 /* =========================================================
-   arvcoin — Three.js 3D scene
-   - floating particle field in the page background (#bg-canvas)
-   - a glowing rotating coin in the hero (#coin-stage)
-   Gracefully does nothing if THREE fails to load (CSS fallback shows).
+   arvcoin — 3D scene
+
+   Two independent scenes:
+     1) #bg-canvas   — full-page depth field: drifting particles
+                       plus slowly rotating wireframe solids
+     2) #lux-stage   — hero centrepiece: a rotating glass coin
+                       inside orbiting rings, with floating shards
+
+   Guards:
+     - bails out silently if THREE is unavailable
+     - honours prefers-reduced-motion
+     - scales geometry/particle counts down on small screens
+     - pauses rendering when the tab is hidden
    ========================================================= */
 (function () {
+  "use strict";
+
   if (typeof THREE === "undefined") {
-    console.warn("[arvcoin] THREE not loaded — using CSS fallback visuals.");
+    console.warn("[arvcoin] three.js not loaded — skipping 3D");
     return;
   }
 
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var isSmall = window.innerWidth < 760;
+  var DPR = Math.min(window.devicePixelRatio || 1, isSmall ? 1.5 : 2);
 
-  /* ---------------- Background particle field ---------------- */
-  (function backgroundField() {
-    const canvas = document.getElementById("bg-canvas");
+  var VIOLET = 0x7c5cff;
+  var CYAN = 0x00e0ff;
+  var MINT = 0x00ffa3;
+  var GOLD = 0xe8c98a;
+
+  /* Shared pointer state, smoothed */
+  var ptr = { x: 0, y: 0, sx: 0, sy: 0 };
+  if (!reduced) {
+    window.addEventListener("pointermove", function (e) {
+      ptr.x = (e.clientX / window.innerWidth) * 2 - 1;
+      ptr.y = (e.clientY / window.innerHeight) * 2 - 1;
+    }, { passive: true });
+  }
+
+  var hidden = false;
+  document.addEventListener("visibilitychange", function () {
+    hidden = document.hidden;
+  });
+
+  /* Soft radial sprite texture for particles */
+  function dotTexture() {
+    var c = document.createElement("canvas");
+    c.width = c.height = 64;
+    var g = c.getContext("2d");
+    var grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, "rgba(255,255,255,1)");
+    grad.addColorStop(0.35, "rgba(255,255,255,0.55)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  }
+
+  /* =========================================================
+     SCENE 1 — background depth field
+     ========================================================= */
+  function backgroundField() {
+    var canvas = document.getElementById("bg-canvas");
     if (!canvas) return;
 
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    var renderer = new THREE.WebGLRenderer({
+      canvas: canvas, alpha: true, antialias: !isSmall
+    });
+    renderer.setPixelRatio(DPR);
     renderer.setSize(window.innerWidth, window.innerHeight);
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.z = 26;
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.z = 420;
 
-    // particles
-    const COUNT = window.innerWidth < 700 ? 900 : 1800;
-    const positions = new Float32Array(COUNT * 3);
-    const speeds = new Float32Array(COUNT);
-    for (let i = 0; i < COUNT; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 90;
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 60;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 50;
-      speeds[i] = 0.002 + Math.random() * 0.01;
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    var tex = dotTexture();
 
-    // soft round sprite texture
-    const c = document.createElement("canvas");
-    c.width = c.height = 64;
-    const cx = c.getContext("2d");
-    const g = cx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    g.addColorStop(0, "rgba(255,255,255,1)");
-    g.addColorStop(0.4, "rgba(150,210,255,0.6)");
-    g.addColorStop(1, "rgba(0,0,0,0)");
-    cx.fillStyle = g;
-    cx.fillRect(0, 0, 64, 64);
-    const sprite = new THREE.CanvasTexture(c);
+    /* ---- layered particles ---- */
+    var layers = [];
+    var layerSpec = isSmall
+      ? [{ n: 320, z: 260, size: 3.4, color: VIOLET, o: 0.55 },
+         { n: 220, z: 120, size: 2.4, color: CYAN, o: 0.45 }]
+      : [{ n: 700, z: 420, size: 3.8, color: VIOLET, o: 0.6 },
+         { n: 520, z: 240, size: 2.8, color: CYAN, o: 0.5 },
+         { n: 320, z: 90, size: 2.0, color: MINT, o: 0.38 }];
 
-    const mat = new THREE.PointsMaterial({
-      size: 0.5,
-      map: sprite,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      color: new THREE.Color(0x8fd6ff),
-      opacity: 0.85,
-    });
-    const points = new THREE.Points(geo, mat);
-    scene.add(points);
-
-    // parallax on mouse
-    let mx = 0, my = 0, tx = 0, ty = 0;
-    window.addEventListener("mousemove", (e) => {
-      tx = (e.clientX / window.innerWidth - 0.5);
-      ty = (e.clientY / window.innerHeight - 0.5);
-    });
-
-    function resize() {
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-    }
-    window.addEventListener("resize", resize);
-
-    const pos = geo.attributes.position.array;
-    function animate() {
-      requestAnimationFrame(animate);
-      // drift particles upward, wrap around
-      for (let i = 0; i < COUNT; i++) {
-        pos[i * 3 + 1] += speeds[i];
-        if (pos[i * 3 + 1] > 30) pos[i * 3 + 1] = -30;
+    layerSpec.forEach(function (spec) {
+      var geo = new THREE.BufferGeometry();
+      var pos = new Float32Array(spec.n * 3);
+      for (var i = 0; i < spec.n; i++) {
+        pos[i * 3] = (Math.random() - 0.5) * 1500;
+        pos[i * 3 + 1] = (Math.random() - 0.5) * 1000;
+        pos[i * 3 + 2] = -spec.z - Math.random() * 220;
       }
-      geo.attributes.position.needsUpdate = true;
-      points.rotation.y += 0.0004;
+      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
 
-      mx += (tx - mx) * 0.04;
-      my += (ty - my) * 0.04;
-      camera.position.x = mx * 8;
-      camera.position.y = -my * 6;
-      camera.lookAt(scene.position);
+      var mat = new THREE.PointsMaterial({
+        size: spec.size, map: tex, color: spec.color,
+        transparent: true, opacity: spec.o,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false, sizeAttenuation: true
+      });
+
+      var pts = new THREE.Points(geo, mat);
+      scene.add(pts);
+      layers.push({ mesh: pts, speed: 0.02 + Math.random() * 0.03 });
+    });
+
+    /* ---- slowly rotating wireframe solids ---- */
+    var solids = [];
+    var solidSpec = isSmall
+      ? [{ type: "ico", r: 70, x: -180, y: 110, z: -230, color: VIOLET },
+         { type: "torus", r: 60, x: 200, y: -130, z: -300, color: CYAN }]
+      : [{ type: "ico", r: 90, x: -340, y: 150, z: -260, color: VIOLET },
+         { type: "torus", r: 78, x: 380, y: -160, z: -320, color: CYAN },
+         { type: "octa", r: 60, x: 240, y: 220, z: -420, color: MINT },
+         { type: "torusKnot", r: 46, x: -300, y: -200, z: -380, color: GOLD }];
+
+    solidSpec.forEach(function (s) {
+      var geo;
+      if (s.type === "ico") geo = new THREE.IcosahedronGeometry(s.r, 1);
+      else if (s.type === "torus") geo = new THREE.TorusGeometry(s.r, s.r * 0.3, 12, 32);
+      else if (s.type === "octa") geo = new THREE.OctahedronGeometry(s.r, 0);
+      else geo = new THREE.TorusKnotGeometry(s.r, s.r * 0.26, 64, 10);
+
+      var mat = new THREE.MeshBasicMaterial({
+        color: s.color, wireframe: true,
+        transparent: true, opacity: 0.16, depthWrite: false
+      });
+
+      var mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(s.x, s.y, s.z);
+      scene.add(mesh);
+
+      solids.push({
+        mesh: mesh,
+        rx: (Math.random() - 0.5) * 0.0025,
+        ry: (Math.random() - 0.5) * 0.0025,
+        floatAmp: 12 + Math.random() * 18,
+        floatSpeed: 0.0003 + Math.random() * 0.0004,
+        baseY: s.y,
+        phase: Math.random() * Math.PI * 2
+      });
+    });
+
+    /* ---- resize ---- */
+    var resizeTimer;
+    window.addEventListener("resize", function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }, 150);
+    });
+
+    /* ---- loop ---- */
+    function frame(t) {
+      requestAnimationFrame(frame);
+      if (hidden) return;
+
+      ptr.sx += (ptr.x - ptr.sx) * 0.04;
+      ptr.sy += (ptr.y - ptr.sy) * 0.04;
+
+      if (!reduced) {
+        layers.forEach(function (l, i) {
+          l.mesh.rotation.z += l.speed * 0.004;
+          var d = (i + 1) * 9;
+          l.mesh.position.x = -ptr.sx * d;
+          l.mesh.position.y = ptr.sy * d;
+        });
+
+        solids.forEach(function (s) {
+          s.mesh.rotation.x += s.rx;
+          s.mesh.rotation.y += s.ry;
+          s.mesh.position.y = s.baseY + Math.sin(t * s.floatSpeed + s.phase) * s.floatAmp;
+        });
+
+        camera.position.x = -ptr.sx * 26;
+        camera.position.y = ptr.sy * 20;
+        camera.lookAt(0, 0, -200);
+      }
 
       renderer.render(scene, camera);
     }
-    animate();
-  })();
+    requestAnimationFrame(frame);
+  }
 
-  /* ---------------- Hero coin ---------------- */
-  (function heroCoin() {
-    const stage = document.getElementById("coin-stage");
-    if (!stage) return;
+  /* =========================================================
+     SCENE 2 — hero centrepiece (#lux-stage)
+     Rotating coin, orbiting rings, floating shards
+     ========================================================= */
+  function heroStage() {
+    var host = document.getElementById("lux-stage");
+    if (!host) return;
 
-    const size = Math.min(stage.clientWidth, stage.clientHeight) || 380;
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(size, size);
+    var w = host.clientWidth || 480;
+    var h = host.clientHeight || 480;
+
+    var renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.setPixelRatio(DPR);
+    renderer.setSize(w, h);
     renderer.domElement.style.position = "absolute";
     renderer.domElement.style.inset = "0";
-    renderer.domElement.style.margin = "auto";
+    renderer.domElement.style.width = "100%";
+    renderer.domElement.style.height = "100%";
+    renderer.domElement.style.pointerEvents = "none";
+    host.insertBefore(renderer.domElement, host.firstChild);
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-    camera.position.set(0, 0, 6);
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(46, w / h, 0.1, 100);
+    camera.position.set(0, 0, 12);
 
-    // coin = short cylinder
-    const coinGroup = new THREE.Group();
-    scene.add(coinGroup);
+    var root = new THREE.Group();
+    scene.add(root);
 
-    const coinGeo = new THREE.CylinderGeometry(1.7, 1.7, 0.28, 64);
-    const coinMat = new THREE.MeshStandardMaterial({
-      color: 0x0c1030,
-      metalness: 0.95,
-      roughness: 0.25,
-      emissive: 0x0a1840,
-      emissiveIntensity: 0.4,
+    /* ---- lights ---- */
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    var l1 = new THREE.PointLight(VIOLET, 2.4, 60); l1.position.set(-8, 6, 10); scene.add(l1);
+    var l2 = new THREE.PointLight(CYAN, 2.0, 60); l2.position.set(9, -4, 8); scene.add(l2);
+    var l3 = new THREE.PointLight(MINT, 1.4, 50); l3.position.set(0, -8, -6); scene.add(l3);
+
+    /* ---- the coin ---- */
+    var coinGroup = new THREE.Group();
+    root.add(coinGroup);
+
+    var coinGeo = new THREE.CylinderGeometry(3.1, 3.1, 0.42, 72);
+    var coinMat = new THREE.MeshStandardMaterial({
+      color: 0x11142c, metalness: 0.95, roughness: 0.22,
+      emissive: VIOLET, emissiveIntensity: 0.16
     });
-    const coin = new THREE.Mesh(coinGeo, coinMat);
+    var coin = new THREE.Mesh(coinGeo, coinMat);
     coin.rotation.x = Math.PI / 2;
     coinGroup.add(coin);
 
-    // rim ring
-    const rimGeo = new THREE.TorusGeometry(1.72, 0.06, 24, 100);
-    const rimMat = new THREE.MeshStandardMaterial({
-      color: 0x00e0ff, metalness: 1, roughness: 0.2,
-      emissive: 0x00e0ff, emissiveIntensity: 1.2,
+    // rim glow
+    var rimGeo = new THREE.TorusGeometry(3.16, 0.075, 12, 84);
+    var rimMat = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.85 });
+    coinGroup.add(new THREE.Mesh(rimGeo, rimMat));
+
+    // the "A" mark, extruded from a shape
+    var shape = new THREE.Shape();
+    shape.moveTo(-1.25, -1.15);
+    shape.lineTo(0, 1.5);
+    shape.lineTo(1.25, -1.15);
+    shape.lineTo(0.72, -1.15);
+    shape.lineTo(0, 0.42);
+    shape.lineTo(-0.72, -1.15);
+    shape.lineTo(-1.25, -1.15);
+
+    var aGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.16, bevelEnabled: false });
+    var aMat = new THREE.MeshStandardMaterial({
+      color: MINT, metalness: 0.7, roughness: 0.25,
+      emissive: MINT, emissiveIntensity: 0.55
     });
-    const rim = new THREE.Mesh(rimGeo, rimMat);
-    coinGroup.add(rim);
+    var aFront = new THREE.Mesh(aGeo, aMat);
+    aFront.position.z = 0.22;
+    coinGroup.add(aFront);
 
-    // "A" mark on the face using an extruded shape
-    const shape = new THREE.Shape();
-    // triangle A outline (outer)
-    shape.moveTo(0, 1.05);
-    shape.lineTo(0.85, -0.9);
-    shape.lineTo(0.5, -0.9);
-    shape.lineTo(0.28, -0.35);
-    shape.lineTo(-0.28, -0.35);
-    shape.lineTo(-0.5, -0.9);
-    shape.lineTo(-0.85, -0.9);
-    shape.closePath();
-    const hole = new THREE.Path();
-    hole.moveTo(0, 0.45);
-    hole.lineTo(0.16, 0.02);
-    hole.lineTo(-0.16, 0.02);
-    hole.closePath();
-    shape.holes.push(hole);
+    var aBack = new THREE.Mesh(aGeo, aMat.clone());
+    aBack.position.z = -0.38;
+    aBack.rotation.y = Math.PI;
+    coinGroup.add(aBack);
 
-    const markGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.12, bevelEnabled: false });
-    markGeo.center();
-    const markMat = new THREE.MeshStandardMaterial({
-      color: 0x00ffc2, metalness: 0.6, roughness: 0.3,
-      emissive: 0x00ffa3, emissiveIntensity: 0.9,
+    // crossbar
+    var barGeo = new THREE.BoxGeometry(1.28, 0.2, 0.16);
+    var bar1 = new THREE.Mesh(barGeo, aMat);
+    bar1.position.set(0, -0.34, 0.3);
+    coinGroup.add(bar1);
+    var bar2 = new THREE.Mesh(barGeo, aMat);
+    bar2.position.set(0, -0.34, -0.3);
+    coinGroup.add(bar2);
+
+    /* ---- orbiting rings ---- */
+    var rings = [];
+    [
+      { r: 4.5, tube: 0.028, color: CYAN, op: 0.7, tilt: 0.5, speed: 0.0055 },
+      { r: 5.5, tube: 0.022, color: VIOLET, op: 0.55, tilt: -0.85, speed: -0.004 },
+      { r: 6.6, tube: 0.018, color: MINT, op: 0.35, tilt: 1.25, speed: 0.003 }
+    ].forEach(function (r) {
+      var m = new THREE.Mesh(
+        new THREE.TorusGeometry(r.r, r.tube, 8, 128),
+        new THREE.MeshBasicMaterial({ color: r.color, transparent: true, opacity: r.op })
+      );
+      m.rotation.x = r.tilt;
+      root.add(m);
+      rings.push({ mesh: m, speed: r.speed, tilt: r.tilt });
     });
-    const markFront = new THREE.Mesh(markGeo, markMat);
-    markFront.position.z = 0.15;
-    markFront.scale.set(0.62, 0.62, 1);
-    coinGroup.add(markFront);
-    const markBack = markFront.clone();
-    markBack.position.z = -0.15;
-    markBack.rotation.y = Math.PI;
-    coinGroup.add(markBack);
 
-    // lights
-    scene.add(new THREE.AmbientLight(0x4455aa, 0.6));
-    const key = new THREE.PointLight(0x7c5cff, 2.2, 50); key.position.set(-5, 5, 6); scene.add(key);
-    const fill = new THREE.PointLight(0x00e0ff, 2.0, 50); fill.position.set(6, -3, 5); scene.add(fill);
-    const back = new THREE.PointLight(0x00ffa3, 1.4, 50); back.position.set(0, 4, -6); scene.add(back);
+    /* ---- floating shards ---- */
+    var shards = [];
+    var shardCount = isSmall ? 7 : 13;
+    for (var i = 0; i < shardCount; i++) {
+      var t = i % 3;
+      var g = t === 0 ? new THREE.TetrahedronGeometry(0.3)
+            : t === 1 ? new THREE.OctahedronGeometry(0.26)
+            : new THREE.BoxGeometry(0.34, 0.34, 0.34);
 
-    // remove CSS fallback once WebGL coin is live
-    const fb = stage.querySelector(".coin-fallback");
-    if (fb) fb.style.display = "none";
-    stage.appendChild(renderer.domElement);
+      var col = [VIOLET, CYAN, MINT, GOLD][i % 4];
+      var m2 = new THREE.Mesh(g, new THREE.MeshStandardMaterial({
+        color: col, metalness: 0.85, roughness: 0.3,
+        emissive: col, emissiveIntensity: 0.35,
+        transparent: true, opacity: 0.9
+      }));
 
-    let tiltX = 0, tiltY = 0, curX = 0, curY = 0;
-    stage.addEventListener("mousemove", (e) => {
-      const r = stage.getBoundingClientRect();
-      tiltY = ((e.clientX - r.left) / r.width - 0.5) * 0.6;
-      tiltX = ((e.clientY - r.top) / r.height - 0.5) * 0.6;
-    });
-    stage.addEventListener("mouseleave", () => { tiltX = 0; tiltY = 0; });
+      var ang = (i / shardCount) * Math.PI * 2;
+      var rad = 5.2 + Math.random() * 2.6;
+      m2.position.set(
+        Math.cos(ang) * rad,
+        (Math.random() - 0.5) * 6,
+        Math.sin(ang) * rad
+      );
+      root.add(m2);
 
-    function resize() {
-      const s = Math.min(stage.clientWidth, stage.clientHeight) || 380;
-      renderer.setSize(s, s);
+      shards.push({
+        mesh: m2, ang: ang, rad: rad,
+        ySpeed: 0.00035 + Math.random() * 0.0005,
+        yAmp: 0.5 + Math.random() * 0.9,
+        baseY: m2.position.y,
+        orbit: 0.00018 + Math.random() * 0.00022,
+        rx: (Math.random() - 0.5) * 0.014,
+        ry: (Math.random() - 0.5) * 0.014,
+        phase: Math.random() * Math.PI * 2
+      });
     }
-    window.addEventListener("resize", resize);
 
-    let t = 0;
-    function animate() {
-      requestAnimationFrame(animate);
-      t += 0.01;
-      curX += (tiltX - curX) * 0.06;
-      curY += (tiltY - curY) * 0.06;
-      if (!reduceMotion) coinGroup.rotation.y += 0.012;
-      coinGroup.rotation.x = curX;
-      coinGroup.rotation.z = Math.sin(t) * 0.05;
-      coinGroup.position.y = Math.sin(t * 0.8) * 0.12;
+    /* ---- dust ---- */
+    var dustGeo = new THREE.BufferGeometry();
+    var dn = isSmall ? 90 : 190;
+    var dpos = new Float32Array(dn * 3);
+    for (var j = 0; j < dn; j++) {
+      var a = Math.random() * Math.PI * 2;
+      var rr = 3 + Math.random() * 7;
+      dpos[j * 3] = Math.cos(a) * rr;
+      dpos[j * 3 + 1] = (Math.random() - 0.5) * 12;
+      dpos[j * 3 + 2] = Math.sin(a) * rr;
+    }
+    dustGeo.setAttribute("position", new THREE.BufferAttribute(dpos, 3));
+    var dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({
+      size: 0.07, map: dotTexture(), color: 0xffffff,
+      transparent: true, opacity: 0.5,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    }));
+    root.add(dust);
+
+    /* ---- resize ---- */
+    var rt;
+    window.addEventListener("resize", function () {
+      clearTimeout(rt);
+      rt = setTimeout(function () {
+        var nw = host.clientWidth || 480, nh = host.clientHeight || 480;
+        camera.aspect = nw / nh;
+        camera.updateProjectionMatrix();
+        renderer.setSize(nw, nh);
+      }, 150);
+    });
+
+    /* ---- loop ---- */
+    function frame(t) {
+      requestAnimationFrame(frame);
+      if (hidden) return;
+
+      if (reduced) {
+        coinGroup.rotation.y = 0.5;
+        renderer.render(scene, camera);
+        return;
+      }
+
+      // coin spins continuously, with a gentle wobble
+      coinGroup.rotation.y = t * 0.00042;
+      coinGroup.rotation.z = Math.sin(t * 0.0005) * 0.09;
+      coinGroup.position.y = Math.sin(t * 0.0007) * 0.26;
+
+      rings.forEach(function (r, i) {
+        r.mesh.rotation.z += r.speed;
+        r.mesh.rotation.x = r.tilt + Math.sin(t * 0.0004 + i) * 0.14;
+      });
+
+      shards.forEach(function (s) {
+        s.ang += s.orbit;
+        s.mesh.position.x = Math.cos(s.ang) * s.rad;
+        s.mesh.position.z = Math.sin(s.ang) * s.rad;
+        s.mesh.position.y = s.baseY + Math.sin(t * s.ySpeed + s.phase) * s.yAmp;
+        s.mesh.rotation.x += s.rx;
+        s.mesh.rotation.y += s.ry;
+      });
+
+      dust.rotation.y = t * 0.00007;
+
+      // whole rig tilts toward the pointer
+      ptr.sx += (ptr.x - ptr.sx) * 0.045;
+      ptr.sy += (ptr.y - ptr.sy) * 0.045;
+      root.rotation.y = ptr.sx * 0.34;
+      root.rotation.x = ptr.sy * 0.24;
+
+      l1.position.x = -8 + ptr.sx * 3;
+      l2.position.x = 9 + ptr.sx * 3;
+
       renderer.render(scene, camera);
     }
-    animate();
-  })();
+    requestAnimationFrame(frame);
+  }
+
+  function boot() {
+    try { backgroundField(); } catch (e) { console.warn("[arvcoin] bg scene:", e); }
+    try { heroStage(); } catch (e) { console.warn("[arvcoin] hero scene:", e); }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
 })();

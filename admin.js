@@ -205,7 +205,7 @@ function renderPreview() {
         '<span class="chip">' + seg2.icon + " " + esc(seg2.name) + '</span>' +
         '<span class="chip">' + esc($("l-level").value) + '</span>' +
       '</div>' +
-      ($("l-summary").value ? '<div class="cc-why"><b>Kya seekhoge</b>' + esc($("l-summary").value) + '</div>' : "");
+      ($("l-summary").value ? '<div class="cc-why"><b>What you will learn</b>' + esc($("l-summary").value) + '</div>' : "");
     return;
   }
 
@@ -214,8 +214,8 @@ function renderPreview() {
       '<span class="cc-inst">Market recap — ' + (esc($("r-date").value) || "date") + '</span>' +
       '<span class="cc-status closed">Recap</span>' +
     '</div>' +
-    ($("r-summary").value ? '<div class="cc-why"><b>Aaj kya hua</b>' + esc($("r-summary").value) + '</div>' : "") +
-    ($("r-why").value ? '<div class="cc-why"><b>Kyun hua</b>' + esc($("r-why").value) + '</div>' : "");
+    ($("r-summary").value ? '<div class="cc-why"><b>What happened</b>' + esc($("r-summary").value) + '</div>' : "") +
+    ($("r-why").value ? '<div class="cc-why"><b>Why it happened</b>' + esc($("r-why").value) + '</div>' : "");
 }
 
 /* live preview + live lint */
@@ -312,16 +312,16 @@ $("form-analysis").addEventListener("submit", function (e) {
   var inst = $("a-instrument").value.trim();
   var obs = $("a-observation").value.trim();
 
-  if (inst.length < 2) { msg("bad", "Instrument ka naam daalo."); return; }
-  if (obs.length < 20) { msg("bad", "Observation likho (min 20 chars)."); return; }
+  if (inst.length < 2) { msg("bad", "Enter an instrument name."); return; }
+  if (obs.length < 20) { msg("bad", "Write an observation (minimum 20 characters)."); return; }
 
   var lv = computeAnalysisLevels();
-  if (!lv) { msg("bad", "Prev High, Low aur Close theek se daalo."); return; }
+  if (!lv) { msg("bad", "Enter a valid previous high, low and close."); return; }
 
   var lint = window.ARVLint.check([inst, obs].join("\n"));
   showLint(lint);
-  if (!lint.ok) { msg("bad", "Compliance block — banned phrases hata do."); return; }
-  if (lint.hasPersonal) { msg("bad", "Personalised advice wali bhasha hata do."); return; }
+  if (!lint.ok) { msg("bad", "Compliance block — remove the blocked phrases."); return; }
+  if (lint.hasPersonal) { msg("bad", "Remove the personalised-advice wording."); return; }
 
   var btn = $("btn-analysis");
   btn.disabled = true;
@@ -340,7 +340,7 @@ $("form-analysis").addEventListener("submit", function (e) {
     createdBy: currentUid()
   })
     .then(function (ref) {
-      msg("ok", "✅ Analysis publish ho gaya (" + ref.id + "). Feed pe turant dikhega.");
+      msg("ok", "✅ Analysis publish ho gaya (" + ref.id + "). It appears on the feed immediately.");
       $("a-instrument").value = "";
       $("a-observation").value = "";
       $("a-high").value = ""; $("a-low").value = ""; $("a-close").value = "";
@@ -350,7 +350,7 @@ $("form-analysis").addEventListener("submit", function (e) {
       btn.disabled = false;
     })
     .catch(function (err) {
-      msg("bad", "❌ " + (err && err.message ? err.message : "Publish fail"));
+      msg("bad", "❌ " + (err && err.message ? err.message : "Publish failed"));
       btn.disabled = false;
     });
 });
@@ -371,11 +371,11 @@ $("form-call").addEventListener("submit", function (e) {
   if (isNaN(c.stopLoss)) bad.push("stop loss");
   if (!c.targets.length) bad.push("targets");
   if (c.rationale.length < 20) bad.push("rationale (min 20 chars)");
-  if (bad.length) { msg("bad", "Ye fields theek karo: " + bad.join(", ")); return; }
+  if (bad.length) { msg("bad", "Please correct these fields: " + bad.join(", ")); return; }
 
   var lint = window.ARVLint.check([c.title, c.rationale].join("\n"));
   showLint(lint);
-  if (!lint.ok) { msg("bad", "Compliance block — banned phrases hata do."); return; }
+  if (!lint.ok) { msg("bad", "Compliance block — remove the blocked phrases."); return; }
 
   var btn = $("btn-call");
   btn.disabled = true;
@@ -383,14 +383,14 @@ $("form-call").addEventListener("submit", function (e) {
 
   publishCall(c)
     .then(function (ref) {
-      msg("ok", "✅ Call publish ho gaya (" + ref.id + "). Subscribers ko dikhne laga.");
+      msg("ok", "✅ Call publish ho gaya (" + ref.id + "). It is now visible to subscribers.");
       $("form-call").reset();
       fillSegments("c-segment");
       renderPreview();
       btn.disabled = false;
     })
     .catch(function (err) {
-      msg("bad", "❌ " + (err && err.message ? err.message : "Publish fail"));
+      msg("bad", "❌ " + (err && err.message ? err.message : "Publish failed"));
       btn.disabled = false;
     });
 });
@@ -404,12 +404,12 @@ $("form-lesson").addEventListener("submit", function (e) {
 
   var title = $("l-title").value.trim();
   var body = $("l-body").value.trim();
-  if (title.length < 4) { msg("bad", "Title likho."); return; }
-  if (body.length < 40) { msg("bad", "Lesson body chhota hai (min 40 chars)."); return; }
+  if (title.length < 4) { msg("bad", "Enter a title."); return; }
+  if (body.length < 40) { msg("bad", "The lesson body is too short (minimum 40 characters)."); return; }
 
   var lint = window.ARVLint.check([title, $("l-summary").value, body].join("\n"));
   showLint(lint);
-  if (!lint.ok) { msg("bad", "Compliance block — banned phrases hata do."); return; }
+  if (!lint.ok) { msg("bad", "Compliance block — remove the blocked phrases."); return; }
 
   var btn = $("btn-lesson");
   btn.disabled = true;
@@ -434,7 +434,7 @@ $("form-lesson").addEventListener("submit", function (e) {
       btn.disabled = false;
     })
     .catch(function (err) {
-      msg("bad", "❌ " + (err && err.message ? err.message : "Publish fail"));
+      msg("bad", "❌ " + (err && err.message ? err.message : "Publish failed"));
       btn.disabled = false;
     });
 });
@@ -448,12 +448,12 @@ $("form-recap").addEventListener("submit", function (e) {
 
   var date = $("r-date").value;
   var summary = $("r-summary").value.trim();
-  if (!date) { msg("bad", "Date choose karo."); return; }
-  if (summary.length < 20) { msg("bad", "Summary likho (min 20 chars)."); return; }
+  if (!date) { msg("bad", "Please choose a date."); return; }
+  if (summary.length < 20) { msg("bad", "Write a summary (minimum 20 characters)."); return; }
 
   var lint = window.ARVLint.check([summary, $("r-why").value].join("\n"));
   showLint(lint);
-  if (!lint.ok) { msg("bad", "Compliance block — banned phrases hata do."); return; }
+  if (!lint.ok) { msg("bad", "Compliance block — remove the blocked phrases."); return; }
 
   var btn = $("btn-recap");
   btn.disabled = true;
@@ -472,7 +472,7 @@ $("form-recap").addEventListener("submit", function (e) {
       btn.disabled = false;
     })
     .catch(function (err) {
-      msg("bad", "❌ " + (err && err.message ? err.message : "Publish fail"));
+      msg("bad", "❌ " + (err && err.message ? err.message : "Publish failed"));
       btn.disabled = false;
     });
 });
@@ -501,7 +501,7 @@ if (!ready) {
     switchKind("analysis");   // ye turant kaam karta hai, RA gate se free
     if (!REGISTERED) {
       $("btn-call").disabled = true;
-      $("btn-call").textContent = "Publishing band — RA number set karo";
+      $("btn-call").textContent = "Publishing disabled — set the RA number";
     }
   });
 }

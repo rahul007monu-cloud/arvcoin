@@ -1,38 +1,42 @@
 /* =========================================================
    arvcoin — central config
 
-   Ek advisory platform. Website + app.
-   Payment website pe NAHI hota — user Telegram/WhatsApp pe
-   connect hota hai, wahan pay karta hai, phir access milta hai.
+   A market research and investor education platform.
+   Website + app.
 
-   ⚠️ Ye file client pe load hoti hai — koi secret NA rakhna.
+   ⚠️ This file loads on the client. Never put secrets here.
    ========================================================= */
 (function () {
   "use strict";
 
   /* ---------------------------------------------------------
-     1) RA REGISTRATION — calls publish karne ka gate
+     1) SEBI RESEARCH ANALYST REGISTRATION
      ---------------------------------------------------------
-     SEBI (Research Analysts) Regulations, 2014: fee lekar
-     securities pe buy/sell recommendation dene ke liye
-     registration zaroori hai.
+     Publishing buy/sell recommendations on securities for a fee
+     requires registration under the SEBI (Research Analysts)
+     Regulations, 2014.
 
-     ⚠️ Payment Telegram pe shift karne se ye requirement
-     khatam NAHI hoti. Fee fee hai, chahe kahin bhi lo.
-     SEBI ke maximum orders Telegram/WhatsApp advisory pe hi aate hain.
-
-     Jab tak `number` khaali hai:
-       - admin panel se call publish nahi hoga
-       - app education mode me chalega (lessons + recap)
+     While `number` is empty the app runs in education mode:
+     levels analysis, lessons and market recaps only.
   --------------------------------------------------------- */
   var RA_REGISTRATION = {
-    number: "",                 // e.g. "INH000012345"
-    entityName: "",
-    analystName: "",
-    validTill: "",
-    bseEnlistment: "",
+    number: "INH000021086",
+
+    // ⚠️ FILL THESE THREE — they render on every published call
+    //    and across the legal pages.
+    entityName: "",             // exact registered entity name, per certificate
+    analystName: "",            // principal / proprietor analyst name
+    validTill: "",              // "YYYY-MM-DD", or "Perpetual"
+
+    // Optional
+    bseEnlistment: "",          // BSE Administration & Supervision enlistment no.
+    registeredAddress: "",
+    telephone: "",
+
+    // Grievance details — required by SEBI
     grievanceEmail: "support@arvcoin.com",
     grievancePhone: "",
+    grievanceOfficer: "",
     scoresUrl: "https://scores.sebi.gov.in",
     odrUrl: "https://smartodr.in"
   };
@@ -41,35 +45,178 @@
     return !!(RA_REGISTRATION.number && String(RA_REGISTRATION.number).trim().length >= 6);
   }
 
+  /* Which required fields are still blank — surfaced in the admin panel */
+  function missingRaFields() {
+    var need = { entityName: "Entity name", analystName: "Analyst name", validTill: "Valid till" };
+    var out = [];
+    Object.keys(need).forEach(function (k) {
+      if (!RA_REGISTRATION[k] || !String(RA_REGISTRATION[k]).trim()) out.push(need[k]);
+    });
+    return out;
+  }
+
   /* ---------------------------------------------------------
-     2) ACCESS — Telegram / WhatsApp funnel
+     2) SEGMENTS AND INSTRUMENTS
+  --------------------------------------------------------- */
+  var SEGMENTS = {
+    equity: {
+      id: "equity", name: "Stocks", icon: "◈", color: "#7c5cff", regulated: true,
+      blurb: "Cash equity across large, mid and small caps. Technical and fundamental basis.",
+      exchanges: ["NSE", "BSE"],
+      instruments: ["Large cap", "Mid cap", "Small cap", "Sectoral", "Index (NIFTY/BANKNIFTY)"]
+    },
+    options: {
+      id: "options", name: "F&O / Options", icon: "◹", color: "#00e0ff", regulated: true,
+      blurb: "Index and stock derivatives — futures, calls, puts and spreads.",
+      exchanges: ["NSE", "BSE"],
+      instruments: ["NIFTY options", "BANKNIFTY options", "FINNIFTY", "Stock futures", "Stock options", "Spreads"]
+    },
+    commodity: {
+      id: "commodity", name: "Commodity", icon: "⛁", color: "#ffb020", regulated: true,
+      blurb: "Metals, energy and agri — exchange-traded contracts on MCX and NCDEX.",
+      exchanges: ["MCX", "NCDEX"],
+      instruments: [
+        "Gold", "Silver", "Copper", "Zinc", "Lead", "Aluminium", "Nickel",
+        "Crude oil", "Natural gas", "Cotton", "Guar", "Soybean"
+      ],
+      groups: {
+        "Precious metals": ["Gold", "Silver"],
+        "Base metals": ["Copper", "Zinc", "Lead", "Aluminium", "Nickel"],
+        "Energy": ["Crude oil", "Natural gas"],
+        "Agri": ["Cotton", "Guar", "Soybean"]
+      }
+    },
+    currency: {
+      id: "currency", name: "Currency", icon: "⇄", color: "#00ffa3", regulated: true,
+      blurb: "Exchange-traded currency derivatives — INR pairs on Indian exchanges only.",
+      exchanges: ["NSE", "BSE", "MSE"],
+      instruments: ["USDINR", "EURINR", "GBPINR", "JPYINR"],
+      note: "RBI-approved INR pairs on recognised Indian exchanges only. " +
+            "Offshore and OTC forex platforms breach FEMA, with penalties of up to " +
+            "three times the transaction value."
+    },
+    crypto: {
+      id: "crypto", name: "Crypto", icon: "₿", color: "#f7931a", regulated: false,
+      blurb: "Major digital assets. Outside SEBI's remit, but taxed at 30% plus 1% TDS.",
+      exchanges: ["Crypto"],
+      instruments: ["BTC", "ETH", "SOL", "XRP", "BNB"]
+    }
+  };
+
+  var SEGMENT_ORDER = ["equity", "options", "commodity", "currency", "crypto"];
+
+  /* ---------------------------------------------------------
+     3) PLANS
+  --------------------------------------------------------- */
+  var PLAN_PRICES = {
+    basic: {
+      id: "basic", name: "Basic",
+      priceInr: 499, durationDays: 30,
+      segments: ["equity", "crypto"],
+      tagline: "Start with stocks",
+      features: [
+        "Equity research",
+        "Crypto insights",
+        "Daily market recap",
+        "Levels analysis"
+      ],
+      missing: ["F&O / Options", "Commodity (metals, energy)", "Currency"]
+    },
+    pro: {
+      id: "pro", name: "Pro",
+      priceInr: 999, durationDays: 30, popular: true,
+      segments: ["equity", "options", "crypto"],
+      tagline: "For active traders",
+      features: [
+        "Everything in Basic",
+        "F&O and options research",
+        "Index and stock derivatives",
+        "Chart analysis",
+        "Priority support"
+      ],
+      missing: ["Commodity (metals, energy)", "Currency"]
+    },
+    elite: {
+      id: "elite", name: "Elite",
+      priceInr: 1999, durationDays: 30,
+      segments: ["equity", "options", "commodity", "currency", "crypto"],
+      tagline: "Every segment",
+      features: [
+        "Everything in Pro",
+        "Commodity — gold, silver, copper, zinc, crude",
+        "Currency (INR pairs)",
+        "Analyst Q&A access",
+        "Early access to research"
+      ],
+      missing: []
+    },
+    quarterly: {
+      id: "quarterly", name: "Elite Quarterly",
+      priceInr: 4999, durationDays: 90,
+      segments: ["equity", "options", "commodity", "currency", "crypto"],
+      tagline: "Three months, best value",
+      saveLabel: "Save 17%",
+      features: [
+        "Full Elite plan for three months",
+        "Single payment",
+        "Rate locked for the term"
+      ],
+      missing: []
+    }
+  };
+
+  var PLAN_ORDER = ["basic", "pro", "elite", "quarterly"];
+
+  // SEBI RA fee cap: ₹1,51,000 per year per family
+  var ANNUAL_FEE_CAP_INR = 151000;
+  var GST_PCT = 18;
+
+  /* ---------------------------------------------------------
+     4) PAYMENTS
      ---------------------------------------------------------
-     Website pe koi payment gateway nahi. User "Unlock" dabata hai:
-       1. accessRequests/{id} doc banta hai (uid + plan + code)
-       2. Telegram pe redirect, message me uska code prefilled
-       3. Aap Telegram pe charges batate ho, payment lete ho
-       4. Admin panel se access grant -> subscriptions/{uid} active
-          (ya bot webhook se automatic)
+     ⚠️ Never trust a client-side "payment success" callback.
+     Flow: create order (Cloud Function) → user pays →
+     Razorpay webhook → verify signature server-side →
+     activate subscriptions/{uid}. The client only reads status.
+  --------------------------------------------------------- */
+  var PAYMENTS = {
+    provider: "razorpay",
+    razorpayKeyId: "",          // rzp_live_... or rzp_test_...  (public key only)
+    currency: "INR",
+    createOrderUrl: "",         // e.g. https://asia-south1-arvcoin.cloudfunctions.net/createOrder
+    verifyUrl: "",
+    checkoutName: "arvcoin",
+    checkoutDescription: "Research access subscription",
+    themeColor: "#7c5cff",
+    gstPct: 18
+  };
+
+  function paymentsReady() {
+    return !!(PAYMENTS.razorpayKeyId && PAYMENTS.createOrderUrl);
+  }
+
+  function planTotal(planId) {
+    var p = PLAN_PRICES[planId];
+    if (!p) return null;
+    var gst = Math.round(p.priceInr * PAYMENTS.gstPct / 100);
+    return { base: p.priceInr, gst: gst, total: p.priceInr + gst };
+  }
+
+  /* ---------------------------------------------------------
+     5) ACCESS — optional manual grant channel
   --------------------------------------------------------- */
   var ACCESS = {
-    mode: "telegram",                          // "telegram" | "whatsapp" | "both"
-
-    telegramUser: "arvcoin_support",           // @username (bina @)
-    telegramChannel: "arvcoin_research",       // public channel
-    telegramBot: "",                           // bot username — auto-access ke liye
-
-    whatsappNumber: "",                        // 91XXXXXXXXXX (country code ke saath)
-
-    // Telegram/WhatsApp pe bheja jaane wala prefilled message
+    mode: "telegram",
+    telegramUser: "arvcoin_support",
+    telegramChannel: "arvcoin_research",
+    telegramBot: "",
+    whatsappNumber: "",
     messageTemplate:
-      "Hi arvcoin team! Mujhe {PLAN} plan ka access chahiye.\n" +
+      "Hi arvcoin team, I would like access to the {PLAN} plan.\n" +
       "Request code: {CODE}\n" +
       "Registered email: {EMAIL}",
-
-    // Access grant hone ke baad UI kya kahe
-    pendingNote: "Payment confirm hone ke baad aapka access 30 minute me activate ho jaata hai.",
-
-    autoGrantEnabled: false                    // bot webhook + Cloud Function chahiye
+    pendingNote: "Access is activated within 30 minutes of payment confirmation.",
+    autoGrantEnabled: false
   };
 
   function telegramUrl(planName, code, email) {
@@ -90,207 +237,80 @@
   }
 
   /* ---------------------------------------------------------
-     3) SEGMENTS + INSTRUMENTS
-     Stocks, Options, Commodity (metals/copper/energy),
-     Currency, Crypto — sab kuch.
-  --------------------------------------------------------- */
-  var SEGMENTS = {
-    equity: {
-      id: "equity", name: "Stocks", icon: "◈", color: "#7c5cff", regulated: true,
-      blurb: "Cash equity — large, mid aur small cap. Technical + fundamental basis.",
-      exchanges: ["NSE", "BSE"],
-      instruments: ["Large cap", "Mid cap", "Small cap", "Sectoral", "Index (NIFTY/BANKNIFTY)"]
-    },
-    options: {
-      id: "options", name: "F&O / Options", icon: "◹", color: "#00e0ff", regulated: true,
-      blurb: "Index aur stock derivatives — futures, calls, puts, spreads.",
-      exchanges: ["NSE", "BSE"],
-      instruments: ["NIFTY options", "BANKNIFTY options", "FINNIFTY", "Stock futures", "Stock options", "Spreads"]
-    },
-    commodity: {
-      id: "commodity", name: "Commodity", icon: "⛁", color: "#ffb020", regulated: true,
-      blurb: "Metals, energy aur agri — MCX/NCDEX exchange-traded contracts.",
-      exchanges: ["MCX", "NCDEX"],
-      instruments: [
-        "Gold", "Silver", "Copper", "Zinc", "Lead", "Aluminium", "Nickel",
-        "Crude oil", "Natural gas", "Cotton", "Guar", "Soybean"
-      ],
-      groups: {
-        "Precious metals": ["Gold", "Silver"],
-        "Base metals": ["Copper", "Zinc", "Lead", "Aluminium", "Nickel"],
-        "Energy": ["Crude oil", "Natural gas"],
-        "Agri": ["Cotton", "Guar", "Soybean"]
-      }
-    },
-    currency: {
-      id: "currency", name: "Currency / Forex", icon: "⇄", color: "#00ffa3", regulated: true,
-      blurb: "Exchange-traded currency derivatives — sirf INR pairs, Indian exchanges.",
-      exchanges: ["NSE", "BSE", "MSE"],
-      instruments: ["USDINR", "EURINR", "GBPINR", "JPYINR"],
-      note: "Sirf RBI-approved INR pairs, recognised Indian exchanges pe. " +
-            "Offshore/OTC forex platforms FEMA ke against hain — penalty transaction amount ke 3x tak."
-    },
-    crypto: {
-      id: "crypto", name: "Crypto", icon: "₿", color: "#f7931a", regulated: false,
-      blurb: "Major digital assets. SEBI ke dayre me nahi, par 30% VDA tax + 1% TDS lagta hai.",
-      exchanges: ["Crypto"],
-      instruments: ["BTC", "ETH", "SOL", "XRP", "BNB"]
-    }
-  };
-
-  var SEGMENT_ORDER = ["equity", "options", "commodity", "currency", "crypto"];
-
-  /* ---------------------------------------------------------
-     4) PLANS — charges site pe dikhte hain, payment Telegram pe
-  --------------------------------------------------------- */
-  var PLAN_PRICES = {
-    basic: {
-      id: "basic", name: "Basic",
-      priceInr: 499, durationDays: 30,
-      segments: ["equity", "crypto"],
-      tagline: "Stocks se shuruaat",
-      features: [
-        "Equity research calls",
-        "Crypto insights",
-        "Daily market recap",
-        "Telegram group access"
-      ],
-      missing: ["F&O / Options", "Commodity (metals, copper, energy)", "Currency"]
-    },
-    pro: {
-      id: "pro", name: "Pro",
-      priceInr: 999, durationDays: 30, popular: true,
-      segments: ["equity", "options", "crypto"],
-      tagline: "Traders ke liye",
-      features: [
-        "Sab Basic features",
-        "F&O / Options calls",
-        "Index + stock derivatives",
-        "Chart analysis",
-        "Priority Telegram support"
-      ],
-      missing: ["Commodity (metals, copper, energy)", "Currency"]
-    },
-    elite: {
-      id: "elite", name: "Elite",
-      priceInr: 1999, durationDays: 30,
-      segments: ["equity", "options", "commodity", "currency", "crypto"],
-      tagline: "Sab kuch, sab segment",
-      features: [
-        "Sab Pro features",
-        "Commodity — gold, silver, copper, zinc, crude",
-        "Currency (INR pairs)",
-        "Analyst Q&A access",
-        "Early call access"
-      ],
-      missing: []
-    },
-    quarterly: {
-      id: "quarterly", name: "Elite Quarterly",
-      priceInr: 4999, durationDays: 90,
-      segments: ["equity", "options", "commodity", "currency", "crypto"],
-      tagline: "3 mahine, best value",
-      saveLabel: "Save 17%",
-      features: [
-        "Poora Elite plan, 3 mahine",
-        "Ek hi baar payment",
-        "Rate locked"
-      ],
-      missing: []
-    }
-  };
-
-  var PLAN_ORDER = ["basic", "pro", "elite", "quarterly"];
-
-  // SEBI RA fee cap: ₹1,51,000 per year per family
-  var ANNUAL_FEE_CAP_INR = 151000;
-  var GST_PCT = 18;
-
-  /* ---------------------------------------------------------
-     4b) PAYMENTS — website pe hi
-     ---------------------------------------------------------
-     Razorpay. Public key yahan, secret SIRF server pe.
-
-     ⚠️ Client ke "payment success" pe kabhi trust nahi.
-     Flow: order banao (Cloud Function) -> user pay kare ->
-     Razorpay webhook -> signature verify (server) ->
-     subscriptions/{uid} activate. Client sirf status padhta hai.
-  --------------------------------------------------------- */
-  var PAYMENTS = {
-    provider: "razorpay",
-    razorpayKeyId: "",          // rzp_live_... ya rzp_test_...  (public key only)
-    currency: "INR",
-    // Cloud Function endpoints
-    createOrderUrl: "",         // e.g. https://asia-south1-arvcoin.cloudfunctions.net/createOrder
-    verifyUrl: "",              // e.g. .../verifyPayment
-    checkoutName: "arvcoin",
-    checkoutDescription: "Research access subscription",
-    themeColor: "#7c5cff",
-    gstPct: 18
-  };
-
-  function paymentsReady() {
-    return !!(PAYMENTS.razorpayKeyId && PAYMENTS.createOrderUrl);
-  }
-
-  /* Plan ka final amount GST ke saath */
-  function planTotal(planId) {
-    var p = PLAN_PRICES[planId];
-    if (!p) return null;
-    var gst = Math.round(p.priceInr * PAYMENTS.gstPct / 100);
-    return { base: p.priceInr, gst: gst, total: p.priceInr + gst };
-  }
-
-  /* ---------------------------------------------------------
-     5) MARKET DATA / CHARTS
+     6) MARKET DATA AND CHARTS
   --------------------------------------------------------- */
   var MARKET_DATA = {
     tradingViewEnabled: true,
     tvDefaultExchange: "NSE",
     coingeckoBase: "https://api.coingecko.com/api/v3",
-    quotesProxyUrl: ""          // Cloud Function proxy — API key server pe
+    quotesProxyUrl: ""          // Cloud Function proxy — keep the API key server-side
   };
 
   /* ---------------------------------------------------------
-     6) DISCLOSURES
+     7) DISCLOSURES
   --------------------------------------------------------- */
   var DISCLOSURES = {
     educationOnly:
-      "Ye platform sirf education aur information ke liye hai. Yahan diya gaya koi bhi " +
-      "content investment advice nahi hai aur kisi security ko khareedne ya bechne ki " +
-      "sifarish nahi hai. Koi bhi decision lene se pehle apni research karo.",
+      "This platform is for information and education only. Nothing here is investment " +
+      "advice or a recommendation to buy or sell any security. Do your own research " +
+      "before making any decision.",
+
     notRegistered:
-      "arvcoin abhi SEBI ke saath Research Analyst ya Investment Adviser ke roop me " +
-      "registered NAHI hai. Isliye abhi koi buy/sell recommendation publish nahi hoti — " +
-      "sirf educational content available hai.",
+      "arvcoin is not currently registered with SEBI as a Research Analyst or Investment " +
+      "Adviser. No buy or sell recommendations are published — educational content only.",
+
     registeredNote:
-      "Research services SEBI-registered Research Analyst dwara provide ki jaati hain. " +
-      "Registration details har call pe di gayi hain.",
+      "Research services are provided by a SEBI-registered Research Analyst. Registration " +
+      "details are shown on every research note.",
+
+    /* SEBI-mandated disclaimer for registered intermediaries.
+       Do not shorten or reword this. */
+    sebiMandated:
+      "Registration granted by SEBI and certification from NISM in no way guarantee " +
+      "performance of the intermediary or provide any assurance of returns to investors.",
+
+    conflictDisclosure:
+      "The Research Analyst and its associates or relatives may hold a position or interest " +
+      "in a recommended security. This disclosure accompanies every research note.",
+
+    standardCaution:
+      "A research note is not an offer or solicitation to buy or sell any security. " +
+      "Recommendations are general in nature and are prepared without regard to the " +
+      "investment objectives, financial situation or risk profile of any individual.",
+
     marketRisk:
-      "Investments are subject to market risk. Read all related documents carefully before investing.",
+      "Investments are subject to market risk. Read all related documents carefully " +
+      "before investing.",
+
     noGuarantee:
-      "Past performance kisi bhi future result ki guarantee nahi hai. Koi assured ya " +
-      "guaranteed return nahi. Derivatives (F&O, commodity, currency) me poora capital " +
-      "doob sakta hai.",
+      "Past performance is not a guarantee of future results. No assured or guaranteed " +
+      "returns are offered. Derivatives — F&O, commodity and currency — can result in the " +
+      "loss of your entire capital.",
+
     noPersonalAdvice:
-      "Hum personalised investment advice nahi dete. Content general research hai, kisi " +
-      "individual ki financial situation, risk profile ya goals ke hisaab se nahi.",
+      "We do not provide personalised investment advice. Content is general research and " +
+      "is not tailored to any individual's financial situation, risk profile or goals.",
+
     forexWarning:
-      "Indian residents sirf RBI-approved INR pairs me, recognised exchanges (NSE/BSE/MSE) pe " +
-      "SEBI-registered broker ke through currency derivatives trade kar sakte hain. " +
-      "Offshore/OTC forex platforms FEMA ke against hain — penalty transaction amount ke 3x tak.",
+      "Indian residents may trade currency derivatives only in RBI-approved INR pairs, on " +
+      "recognised exchanges (NSE, BSE, MSE), through a SEBI-registered broker. Offshore and " +
+      "OTC forex platforms breach FEMA, with penalties of up to three times the transaction value.",
+
     cryptoTax:
-      "Crypto (VDA) pe India me 30% tax + 1% TDS lagta hai. Crypto SEBI ke dayre me nahi aata.",
+      "Crypto (virtual digital assets) is taxed in India at 30% plus 1% TDS. Crypto falls " +
+      "outside SEBI's remit.",
+
     toolNotAdvice:
-      "Levels calculator ek calculation tool hai. Ye standard public formulas se levels " +
-      "compute karta hai — koi recommendation nahi deta. Same input pe sabko same output milta hai.",
+      "The levels calculator is a calculation tool. It derives levels from standard public " +
+      "formulas and makes no recommendation. The same input always produces the same output.",
+
     paymentNote:
-      "Subscription charges GST ke alawa hain. Payment secure gateway (Razorpay) ke through " +
-      "hoti hai — card/UPI details humare server pe store nahi hoti."
+      "Charges are exclusive of GST. Payment is processed through a secure gateway " +
+      "(Razorpay) — card and UPI details are never stored on our servers."
   };
 
   /* ---------------------------------------------------------
-     7) BRAND
+     8) BRAND
   --------------------------------------------------------- */
   var BRAND = {
     name: "arvcoin",
@@ -303,15 +323,18 @@
      Helpers
   --------------------------------------------------------- */
   function plan(id) { return PLAN_PRICES[id] || null; }
+
   function planCovers(planId, segment) {
     var p = plan(planId);
     return !!(p && p.segments.indexOf(segment) > -1);
   }
+
   function segment(id) { return SEGMENTS[id] || null; }
+
   function inrFmt(n) {
     return "\u20B9" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
   }
-  /** Chhota readable request code — Telegram message me jaata hai */
+
   function newRequestCode() {
     var s = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", out = "ARV-";
     for (var i = 0; i < 6; i++) out += s.charAt(Math.floor(Math.random() * s.length));
@@ -321,6 +344,7 @@
   window.ARV_CONFIG = {
     RA_REGISTRATION: RA_REGISTRATION,
     isRegistered: isRegistered,
+    missingRaFields: missingRaFields,
     ACCESS: ACCESS,
     telegramUrl: telegramUrl,
     whatsappUrl: whatsappUrl,

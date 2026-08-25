@@ -21,12 +21,12 @@
       rn.className = "lux-note good rv";
       rn.innerHTML = '<span class="n-ico">✅</span><div><b>SEBI Registered Research Analyst.</b> ' +
         'Reg. no. ' + esc(ra.number) + (ra.entityName ? " · " + esc(ra.entityName) : "") +
-        '. Research services registration ke under provide ki jaati hain.</div>';
+        '. Research services are provided under this registration.</div>';
     } else {
       rn.className = "lux-note rv";
-      rn.innerHTML = '<span class="n-ico">🎓</span><div><b>Abhi education mode chalu hai.</b> ' +
+      rn.innerHTML = '<span class="n-ico">🎓</span><div><b>Currently in education mode.</b> ' +
         esc(CFG.DISCLOSURES.notRegistered) +
-        ' Plans paid research ke liye ready hain — registration complete hone pe activate honge.</div>';
+        ' Plans are ready for paid research and activate once registration is complete.</div>';
     }
   }
 
@@ -46,7 +46,7 @@
       var miss = (p.missing || []).map(function (f) { return '<li class="no">' + esc(f) + "</li>"; }).join("");
 
       return '' +
-        '<div class="lux plan lux-tilt rv' + (i ? " d" + Math.min(i, 5) : "") + (p.popular ? " pop" : "") + '">' +
+        '<div class="lux plan lux-3d rv' + (i ? " d" + Math.min(i, 5) : "") + (p.popular ? " pop" : "") + '">' +
           (p.popular ? '<span class="tag">Most popular</span>' :
             (p.saveLabel ? '<span class="tag">' + esc(p.saveLabel) + '</span>' : "")) +
           '<h3>' + esc(p.name) + '</h3>' +
@@ -64,8 +64,8 @@
   /* ---------- gst note ---------- */
   var gn = $("gst-note");
   if (gn) {
-    gn.textContent = "Sabhi charges pe " + CFG.PAYMENTS.gstPct +
-      "% GST alag se lagta hai. Koi auto-renewal nahi — plan khatam hone pe access band ho jaata hai. " +
+    gn.textContent = "GST of " + CFG.PAYMENTS.gstPct +
+      "% GST applies on top. No auto-renewal — access stops when the term ends. " +
       "SEBI RA fee limit: " + CFG.inrFmt(CFG.ANNUAL_FEE_CAP_INR) + " per year per family.";
   }
 
@@ -120,7 +120,7 @@
       var s = CFG.SEGMENTS[sid];
       var chips = (s.instruments || []).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("");
       return '' +
-        '<div class="lux lux-card lux-tilt rv' + (i ? " d" + Math.min(i, 5) : "") + '">' +
+        '<div class="lux lux-card lux-3d rv' + (i ? " d" + Math.min(i, 5) : "") + '">' +
           '<div class="ico" style="color:' + s.color + '">' + s.icon + '</div>' +
           '<h3>' + esc(s.name) + '</h3>' +
           '<p>' + esc(s.blurb) + '</p>' +

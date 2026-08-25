@@ -21,7 +21,7 @@ if (ready) {
   auth = getAuth(app);
   db = getFirestore(app);
 } else {
-  console.warn("[arvcoin] Firebase config abhi nahi laga — firebase-config.js me daalo.");
+  console.warn("[arvcoin] Firebase config missing — add it to firebase-config.js.");
 }
 
 /* ---------- helpers ---------- */
@@ -54,19 +54,19 @@ function isVerified(uid) {
 
 function friendlyError(e) {
   var c = (e && e.code) || "";
-  if (c.indexOf("email-already-in-use") > -1) return "Ye email pehle se registered hai. Login karo.";
-  if (c.indexOf("invalid-credential") > -1 || c.indexOf("wrong-password") > -1 || c.indexOf("user-not-found") > -1) return "Email ya password galat hai.";
-  if (c.indexOf("weak-password") > -1) return "Password kam se kam 6 characters ka rakho.";
-  if (c.indexOf("invalid-email") > -1) return "Valid email daalo.";
-  if (c.indexOf("too-many-requests") > -1) return "Bahut baar try kiya. Thodi der baad koshish karo.";
-  if (c.indexOf("popup-closed") > -1 || c.indexOf("cancelled-popup") > -1) return "Google login cancel ho gaya.";
-  if (c.indexOf("popup-blocked") > -1) return "Popup block ho gaya — browser me allow karo.";
-  if (c.indexOf("network") > -1) return "Internet check karo.";
-  return "Kuch gadbad: " + (e && e.message ? e.message : c);
+  if (c.indexOf("email-already-in-use") > -1) return "This email is already registered. Please sign in.";
+  if (c.indexOf("invalid-credential") > -1 || c.indexOf("wrong-password") > -1 || c.indexOf("user-not-found") > -1) return "Incorrect email or password.";
+  if (c.indexOf("weak-password") > -1) return "Use a password of at least 6 characters.";
+  if (c.indexOf("invalid-email") > -1) return "Enter a valid email address.";
+  if (c.indexOf("too-many-requests") > -1) return "Too many attempts. Please try again shortly.";
+  if (c.indexOf("popup-closed") > -1 || c.indexOf("cancelled-popup") > -1) return "Google sign-in was cancelled.";
+  if (c.indexOf("popup-blocked") > -1) return "The popup was blocked — please allow popups.";
+  if (c.indexOf("network") > -1) return "Please check your internet connection.";
+  return "Something went wrong: " + (e && e.message ? e.message : c);
 }
 
 function guardReady() {
-  if (!ready) { msg("bad", "Firebase config abhi set nahi hai. Kiro ko config bhejo."); return false; }
+  if (!ready) { msg("bad", "Firebase config is not set yet."); return false; }
   return true;
 }
 
@@ -90,7 +90,7 @@ function sendOtpEmail(toEmail, toName, code) {
   if (!ejsReady || !window.emailjs) {
     // DEMO fallback — taaki keys aane se pehle bhi flow test ho sake
     console.log("[arvcoin][DEMO OTP] " + code + " -> " + toEmail);
-    alert("DEMO mode: EmailJS keys abhi nahi lage.\nTumhara OTP hai: " + code + "\n(Asli email tab jayega jab keys daalenge.)");
+    alert("DEMO mode: EmailJS keys are not configured yet.\nYour OTP is: " + code + "\n(Real emails will send once the keys are added.)");
     return Promise.resolve({ demo: true });
   }
   // "valid till {{time}}" ke liye readable expiry time (IST)
@@ -141,11 +141,11 @@ if (signupForm) {
     var nameOk = name.length >= 2, emailOk = isEmail(email), mobileOk = isMobile(mobile), pwOk = pw.length >= 6;
     invalid("f-name", !nameOk); invalid("f-email", !emailOk); invalid("f-mobile", !mobileOk); invalid("f-pass", !pwOk);
     if (!nameOk || !emailOk || !mobileOk || !pwOk) return;
-    if (!terms) { msg("bad", "Pehle Terms & Privacy accept karo."); return; }
+    if (!terms) { msg("bad", "Please accept the Terms and Privacy Policy first."); return; }
 
     var btn = signupForm.querySelector("button[type=submit]");
     if (btn) btn.disabled = true;
-    msg("ok", "Account bana rahe hain\u2026");
+    msg("ok", "Creating your account\u2026");
 
     /* Account ABHI banta hai — password seedha Firebase ko jaata hai aur
        kahin store nahi hota. Uske baad email OTP verify hoti hai. */
@@ -167,11 +167,11 @@ if (signupForm) {
               code: code, exp: Date.now() + 15 * 60 * 1000, // 15 min
               sentAt: Date.now()
             });
-            msg("ok", "Email pe verification code bhej rahe hain\u2026");
+            msg("ok", "Sending a verification code to your email\u2026");
             return sendOtpEmail(email, name, code);
           })
           .then(function () {
-            msg("ok", "\uD83D\uDCE7 Code bhej diya " + email + " pe. Verify karo\u2026");
+            msg("ok", "\uD83D\uDCE7 Code sent to " + email + " — please verify\u2026");
             setTimeout(function () { window.location.href = "verify.html"; }, 800);
           });
       })
@@ -195,13 +195,13 @@ if (loginForm) {
     var emailOk = isEmail(email), pwOk = pw.length >= 6;
     invalid("f-email", !emailOk); invalid("f-pass", !pwOk);
     if (!emailOk || !pwOk) {
-      if (!emailOk) msg("bad", "Valid email daalo (mobile login abhi nahi).");
+      if (!emailOk) msg("bad", "Enter a valid email address (mobile sign-in is not available yet).");
       return;
     }
 
     var btn = loginForm.querySelector("button[type=submit]");
     if (btn) btn.disabled = true;
-    msg("ok", "Login ho raha hai\u2026");
+    msg("ok", "Signing in\u2026");
 
     signInWithEmailAndPassword(auth, email, pw)
       .then(function (cred) {
@@ -212,7 +212,7 @@ if (loginForm) {
            Sirf pehli baar (unverified account) OTP maangte hain. */
         return isVerified(u.uid).then(function (ok) {
           if (ok) {
-            msg("ok", "\uD83D\uDD13 Welcome back! Dashboard khul raha hai\u2026");
+            msg("ok", "\uD83D\uDD13 Welcome back — opening your dashboard\u2026");
             setTimeout(function () { window.location.href = "dashboard.html"; }, 800);
             return;
           }
@@ -222,7 +222,7 @@ if (loginForm) {
             name: u.displayName || "", email: u.email, mobile: "", uid: u.uid,
             code: code, exp: Date.now() + 15 * 60 * 1000, sentAt: Date.now()
           });
-          msg("ok", "Ek baar email verify karni hai \u2014 code bhej rahe hain\u2026");
+          msg("ok", "We need to verify your email once — sending a code\u2026");
           return sendOtpEmail(u.email, u.displayName || "there", code).then(function () {
             setTimeout(function () { window.location.href = "verify.html"; }, 800);
           });
@@ -240,7 +240,7 @@ function googleLogin(btn) {
   if (!guardReady()) return;
   var provider = new GoogleAuthProvider();
   if (btn) btn.disabled = true;
-  msg("ok", "Google se connect kar rahe hain\u2026");
+  msg("ok", "Connecting to Google\u2026");
   signInWithPopup(auth, provider)
     .then(function (res) {
       var u = res.user;
@@ -264,7 +264,7 @@ document.querySelectorAll(".social-btn[data-provider]").forEach(function (btn) {
   btn.addEventListener("click", function () {
     var p = btn.getAttribute("data-provider");
     if (p === "google") { googleLogin(btn); }
-    else { msg("", "Apple login jaldi aa raha hai. Abhi Google ya email use karo."); }
+    else { msg("", "Apple sign-in is coming soon. Please use Google or email for now."); }
   });
 });
 
@@ -275,15 +275,15 @@ window.arvOtp = {
 
   verify: function (codeStr, onOk, onErr) {
     var p = getPending();
-    if (!p) { onErr && onErr("Session expire ho gaya. Dobara signup karo."); return; }
-    if (Date.now() > p.exp) { onErr && onErr("Code expire ho gaya. Naya code bhejo (Resend)."); return; }
-    if (String(codeStr) !== String(p.code)) { onErr && onErr("Galat code. Dobara check karo."); return; }
-    if (!guardReady()) { onErr && onErr("Firebase config set nahi hai."); return; }
+    if (!p) { onErr && onErr("Your session expired. Please sign up again."); return; }
+    if (Date.now() > p.exp) { onErr && onErr("The code expired. Please request a new one."); return; }
+    if (String(codeStr) !== String(p.code)) { onErr && onErr("Incorrect code. Please check and try again."); return; }
+    if (!guardReady()) { onErr && onErr("Firebase config is not set."); return; }
 
     /* Account signup pe hi ban gaya tha. Yahan sirf email verified mark
        karte hain — koi password handling nahi. */
     var uid = p.uid || (auth.currentUser && auth.currentUser.uid);
-    if (!uid) { onErr && onErr("Session mil nahi raha. Dobara login karo."); return; }
+    if (!uid) { onErr && onErr("Session not found. Please sign in again."); return; }
 
     saveProfile(uid, { emailVerified: true, verifiedAt: serverTimestamp() })
       .then(function () {
@@ -296,13 +296,13 @@ window.arvOtp = {
 
   resend: function (onOk, onErr) {
     var p = getPending();
-    if (!p) { onErr && onErr("Session expire ho gaya. Dobara signup karo."); return; }
+    if (!p) { onErr && onErr("Your session expired. Please sign up again."); return; }
     var code = genOtp();
     p.code = code; p.exp = Date.now() + 15 * 60 * 1000; p.sentAt = Date.now();
     setPending(p);
     sendOtpEmail(p.email, p.name, code)
       .then(function () { onOk && onOk(); })
-      .catch(function (e) { onErr && onErr("Resend fail. Dobara try karo."); });
+      .catch(function (e) { onErr && onErr("Resend failed. Please try again."); });
   }
 };
 
@@ -313,10 +313,10 @@ if (forgot) {
     e.preventDefault();
     if (!guardReady()) return;
     var email = ($("email") && $("email").value.trim()) || "";
-    if (!isEmail(email)) { email = prompt("Apna registered email daalo — reset link bhej denge:") || ""; email = email.trim(); }
-    if (!isEmail(email)) { msg("bad", "Valid email daalo password reset ke liye."); return; }
+    if (!isEmail(email)) { email = prompt("Enter your registered email and we will send a reset link:") || ""; email = email.trim(); }
+    if (!isEmail(email)) { msg("bad", "Enter a valid email address to reset your password."); return; }
     sendPasswordResetEmail(auth, email)
-      .then(function () { msg("ok", "\uD83D\uDCE7 Reset link " + email + " pe bhej diya. Inbox/spam check karo."); })
+      .then(function () { msg("ok", "\uD83D\uDCE7 Reset link " + email + " — check your inbox and spam folder."); })
       .catch(function (err) { msg("bad", friendlyError(err)); });
   });
 }

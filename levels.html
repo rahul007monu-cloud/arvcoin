@@ -109,19 +109,19 @@
       <span class="lux-eyebrow"><span class="dot"></span> Free tool · no login</span>
       <h1 class="lux-h1" style="font-size:clamp(30px,5vw,54px)">Levels <span class="shimmer">calculator</span></h1>
       <p class="lux-lead" style="margin-top:16px">
-        Kisi bhi stock, index, commodity ya currency ka <b style="color:var(--txt)">major support</b>,
-        <b style="color:var(--txt)">major resistance</b>, pivot points aur CPR nikaalo.
-        Previous session ka High, Low, Close daalo — baaki math kar dega.
+        Find the <b style="color:var(--txt)">major support</b>, <b style="color:var(--txt)">major resistance</b>,
+        pivot points and CPR for any stock, index, commodity or currency.
+        Enter the previous session’s high, low and close — the maths does the rest.
       </p>
     </div>
 
     <div class="lux-note info" style="margin-bottom:28px">
       <span class="n-ico">🧮</span>
       <div>
-        <b>Ye ek calculator hai, recommendation nahi.</b> Levels standard public formulas
-        (Classic, Fibonacci, Camarilla, Woodie, CPR) se compute hote hain. Same input pe
-        sabko same output milta hai. Ye batata hai ki <b>math ke hisaab se</b> levels kahan
-        hain — ye nahi ki aapko kya karna chahiye. Sirf education aur analysis ke liye.
+        <b>This is a calculator, not a recommendation.</b> Levels are computed from standard
+        public formulas (Classic, Fibonacci, Camarilla, Woodie, CPR). The same input always
+        produces the same output for everyone. It tells you where the levels sit
+        <b>mathematically</b> — not what you should do. For education and analysis only.
       </div>
     </div>
 
@@ -131,7 +131,7 @@
       <div class="lux card" style="padding:26px">
         <h2 style="font-size:18px;font-weight:700;margin-bottom:4px">Previous session data</h2>
         <p style="color:var(--muted-2);font-size:13px;margin-bottom:20px">
-          Pichle din (ya pichle candle) ka OHLC daalo.
+          Enter the OHLC of the previous day, or the previous candle.
         </p>
 
         <div class="fld">
@@ -167,18 +167,18 @@
           <div class="fld">
             <label for="i-open">Open</label>
             <input id="i-open" type="number" step="any" inputmode="decimal" placeholder="1402.00" />
-            <p class="hint">Woodie pivots ke liye</p>
+            <p class="hint">For Woodie pivots</p>
           </div>
         </div>
 
         <div class="fld">
           <label for="i-ltp">Current LTP (optional)</label>
           <input id="i-ltp" type="number" step="any" inputmode="decimal" placeholder="1438.00" />
-          <p class="hint">Daalo to levels ke saath live distance dikhega</p>
+          <p class="hint">Enter it to see live distance from each level</p>
         </div>
 
         <button type="button" class="btn-lux" id="btn-calc" style="width:100%;justify-content:center">
-          Levels nikaalo →
+          Calculate levels →
         </button>
         <button type="button" class="btn-glass" id="btn-clear" style="width:100%;justify-content:center;margin-top:10px">
           Clear
@@ -228,7 +228,7 @@
           <div class="lux" style="padding:22px;margin-top:18px">
             <h2 style="font-size:17px;font-weight:700;margin-bottom:6px">Computed extent</h2>
             <p style="color:var(--muted-2);font-size:12.5px;margin-bottom:16px">
-              Formula ke hisaab se sabse door ke levels. Ye prediction nahi — calculation hai.
+              The furthest levels the formulas produce. This is a calculation, not a prediction.
             </p>
             <div class="lux-table">
               <div class="tr"><span>Nearest resistance (R1)</span><b id="e-r1"></b></div>
@@ -242,9 +242,9 @@
         <!-- empty -->
         <div class="empty" id="empty">
           <div class="e-ico">🧮</div>
-          <h3>Data daalo, levels aayenge</h3>
-          <p>Previous session ka High, Low aur Close bharo — Classic, Fibonacci, Camarilla,
-             Woodie pivots aur CPR sab ek saath mil jaayenge.</p>
+          <h3>Enter data to see levels</h3>
+          <p>Fill in the previous session’s high, low and close — you will get Classic,
+             Fibonacci, Camarilla and Woodie pivots plus CPR, all at once.</p>
         </div>
       </div>
     </div>
@@ -252,45 +252,42 @@
     <!-- how to read -->
     <section class="lux-sec" style="padding-bottom:20px">
       <h2 class="lux-h2" style="font-size:clamp(22px,3vw,32px);margin-bottom:26px">
-        Inhe <span class="shimmer">kaise padhte</span> hain
+        How to <span class="shimmer">read these</span>
       </h2>
       <div class="lux-grid g3">
-        <div class="lux lux-card lux-tilt">
+        <div class="lux lux-card lux-3d">
           <div class="ico">◈</div>
           <h3>Pivot point</h3>
-          <p>Previous session ke High, Low, Close ka average. Ye wo reference level hai
-             jiske aas-paas se baaki sab levels nikalte hain.</p>
+          <p>The average of the previous session’s high, low and close. Every other level is
+             derived around this reference point.</p>
         </div>
-        <div class="lux lux-card lux-tilt">
+        <div class="lux lux-card lux-3d">
           <div class="ico">▲</div>
           <h3>Resistance (R1–R4)</h3>
-          <p>Pivot ke upar ke computed levels. Formula ke hisaab se yahan tak upar
-             ka scope calculate hota hai.</p>
+          <p>Computed levels above the pivot. These mark how far up the formulas extend.</p>
         </div>
-        <div class="lux lux-card lux-tilt">
+        <div class="lux lux-card lux-3d">
           <div class="ico">▼</div>
           <h3>Support (S1–S4)</h3>
-          <p>Pivot ke neeche ke computed levels. Formula ke hisaab se yahan tak neeche
-             ka scope calculate hota hai.</p>
+          <p>Computed levels below the pivot. These mark how far down the formulas extend.</p>
         </div>
-        <div class="lux lux-card lux-tilt">
+        <div class="lux lux-card lux-3d">
           <div class="ico">◫</div>
           <h3>CPR</h3>
-          <p>Central Pivot Range — Pivot, TC aur BC ka band. Narrow CPR aur wide CPR
-             ka historical behaviour alag hota hai.</p>
+          <p>Central Pivot Range — the band formed by the pivot, TC and BC. Narrow and wide
+             CPRs have historically behaved differently.</p>
         </div>
-        <div class="lux lux-card lux-tilt">
+        <div class="lux lux-card lux-3d">
           <div class="ico">∑</div>
-          <h3>Chaar formulas kyun?</h3>
-          <p>Classic, Fibonacci, Camarilla aur Woodie — har ek alag math use karta hai.
-             Jahan multiple formulas ek hi level pe milte hain, wo cluster analysts
-             ke liye interesting hota hai.</p>
+          <h3>Why four formulas?</h3>
+          <p>Classic, Fibonacci, Camarilla and Woodie each use different maths. Where several
+             formulas converge on the same level, that cluster tends to interest analysts.</p>
         </div>
-        <div class="lux lux-card lux-tilt">
+        <div class="lux lux-card lux-3d">
           <div class="ico">⚠️</div>
           <h3>Limitation</h3>
-          <p>Ye pure math hai — news, results, global cues, liquidity kuch bhi account
-             me nahi hai. Levels guarantee nahi hain, sirf reference points hain.</p>
+          <p>This is pure maths — it accounts for no news, results, global cues or liquidity.
+             Levels are not guarantees, only reference points.</p>
         </div>
       </div>
     </section>

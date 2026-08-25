@@ -104,17 +104,17 @@
   function explain(res) {
     var out = [];
     if (res.hits.length) {
-      out.push("🚫 BLOCKED — ye phrases legal risk hain: " + res.hits.join(", ") +
-               "\nGuaranteed/assured returns kabhi allowed nahi hain (SEBI + consumer law).");
+      out.push("🚫 BLOCKED — these phrases carry legal risk: " + res.hits.join(", ") +
+               "\nGuaranteed or assured returns are never permitted (SEBI and consumer law).");
     }
     if (res.personal.length) {
       out.push("⚠️ Personalised advice detected: " + res.personal.join(", ") +
-               "\nRA registration research cover karta hai, personalised advice nahi (wo IA registration hai).");
+               "\nRA registration covers research, not personalised advice — that requires IA registration.");
     }
     if (res.warnings.length) {
-      out.push("⚠️ Review karo — hype language: " + res.warnings.join(", "));
+      out.push("⚠️ Review — promotional language: " + res.warnings.join(", "));
     }
-    if (!out.length) out.push("✅ Clean — koi banned phrase nahi mila.");
+    if (!out.length) out.push("✅ Clean — no blocked phrases found.");
     return out.join("\n\n");
   }
 

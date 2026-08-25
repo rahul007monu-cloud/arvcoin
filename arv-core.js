@@ -249,10 +249,10 @@ export function entitlement(sub) {
 
 /** Access request banao aur Telegram/WhatsApp ka URL wapas do. */
 export function requestAccess(planId, channel) {
-  if (!ready || !_user) return Promise.reject(new Error("Pehle login karo"));
+  if (!ready || !_user) return Promise.reject(new Error("Please sign in first"));
 
   var p = CFG.plan(planId);
-  if (!p) return Promise.reject(new Error("Plan nahi mila: " + planId));
+  if (!p) return Promise.reject(new Error("Plan not found: " + planId));
 
   var code = CFG.newRequestCode();
   var email = _user.email || "";
@@ -380,15 +380,15 @@ export function getCall(callId) {
  * (yahan bhi, aur firestore.rules me bhi).
  */
 export function publishCall(data) {
-  if (!ready) return Promise.reject(new Error("Firebase ready nahi hai"));
-  if (!isAnalyst()) return Promise.reject(new Error("Sirf analyst/admin call publish kar sakta hai"));
+  if (!ready) return Promise.reject(new Error("Firebase is not ready"));
+  if (!isAnalyst()) return Promise.reject(new Error("Only an analyst or admin can publish research"));
 
   var ra = CFG.RA_REGISTRATION || {};
   if (!CFG.isRegistered || !CFG.isRegistered()) {
     return Promise.reject(new Error(
-      "SEBI RA registration number arv-config.js me set nahi hai. " +
-      "Fee lekar securities pe recommendation dene ke liye registration zaroori hai " +
-      "(SEBI Research Analysts Regulations, 2014). Apna number daalo ya partner RA ka."
+      "The SEBI RA registration number is not set in arv-config.js. " +
+      "Publishing recommendations on securities for a fee requires registration " +
+      "(SEBI Research Analysts Regulations, 2014). Add your own number or a partner RA's."
     ));
   }
 
@@ -396,12 +396,12 @@ export function publishCall(data) {
   if (window.ARVLint) {
     var lint = window.ARVLint.check([data.title, data.rationale, data.notes].join("\n"));
     if (!lint.ok) {
-      return Promise.reject(new Error("Compliance block — ye phrases hata do: " + lint.hits.join(", ")));
+      return Promise.reject(new Error("Compliance block — remove these phrases: " + lint.hits.join(", ")));
     }
   }
 
   if (!data.rationale || String(data.rationale).trim().length < 20) {
-    return Promise.reject(new Error("Rationale likhna zaroori hai (min 20 chars). Bare tip research nahi hai."));
+    return Promise.reject(new Error("A rationale is required (minimum 20 characters). A bare tip is not research."));
   }
 
   var payload = {
@@ -556,12 +556,12 @@ export function getGrowth() {
    ========================================================= */
 
 export function askQuestion(text, segment) {
-  if (!ready || !_user) return Promise.reject(new Error("Login karo"));
+  if (!ready || !_user) return Promise.reject(new Error("Please sign in"));
   if (window.ARVLint) {
     var lint = window.ARVLint.check(text);
     if (!lint.ok) {
       return Promise.reject(new Error(
-        "Personalised buy/sell advice nahi de sakte. Concept-level sawaal poocho."
+        "We cannot give personalised buy or sell advice. Please ask a concept-level question."
       ));
     }
   }
