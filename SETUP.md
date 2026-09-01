@@ -1,198 +1,282 @@
-# Firebase setup — step by step
+# Setup
 
-Follow this once to connect arvcoin to a Firebase project. Everything is done
-in the browser except the final rules deploy.
-
-> **Status: steps 1–3 are done.** The project is created and connected:
->
-> | | |
-> |---|---|
-> | Project ID | `arvcoin-fbd29` |
-> | Project number | `44275546012` |
-> | Auth domain | `arvcoin-fbd29.firebaseapp.com` |
->
-> `firebase-config.js` is updated and `.firebaserc` pins the project, so
-> `firebase deploy` no longer needs a `--project` flag.
->
-> Users from the old inaccessible project do not carry over — they will need
-> to sign up again.
+Two modes. Local needs nothing; hosted needs a Supabase project.
 
 ---
 
-## 1. Create the project
-
-1. Open <https://console.firebase.google.com>
-2. Confirm the account in the top-right avatar is the one you want to own this
-3. Click **Create a project**
-4. Name it `arvcoin` — note the **Project ID** it generates underneath
-   (likely `arvcoin-app` or similar). **Write that ID down**, you need it later
-5. Google Analytics is optional. Disabling it is fine
-6. Click **Create project**
-
----
-
-## 2. Register the web app
-
-1. On the project overview, click the **web icon** `</>`
-2. App nickname: `arvcoin web`
-3. Leave "Firebase Hosting" **unchecked** — the site is hosted on Hostinger
-4. Click **Register app**
-5. You will see a `firebaseConfig` block. **Copy all of it.**
-
-It looks like this:
-
-```js
-const firebaseConfig = {
-  apiKey: "AIza...",
-  authDomain: "arvcoin-app.firebaseapp.com",
-  projectId: "arvcoin-app",
-  storageBucket: "arvcoin-app.firebasestorage.app",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:abc123def456",
-  measurementId: "G-XXXXXXXXXX"
-};
-```
-
----
-
-## 3. Paste it into `firebase-config.js`
-
-Open `firebase-config.js` in the repo and replace the values. Keep the
-`window.ARV_FIREBASE_CONFIG =` wrapper exactly as it is:
-
-```js
-window.ARV_FIREBASE_CONFIG = {
-  apiKey: "PASTE_YOURS",
-  authDomain: "PASTE_YOURS",
-  projectId: "PASTE_YOURS",
-  storageBucket: "PASTE_YOURS",
-  messagingSenderId: "PASTE_YOURS",
-  appId: "PASTE_YOURS",
-  measurementId: "PASTE_YOURS"
-};
-```
-
-These values are **public by design** — they ship in the frontend of every
-Firebase web app. They are not secrets.
-
----
-
-## 4. Turn on Authentication
-
-1. Left menu → **Build → Authentication** → **Get started**
-2. **Sign-in method** tab → enable **Email/Password** → Save
-3. Enable **Google** as well:
-   - Pick a support email from the dropdown
-   - Save
-4. **Settings** tab → **Authorised domains** → **Add domain** → `arvcoin.com`
-
-Without step 4, Google sign-in fails on the live site.
-
----
-
-## 5. Create the Firestore database
-
-1. Left menu → **Build → Firestore Database** → **Create database**
-2. Choose **Start in production mode** — the repo ships proper rules, so an
-   open test mode is unnecessary and unsafe
-3. Location: **asia-south1 (Mumbai)** for the lowest latency in India.
-   **This cannot be changed later.**
-4. Click **Enable**
-
----
-
-## 6. Deploy the security rules
-
-This is the step that actually enforces access gating. Nothing works properly
-without it.
+## 1. Local, no backend
 
 ```bash
-npm install -g firebase-tools     # once
-firebase login                    # opens a browser
-firebase deploy --only firestore:rules,firestore:indexes
+python3 -m http.server 8080
 ```
 
-No `--project` flag needed — `.firebaserc` pins it to `arvcoin-fbd29`.
+Open `http://localhost:8080`. With `SUPABASE.url` blank in `arv-config.js` the app
+runs entirely in the browser:
 
-**No terminal available?** Paste the rules manually instead:
+- ✅ live prices from real exchanges, real candles, the full 3D scene
+- ✅ the complete fee, FIFO and tax engine — every number is genuinely computed
+- ✅ working buy and redeem flows against `localStorage`
+- ❌ nothing persists past a cleared cache, and it is one browser only
 
-1. Firestore Database → **Rules** tab
-2. Delete everything in the editor
-3. Open `firestore.rules` from the repo, copy the whole file, paste it in
-4. Click **Publish**
+Good for evaluating the product. Not a deployment.
 
-The indexes can be added later — Firestore will show a direct "create index"
-link in the browser console the first time a query needs one.
-
----
-
-## 7. Make yourself admin
-
-1. Sign up on the live site with your email
-2. Go to `arvcoin.com/dashboard.html` → **Settings** → copy your **UID**
-3. Firebase Console → Firestore Database → **Start collection**
-4. Collection ID: `admins`
-5. Document ID: **paste your UID**
-6. Add two fields:
-
-   | Field | Type | Value |
-   |---|---|---|
-   | `admin` | boolean | `true` |
-   | `analyst` | boolean | `true` |
-
-7. Save
-8. On the site: **sign out, then sign back in** — the role is read at sign-in
-
-`arvcoin.com/admin.html` now opens.
+> Local mode necessarily runs the ledger client-side, which is exactly what row
+> level security exists to prevent in the hosted setup. Do not treat it as a
+> production path.
 
 ---
 
-## 8. Optional — email OTP
+## 2. Hosted, with Supabase
 
-`emailjs-config.js` holds EmailJS keys for the one-time verification email. If
-they are missing or invalid, signup still works and the OTP is printed to the
-browser console in DEMO mode.
+### 2.1 Create the project
 
-To set it up properly: sign up free at <https://www.emailjs.com>, create an
-email service and a template containing `{{passcode}}` in the body and
-`{{email}}` in the "To Email" field, then paste the three IDs into
-`emailjs-config.js`.
+[supabase.com](https://supabase.com) → new project. From **Settings → API** take:
+
+- Project URL — `https://xxxxx.supabase.co`
+- `anon` **public** key
+- `service_role` key — **secret**
+
+### 2.2 Configure the front end
+
+In `arv-config.js`:
+
+```js
+var SUPABASE = {
+  url:     'https://xxxxx.supabase.co',
+  anonKey: 'eyJhbGciOi...',      // the anon key, public by design
+  functionsBase: ''              // leave blank
+};
+```
+
+> The `anon` key belongs in the browser — it is safe there because every table is
+> guarded by RLS. The **`service_role` key must never appear in this repo, in
+> `arv-config.js`, or anywhere a browser can reach.** It bypasses RLS entirely. It
+> goes only into function secrets, below.
+
+### 2.3 Apply the schema
+
+Supabase dashboard → **SQL Editor** → paste all of
+`supabase/migrations/0001_init.sql` → Run.
+
+Or with the CLI:
+
+```bash
+npm install -g supabase
+supabase link --project-ref xxxxx
+supabase db push
+```
+
+This creates the tables, row level security policies, the append-only trigger on
+`transactions`, the privilege-escalation guards on `profiles`, the signup hook and
+the reporting views. It is idempotent — safe to re-run.
+
+**Verify it took effect.** In the SQL editor:
+
+```sql
+select tablename, rowsecurity from pg_tables
+where schemaname = 'public' order by tablename;
+```
+
+Every table must show `rowsecurity = true`. If any does not, stop and fix it — that
+table is world-writable.
+
+### 2.4 Deploy the functions
+
+```bash
+supabase secrets set SUPABASE_URL=https://xxxxx.supabase.co
+supabase secrets set SUPABASE_ANON_KEY=eyJhbGciOi...
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...   # secret
+
+supabase functions deploy trade
+supabase functions deploy ingest --no-verify-jwt
+supabase functions deploy backfill
+```
+
+`ingest` is deployed with `--no-verify-jwt` because a scheduler calls it, not a
+signed-in user. `trade` and `backfill` verify the caller's JWT and re-check
+operator authority against the database.
+
+> **If the bundler cannot resolve `../../../js/ledger.js`:** the functions import
+> the ledger maths from the front-end tree on purpose, so the quote a user sees and
+> the arithmetic that writes the ledger are one implementation. If your CLI version
+> refuses to bundle outside `supabase/functions/`, copy the two files in and adjust
+> the import:
+>
+> ```bash
+> mkdir -p supabase/functions/_shared/lib
+> cp js/ledger.js js/money.js supabase/functions/_shared/lib/
+> # then in _shared/context.ts change the two import paths to './lib/…'
+> ```
+>
+> If you do this, re-copy them whenever `js/ledger.js` changes. Divergence between
+> the two copies means users agree to numbers the ledger disagrees with.
+
+### 2.5 Grant yourself operator access
+
+Sign up through the app first, then in the SQL editor:
+
+```sql
+update public.profiles set is_admin = true where email = 'you@example.com';
+```
+
+There is no UI for this by design — a user cannot grant themselves `is_admin`, and
+the trigger blocks the attempt.
+
+### 2.6 Start the price feed
+
+**Backfill history once.** From the app, signed in as an operator, or by curl with
+your access token:
+
+```bash
+TOKEN='<your access_token from the browser session>'
+BASE='https://xxxxx.supabase.co/functions/v1'
+
+curl -s -X POST "$BASE/backfill" -H "authorization: Bearer $TOKEN" \
+     -H 'content-type: application/json' -d '{"tf":"1D"}'
+curl -s -X POST "$BASE/backfill" -H "authorization: Bearer $TOKEN" \
+     -H 'content-type: application/json' -d '{"tf":"1h","days":90}'
+curl -s -X POST "$BASE/backfill" -H "authorization: Bearer $TOKEN" \
+     -H 'content-type: application/json' -d '{"tf":"1m","days":7}'
+```
+
+Run them one at a time — each paces its own requests to avoid being rate-limited,
+so the daily one takes a couple of minutes.
+
+**Then schedule `ingest` every minute.** In the SQL editor:
+
+```sql
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+
+select cron.schedule(
+  'arv-ingest',
+  '* * * * *',
+  $$
+  select net.http_post(
+    url     := 'https://xxxxx.supabase.co/functions/v1/ingest',
+    headers := '{"content-type":"application/json"}'::jsonb
+  );
+  $$
+);
+```
+
+Any external scheduler works too — GitHub Actions on a cron, cron-job.org,
+Cloudflare Workers. It just needs to POST to `/functions/v1/ingest` once a minute.
+
+**Confirm it is running:**
+
+```sql
+select tf, count(*), max(ts) as latest
+from public.arv_candles group by tf order by tf;
+```
+
+`latest` for `1m` should be within the last minute or two. **Trading is paused
+while the newest price is more than 10 minutes old** — deliberately, so nothing
+executes at a stale number. If `ingest` stops, buys and redemptions stop.
 
 ---
 
-## Checklist
+## 3. Payments
 
-- [x] Project created — `arvcoin-fbd29`
-- [x] Web app registered, config copied
-- [x] `firebase-config.js` updated
-- [ ] Email/Password sign-in enabled
-- [ ] Google sign-in enabled
-- [ ] `arvcoin.com` added to authorised domains
-- [ ] Firestore created in production mode, asia-south1
-- [ ] `firestore.rules` deployed or pasted
-- [ ] Signed up on the live site
-- [ ] `admins/{your-uid}` document created with `admin: true` and `analyst: true`
-- [ ] Signed out and back in
-- [ ] `admin.html` opens
+### 3.1 Configure UPI
+
+```js
+var PAYMENTS = {
+  vpa:        'yourname@okhdfcbank',   // your real UPI ID
+  payeeName:  'ARV Coin',
+  merchantCode: '',
+  settlementHours: 24
+};
+```
+
+With `vpa` set, the buy screen generates a real scannable UPI intent QR with the
+amount pre-filled, plus a deep link that opens the UPI app directly on mobile.
+Leave it blank and a clearly-marked placeholder is shown instead.
+
+### 3.2 How confirmation works, and why
+
+**A UPI QR cannot tell the app that money arrived.** It carries a request one way
+and returns nothing — no callback, no signature, nothing to verify. So:
+
+1. `create_deposit` records the intent and issues **nothing**
+2. money lands in your bank account
+3. an operator confirms it in `admin.html`
+4. units are issued at the price **at that moment**, not when the QR was shown
+
+Step 3 is manual because with a bare UPI QR there is nothing to automate against.
+To automate it, use a PSP that signs webhooks (Razorpay, Cashfree, PhonePe
+business), verify the signature server-side inside the `trade` function, and call
+the same `confirm_deposit` path.
+
+> **Never wire a client-side "payment succeeded" callback to issue units.** It is
+> the single most reliable way to have a treasury emptied by someone who never paid.
+
+### 3.3 Payouts
+
+Redemptions queue in `payouts` with the amount already net of exit fee, GST and
+TDS. `admin.html` lists them with the holder's UPI ID and a scannable QR so the
+payout can be sent without retyping the amount. Mark them paid once sent.
 
 ---
 
-## Troubleshooting
+## 4. Operating it
 
-**"Missing or insufficient permissions"**
-The rules are not deployed. Redo step 6.
+### Daily: reconcile
 
-**Google sign-in opens then closes with an error**
-`arvcoin.com` is missing from authorised domains. Step 4.
+Open `admin.html`. It computes the Bitcoin the treasury must hold — units
+outstanding × NAV ÷ Bitcoin's rupee price — and you enter what is actually held.
 
-**`admin.html` redirects to the dashboard**
-Either the `admins/{uid}` document is missing, the UID does not match exactly,
-the fields are strings instead of booleans, or you have not signed out and
-back in since creating it.
+Any gap is tracking error, and it is funded by whoever redeems last. Under 0.5% is
+normal execution drift. Anything larger needs correcting before the next
+redemption. This compounds silently if left alone.
 
-**Nothing loads and the console says `auth/invalid-api-key`**
-`firebase-config.js` still has old or partial values. Step 3.
+### Monthly and quarterly
 
-**Analysis or notes will not publish**
-Check you are on `admin.html` as an analyst, and that the rules are deployed.
-The browser console shows the exact rule that rejected the write.
+- **TDS deposited.** `admin.html` shows TDS withheld under s.194S. It is not
+  revenue — it is holders' money that must be deposited with the department and
+  reported so it appears in each holder's Form 26AS.
+- **GST on fees.** Also a liability, not income.
+- **Ledger check.** `select * from public.treasury_summary;`
+
+### When assets change
+
+Bump `CACHE` in `sw.js` and add any new file to its `ASSETS` list, or returning
+users keep the old shell from cache.
+
+---
+
+## 5. Deploying the front end
+
+Static files — any host works.
+
+**Hostinger** (what this repo was previously wired to): merging to `main` deploys.
+Check that first if the repo has a GitHub integration attached.
+
+**Netlify / Vercel / Cloudflare Pages:** no build command, publish directory `.`.
+
+**Supabase Storage / S3 / GitHub Pages:** upload as-is.
+
+Requirements: serve over **HTTPS** (the service worker and WebSockets need it), and
+serve `.js` as `text/javascript` — some hosts default `.mjs` or ES modules wrongly
+and the browser then refuses the module.
+
+---
+
+## 6. Troubleshooting
+
+| Symptom | Cause |
+|---|---|
+| Price shows `—` forever | Every exchange blocked from that network. Check the feed indicator in the footer — it names the source it settled on. Reorder `FEED.sources`. |
+| "No market data source reachable" | Same, with all sources exhausted. Binance and Bybit block many regions. |
+| Chart empty on 1m but fine on 1D | `ingest` is not running, or backfill for `1m` was never done. |
+| "Trading is paused… price is N minutes old" | `ingest` has stopped. Working as intended — check the cron job. |
+| "No price available yet" on a trade | Backfill and ingest have not run. Do §2.6. |
+| QR shows "UPI not configured" | `PAYMENTS.vpa` is empty. |
+| Confirm button missing on buy | Account is not an operator. Do §2.5. |
+| `admin.html` says "Not authorised" | Same. |
+| Units issued at a different price than quoted | Correct behaviour. Issuance uses the confirmation-time price. |
+| `permission denied for table holdings` | Correct behaviour — browsers cannot write holdings. The write must go through the `trade` function. |
+| Signup succeeds but sign-in fails | Email confirmation is on in Supabase Auth. Confirm the address or turn it off for testing. |
+| Google sign-in fails | Configure the Google provider in Supabase Auth and add your redirect URL. |
+| Helix not rendering | No WebGL, or `prefers-reduced-motion` is set. The CSS gradient fallback is expected. |
+| Old version after deploy | `CACHE` in `sw.js` was not bumped. |

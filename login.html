@@ -1,125 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#05060f" />
-  <title>Log in — arvcoin</title>
-  <meta name="description" content="Log in to arvcoin — your micro-investment super app." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="auth.css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in — ARV Coin</title>
+<meta name="theme-color" content="#05070d">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
 </head>
 <body>
-  <canvas id="bg-canvas"></canvas>
-  <div class="grid-overlay"></div>
-  <div class="noise-overlay"></div>
 
-  <div class="auth-wrap">
-    <!-- brand panel -->
-    <aside class="auth-brand">
-      <div class="ab-glow"></div>
-      <div class="ab-top">
-        <a href="index.html" class="brand">
-          <span class="brand-mark">
-            <svg viewBox="0 0 40 40" width="34" height="34" aria-hidden="true">
-              <defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#7c5cff"/><stop offset="0.5" stop-color="#00e0ff"/><stop offset="1" stop-color="#00ffa3"/>
-              </linearGradient></defs>
-              <circle cx="20" cy="20" r="18" fill="none" stroke="url(#lg1)" stroke-width="2.5"/>
-              <path d="M13 26 L20 12 L27 26 M15.6 21 H24.4" fill="none" stroke="url(#lg1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-          <span class="brand-name">arv<span>coin</span></span>
-        </a>
+<canvas id="helix-canvas" aria-hidden="true"></canvas>
+<div data-nav></div>
+
+<main class="page wrap" style="max-width:440px;padding-top:var(--sp-8);padding-bottom:var(--sp-8)">
+  <div class="card">
+    <h1 style="font-size:1.5rem;margin-bottom:var(--sp-2)">Sign in</h1>
+    <p class="small muted" style="margin-bottom:var(--sp-5)">
+      Your portfolio, history and tax statement.
+    </p>
+
+    <form data-form class="stack">
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="email" required>
       </div>
-
-      <div class="auth-coin">
-        <svg viewBox="0 0 40 40" width="96" height="96"><path d="M13 27 L20 11 L27 27 M15 21.5 H25" fill="none" stroke="#00ffc2" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="field">
+        <label for="pw">Password</label>
+        <input id="pw" type="password" autocomplete="current-password" required>
       </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg">Sign in</button>
+    </form>
 
-      <div class="auth-tag">
-        <h2>Welcome back to the <span class="grad">future</span> of investing.</h2>
-        <p>Sign in to access the research desk, levels analysis and market recaps.</p>
-        <ul class="auth-points">
-          <li><span class="tick">✓</span> Partner-regulated & secure</li>
-          <li><span class="tick">✓</span> ₹10 se micro-investing</li>
-          <li><span class="tick">✓</span> Crypto + stocks, one app</li>
-        </ul>
-      </div>
-    </aside>
+    <div class="row" style="margin:var(--sp-4) 0">
+      <div style="flex:1;height:1px;background:var(--glass-brd)"></div>
+      <span class="tiny muted">or</span>
+      <div style="flex:1;height:1px;background:var(--glass-brd)"></div>
+    </div>
 
-    <!-- form panel -->
-    <main class="auth-form-side">
-      <div class="auth-card">
-        <a href="index.html" class="back-home">← Back to home</a>
-        <div class="a-brand">
-          <h1>Log in</h1>
-        </div>
-        <p class="a-sub">Welcome back. Let's get you signed in.</p>
+    <button class="btn btn-ghost btn-block" data-google>Continue with Google</button>
 
-        <form id="login-form" novalidate>
-          <div class="field" id="f-email">
-            <label for="email">Email or mobile</label>
-            <div class="input-wrap">
-              <span class="ic">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></svg>
-              </span>
-              <input type="text" id="email" name="email" placeholder="you@email.com" autocomplete="username" />
-            </div>
-            <span class="err">Enter a valid email address.</span>
-          </div>
+    <p class="small muted center" style="margin:var(--sp-5) 0 0">
+      No account? <a href="signup.html">Create one</a>
+    </p>
 
-          <div class="field" id="f-pass">
-            <label for="password">Password</label>
-            <div class="input-wrap">
-              <span class="ic">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-              </span>
-              <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" />
-              <button type="button" class="toggle-eye" data-target="password" aria-label="Show password">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-              </button>
-            </div>
-            <span class="err">Password must be at least 6 characters.</span>
-          </div>
-
-          <div class="auth-row">
-            <label><input type="checkbox" id="remember" /> Remember me</label>
-            <a href="#" id="forgot-pass">Forgot password?</a>
-          </div>
-
-          <!-- Cloudflare Turnstile (free captcha) — REAL site key (arvcoin) -->
-          <div class="cf-turnstile" data-sitekey="0x4AAAAAADxjXqOsk6FWgGLU" data-theme="dark"></div>
-
-          <button type="submit" class="btn btn-primary btn-lg full">Log in</button>
-          <div class="a-msg" id="msg"></div>
-        </form>
-
-        <div class="divider-or">or continue with</div>
-        <div class="social-btns">
-          <button class="social-btn" type="button" data-provider="google">
-            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.2c-.3 1.4-1.1 2.6-2.3 3.4v2.8h3.7C21.8 18.6 23 15.8 23 12.3Z"/><path fill="#34A853" d="M12 24c3.1 0 5.7-1 7.6-2.8l-3.7-2.8c-1 .7-2.3 1.1-3.9 1.1-3 0-5.5-2-6.4-4.8H1.8v3C3.7 21.4 7.5 24 12 24Z"/><path fill="#FBBC05" d="M5.6 14.7c-.2-.7-.4-1.4-.4-2.2s.1-1.5.4-2.2v-3H1.8C1 8.9.6 10.4.6 12s.4 3.1 1.2 4.7l3.8-3Z"/><path fill="#EA4335" d="M12 4.8c1.7 0 3.2.6 4.4 1.7l3.3-3.3C17.7 1.2 15.1 0 12 0 7.5 0 3.7 2.6 1.8 6.3l3.8 3C6.5 6.8 9 4.8 12 4.8Z"/></svg>
-            Google
-          </button>
-          <button class="social-btn" type="button" data-provider="apple">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.9c0-2.1 1.7-3.1 1.8-3.2-1-1.4-2.5-1.6-3-1.7-1.3-.1-2.5.8-3.2.8-.6 0-1.7-.7-2.8-.7-1.4 0-2.8.8-3.5 2.1-1.5 2.6-.4 6.4 1.1 8.5.7 1 1.5 2.2 2.6 2.1 1-.04 1.4-.7 2.7-.7 1.2 0 1.6.7 2.7.6 1.1-.02 1.8-1 2.5-2 .8-1.2 1.1-2.3 1.1-2.3s-2.1-.8-2.1-3.3ZM14.3 6.3c.6-.7 1-1.7.9-2.7-.9 0-1.9.6-2.5 1.3-.5.6-1 1.6-.9 2.6 1 .1 1.9-.5 2.5-1.2Z"/></svg>
-            Apple
-          </button>
-        </div>
-
-        <p class="auth-switch">New here? <a href="signup.html">Create account</a></p>
-      </div>
-    </main>
+    <div class="note-box" style="margin-top:var(--sp-4)" data-local-note hidden>
+      <strong>Running without a backend.</strong> Supabase is not configured, so
+      accounts and holdings live in this browser only. Signing in with any email
+      creates a local session. See <code>SETUP.md</code> to connect a real database.
+    </div>
   </div>
+</main>
 
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="3d.js" defer></script>
-  <script src="auth.js" defer></script>
-  <script src="firebase-config.js"></script>
-  <script type="module" src="firebase-auth.js"></script>
+<div data-footer></div>
+<script type="module" src="js/pages/auth.js"></script>
 </body>
 </html>

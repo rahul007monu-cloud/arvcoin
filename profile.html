@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profile — ARV Coin</title>
+<meta name="theme-color" content="#05070d">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
+</head>
+<body>
+
+<canvas id="helix-canvas" aria-hidden="true"></canvas>
+<div data-nav></div>
+
+<main class="page wrap" style="max-width:820px;padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
+
+  <h1 style="font-size:1.7rem">Profile</h1>
+
+  <div class="grid" style="grid-template-columns:1.2fr 1fr;gap:var(--sp-4);align-items:start">
+
+    <div class="card">
+      <div class="card-head">
+        <h3 style="font-size:1rem">Your details</h3>
+        <span class="badge" data-kyc>—</span>
+      </div>
+
+      <form data-form class="stack">
+        <div class="field">
+          <label for="name">Full name</label>
+          <input id="name" type="text" autocomplete="name">
+        </div>
+
+        <div class="field">
+          <label for="pan">PAN</label>
+          <input id="pan" type="text" maxlength="10" placeholder="ABCDE1234F"
+                 style="text-transform:uppercase" autocomplete="off">
+          <span class="hint">
+            Required for the correct TDS rate. Without it, section 206AA applies
+            <span data-nopan>20%</span> instead of <span data-pan>1%</span>.
+          </span>
+          <span class="err hidden" data-pan-err></span>
+        </div>
+
+        <div class="field">
+          <label for="vpa">Payout UPI ID</label>
+          <input id="vpa" type="text" placeholder="yourname@bank" autocomplete="off">
+          <span class="hint">Redemptions are paid here</span>
+          <span class="err hidden" data-vpa-err></span>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save</button>
+      </form>
+    </div>
+
+    <div class="stack">
+      <div class="card card-tight">
+        <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
+          <h4 style="font-size:0.95rem">Tax position</h4>
+        </div>
+        <div class="ledger-list" data-tax-position></div>
+      </div>
+
+      <div class="card card-tight">
+        <h4 style="font-size:0.95rem">Why the PAN matters</h4>
+        <p class="small" style="margin-bottom:0">
+          TDS under section 194S is withheld on the gross value of every
+          redemption once your transfers for the year pass the threshold. With a
+          PAN on record the rate is 1%. Without one, section 206AA raises it to
+          20% — twenty times as much money held back from each payout, all of it
+          recoverable only by filing.
+        </p>
+      </div>
+
+      <div class="card card-tight" data-local-card hidden>
+        <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
+          <h4 style="font-size:0.95rem">Local data</h4>
+          <span class="badge warn">no backend</span>
+        </div>
+        <p class="small">
+          Everything is in this browser's storage. Clearing site data erases it.
+        </p>
+        <button class="btn btn-danger btn-sm btn-block" data-reset>Erase local data</button>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<div data-footer></div>
+<script type="module" src="js/pages/profile.js"></script>
+</body>
+</html>

@@ -1,472 +1,239 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#05060f" />
-  <title>arvcoin — Market Research Desk | Stocks, Options, Commodity, Currency, Crypto</title>
-  <meta name="description" content="arvcoin research desk — structured market research across stocks, F&O options, commodity (gold, silver, copper, crude), currency and crypto. Education-first, with the full history public." />
-  <link rel="canonical" href="https://arvcoin.com/" />
-  <meta property="og:title" content="arvcoin — Market Research Desk" />
-  <meta property="og:description" content="Stocks, Options, Commodity, Currency, Crypto — structured research, education-first." />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://arvcoin.com/" />
-  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="lux.css" />
-  <script>
-  /* Register the service worker as early as possible, so a stale
-     worker is replaced immediately. */
-  (function () {
-    if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
-    var reloaded = false;
-    navigator.serviceWorker.addEventListener("controllerchange", function () {
-      if (reloaded) return;
-      reloaded = true;
-      location.reload();
-    });
-    window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js").then(function (reg) {
-        reg.update().catch(function () {});
-      }).catch(function () {});
-    });
-  })();
-  </script>
-  <script type="application/ld+json">
-  {
-    "@context":"https://schema.org",
-    "@type":"Organization",
-    "name":"arvcoin",
-    "url":"https://arvcoin.com",
-    "description":"Market research and investor education platform covering stocks, options, commodity, currency and crypto.",
-    "email":"support@arvcoin.com"
-  }
-  </script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARV Coin — one rupee, one unit, Bitcoin's every move</title>
+<meta name="description" content="ARV is an index unit priced at ₹1 at launch that tracks Bitcoin one for one. Live minute charts, transparent fees, and Indian VDA tax computed on every redemption.">
+<meta name="theme-color" content="#05070d">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js" defer></script>
 </head>
 <body>
-  <canvas id="bg-canvas"></canvas>
-  <div class="aurora"><span class="a1"></span><span class="a2"></span><span class="a3"></span><span class="a4"></span></div>
-  <div class="grid-overlay"></div>
-  <div class="grain"></div>
 
-  <!-- ================= NAV ================= -->
-  <header class="nav" id="nav">
-    <div class="nav-inner">
-      <a href="index.html" class="brand">
-        <span class="brand-mark">
-          <svg viewBox="0 0 40 40" width="30" height="30">
-            <defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#7c5cff"/><stop offset="0.5" stop-color="#00e0ff"/><stop offset="1" stop-color="#00ffa3"/>
-            </linearGradient></defs>
-            <circle cx="20" cy="20" r="18" fill="none" stroke="url(#lg1)" stroke-width="2.5"/>
-            <path d="M13 26 L20 12 L27 26 M15.6 21 H24.4" fill="none" stroke="url(#lg1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </span>
-        <span class="brand-name">arv<span>coin</span></span>
-      </a>
+<canvas id="helix-canvas" aria-hidden="true"></canvas>
 
-      <nav class="nav-links">
-        <a href="calls.html">Research</a>
-        <a href="#segments">Segments</a>
-        <a href="pricing.html">Plans</a>
-        <a href="#how">How it works</a>
-        <a href="about.html">About</a>
-        <div class="mobile-auth">
-          <a href="login.html" class="btn btn-ghost">Log in</a>
-          <a href="signup.html" class="btn btn-primary">Get started</a>
-        </div>
-      </nav>
+<div data-nav></div>
 
-      <div class="nav-cta">
-        <a href="login.html" class="btn btn-ghost">Log in</a>
-        <a href="signup.html" class="btn btn-primary">Get started</a>
-      </div>
+<main class="page">
 
-      <button class="nav-burger" id="burger" aria-label="Menu">
-        <span></span><span></span><span></span>
-      </button>
-    </div>
-  </header>
+  <!-- ================================================================ hero -->
+  <section class="wrap" style="padding-top:var(--sp-8);padding-bottom:var(--sp-7)">
+    <div class="grid" style="grid-template-columns:1.15fr 1fr;align-items:center;gap:var(--sp-7)">
 
-  <!-- ================= HERO ================= -->
-  <section class="lux-hero">
-    <div class="lux-wrap hero-split">
       <div>
-        <span class="lux-eyebrow rv"><span class="dot"></span> Education-first research desk</span>
+        <div class="row" style="margin-bottom:var(--sp-4)">
+          <span class="badge btc">Tracks Bitcoin 1:1</span>
+          <span class="badge" data-index-quote>Quoted in ₹</span>
+        </div>
 
-        <h1 class="lux-h1 rv d1">
-          Understand the market,<br />
-          <span class="shimmer">then decide</span>
+        <h1 style="margin-bottom:var(--sp-4)">
+          One rupee.<br>One unit.<br>
+          <span style="background:linear-gradient(135deg,var(--btc),var(--arv));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">Bitcoin's every move.</span>
         </h1>
 
-        <p class="lux-lead rv d2" style="margin-top:22px">
-          Stocks, F&amp;O options, commodity (gold, silver, copper, crude), currency and crypto —
-          structured research where <b style="color:var(--txt)">every note carries its rationale</b>.
-          Not just a tip, the full reasoning.
+        <p style="font-size:1.08rem;max-width:52ch">
+          ARV started at <strong>₹1.0000</strong> on
+          <span data-launch-date>1 January 2025</span>. From that moment its price has
+          been exactly Bitcoin's percentage change, applied to that rupee. Bitcoin
+          doubles, ARV is ₹2. Bitcoin falls 8%, ARV is ₹0.92. Nothing else moves it.
         </p>
 
-        <div class="cta-row rv d3" style="margin-top:34px">
-          <a href="signup.html" class="btn-lux">Create a free account →</a>
-          <a href="calls.html" class="btn-glass">Browse research</a>
+        <div class="row row-wrap" style="margin:var(--sp-5) 0">
+          <a href="buy.html" class="btn btn-primary btn-lg">Buy ARV</a>
+          <a href="charts.html" class="btn btn-ghost btn-lg">Open charts</a>
         </div>
 
-        <div class="lux-note info rv d4" style="margin-top:32px;max-width:560px">
-          <span class="n-ico">🎓</span>
-          <div>
-            <b>For education only.</b> Nothing here is investment advice.
-            Do your own research, or consult a SEBI-registered adviser, before acting.
+        <div class="row row-wrap small muted" style="gap:var(--sp-4)">
+          <span>◆ Live minute candles</span>
+          <span>◆ Fees shown before you commit</span>
+          <span>◆ Tax computed on every redemption</span>
+        </div>
+      </div>
+
+      <!-- live price card -->
+      <div class="card card-float">
+        <div class="card-head">
+          <div class="row" style="gap:9px">
+            <span class="live-dot off" data-hero-dot></span>
+            <h3 style="font-size:1rem">ARV Coin</h3>
+          </div>
+          <div class="tabs" data-hero-tf>
+            <button class="tab" data-tf="1h">1H</button>
+            <button class="tab on" data-tf="1D">1D</button>
+            <button class="tab" data-tf="1W">1W</button>
+          </div>
+        </div>
+
+        <div class="price-hero" style="margin-bottom:var(--sp-2)">
+          <span class="v" data-hero-price>₹—</span>
+          <span class="chip flat" data-hero-change>—</span>
+        </div>
+        <div class="small muted" style="margin-bottom:var(--sp-5)">
+          <span data-hero-window>24h</span> change ·
+          since launch <span class="strong" data-hero-launch>—</span>
+        </div>
+
+        <div class="chart-canvas short" data-hero-chart style="margin:0 calc(var(--sp-5) * -1) var(--sp-4)"></div>
+
+        <div class="grid g-2" style="gap:var(--sp-3)">
+          <div class="stat">
+            <span class="stat-k">Bitcoin</span>
+            <span class="num strong" data-btc-inr>—</span>
+            <span class="stat-sub"><span data-btc-usd>—</span></span>
+          </div>
+          <div class="stat">
+            <span class="stat-k">ARV = BTC ×</span>
+            <span class="num strong" data-ratio>—</span>
+            <span class="stat-sub">identical percentage</span>
           </div>
         </div>
       </div>
 
-      <div id="lux-stage">
-        <!-- floating preview cards -->
-        <div class="lux lux-float hero-peek" data-parallax="18" style="top:8%;left:2%">
-          <b style="color:var(--up)">◈ Stocks</b>
-          <small>Cash equity · NSE / BSE</small>
-        </div>
-        <div class="lux lux-float d1 hero-peek" data-parallax="26" style="top:38%;right:-2%">
-          <b style="color:var(--cyan)">◹ F&amp;O Options</b>
-          <small>NIFTY · BANKNIFTY · Stocks</small>
-        </div>
-        <div class="lux lux-float d2 hero-peek" data-parallax="14" style="bottom:14%;left:6%">
-          <b style="color:#ffb020">⛁ Commodity</b>
-          <small>Gold · Silver · Copper · Crude</small>
-        </div>
-        <div class="lux lux-float d3 hero-peek" data-parallax="22" style="bottom:2%;right:8%">
-          <b style="color:var(--mint)">⇄ Currency</b>
-          <small>USDINR · EURINR (INR pairs)</small>
-        </div>
-      </div>
     </div>
   </section>
 
-  <!-- ================= MARQUEE ================= -->
-  <div class="lux-marquee" style="padding:8px 0 4px">
-    <div class="track">
-      <span class="mq-item"><b>NIFTY 50</b> Index options</span>
-      <span class="mq-item"><b>BANKNIFTY</b> Derivatives</span>
-      <span class="mq-item"><b>GOLD</b> MCX</span>
-      <span class="mq-item"><b>SILVER</b> MCX</span>
-      <span class="mq-item"><b>COPPER</b> Base metal</span>
-      <span class="mq-item"><b>ZINC</b> Base metal</span>
-      <span class="mq-item"><b>CRUDE OIL</b> Energy</span>
-      <span class="mq-item"><b>NATURAL GAS</b> Energy</span>
-      <span class="mq-item"><b>USDINR</b> Currency</span>
-      <span class="mq-item"><b>BTC</b> Crypto</span>
-      <span class="mq-item"><b>ETH</b> Crypto</span>
-      <span class="mq-item"><b>ALUMINIUM</b> Base metal</span>
-    </div>
-  </div>
+  <!-- ========================================================== mechanics -->
+  <section class="wrap" style="padding:var(--sp-7) 0">
+    <h2>How the price is built</h2>
+    <p style="max-width:64ch">
+      There is one formula, and it is the whole product. No committee sets the
+      price, no operator adjusts it, and money arriving or leaving does not move it.
+    </p>
 
-  <!-- ================= SEGMENTS ================= -->
-  <section class="lux-sec" id="segments">
-    <div class="lux-wrap">
-      <div class="lux-head">
-        <span class="lux-eyebrow rv"><span class="dot"></span> Coverage</span>
-        <h2 class="lux-h2 rv d1">Five segments, <span class="shimmer">one desk</span></h2>
-        <p class="lux-lead rv d2">Each segment has its own analyst framework. No guesswork.</p>
+    <div class="card card-solid" style="margin:var(--sp-5) 0;overflow-x:auto">
+      <div class="mono" style="font-size:1.02rem;line-height:2.2;white-space:nowrap">
+        <span class="muted">ARV(t)</span> =
+        <span style="color:var(--arv)">₹1</span> ×
+        <span style="color:var(--btc)">BTC(t)</span> ÷
+        <span style="color:var(--btc)">BTC(launch)</span>
       </div>
-
-      <div class="lux-grid g5" id="seg-grid"></div>
-
-      <div class="lux-note rv" style="margin-top:26px">
-        <span class="n-ico">⇄</span>
-        <div>
-          <b>On currency:</b> RBI-approved <b>INR pairs</b> only, on recognised Indian
-          exchanges (NSE / BSE / MSE). Offshore and OTC forex platforms breach FEMA for Indian
-          residents, with penalties of up to three times the transaction value. We do not
-          cover them.
-        </div>
+      <div class="small muted" style="margin-top:var(--sp-3)">
+        Bitcoin at launch was <strong data-base-inr>—</strong>
+        (<span data-base-usd>$93,347.59</span> at USD/INR
+        <span data-base-fx>85.60</span>). Both figures are locked in
+        <code>arv-config.js</code> and never change.
       </div>
     </div>
-  </section>
 
-  <!-- ============ HELIX CAPTION ============
-       The DNA strand itself is a fixed, full-page canvas created by
-       helix.js. This section is the readable caption that tracks
-       whichever node is currently passing the viewport centre. -->
-  <section class="lux-sec helix-sec" id="helix-section">
-    <div class="lux-wrap">
-      <div class="helix-ui">
-        <span class="lux-eyebrow"><span class="dot"></span> What we cover</span>
-        <div class="helix-index" id="helix-index">01 / 08</div>
-        <h2 class="helix-title" id="helix-title">Stocks</h2>
-        <p class="helix-body" id="helix-body">Cash equity across large, mid and small caps.</p>
-        <div class="helix-dots" id="helix-dots"></div>
-        <p class="helix-hint">Keep scrolling — the strand runs the whole page</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ================= HOW IT WORKS ================= -->
-  <section class="lux-sec" id="how">
-    <div class="lux-wrap">
-      <div class="lux-head">
-        <span class="lux-eyebrow rv"><span class="dot"></span> How it works</span>
-        <h2 class="lux-h2 rv d1">Four steps, <span class="shimmer">that’s it</span></h2>
-      </div>
-
-      <div class="lux-grid g4">
-        <div class="lux lux-card step lux-3d rv"><div class="n">01</div>
-          <h3>Create an account</h3>
-          <p>Sign up with email or Google. Your email is verified once — we never ask for an OTP again.</p>
-        </div>
-        <div class="lux lux-card step lux-3d rv d1"><div class="n">02</div>
-          <h3>Choose your segments</h3>
-          <p>Stocks, options, commodity, currency, crypto — whichever you want to follow.</p>
-        </div>
-        <div class="lux lux-card step lux-3d rv d2"><div class="n">03</div>
-          <h3>Pick a plan</h3>
-          <p>Charges are shown upfront. Payment runs through a secure gateway — card and UPI details never touch our servers.</p>
-        </div>
-        <div class="lux lux-card step lux-3d rv d3"><div class="n">04</div>
-          <h3>Read the research</h3>
-          <p>Notes with full rationale, daily market recaps, and the complete history — nothing hidden.</p>
-        </div>
-      </div>
-
-      <div class="lux-note good rv" style="margin-top:26px">
-        <span class="n-ico">🔒</span>
-        <div>
-          <b>No auto-renewal, ever.</b> Plans run for a fixed term and simply expire. You renew
-          only if you choose to. No silent charges, no card stored on our servers.
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ================= WHAT A CALL LOOKS LIKE ================= -->
-  <section class="lux-sec">
-    <div class="lux-wrap">
-      <div class="lux-head">
-        <span class="lux-eyebrow rv"><span class="dot"></span> Transparency</span>
-        <h2 class="lux-h2 rv d1">What a research note <span class="shimmer">looks like</span></h2>
-        <p class="lux-lead rv d2">Not just numbers — reasoning, risk and horizon too.</p>
-      </div>
-
-      <div class="lux lux-3d rv" style="padding:26px;max-width:680px;margin:0 auto">
-        <div style="display:flex;gap:11px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
-          <span style="font-family:var(--font-alt);font-weight:800;font-size:12.5px;letter-spacing:.06em;padding:5px 12px;border-radius:8px;background:rgba(47,224,138,.16);color:var(--up);border:1px solid rgba(47,224,138,.34)">BUY</span>
-          <span style="font-size:17.5px;font-weight:700">EXAMPLE STOCK</span>
-          <span style="font-size:11.5px;color:var(--muted-2);padding:3px 8px;border-radius:6px;background:rgba(255,255,255,.05)">NSE</span>
-          <span style="margin-left:auto;font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:999px;background:rgba(0,224,255,.14);color:var(--cyan);border:1px solid rgba(0,224,255,.3)">Sample</span>
-        </div>
-
-        <div class="lux-grid g4" style="gap:10px;margin-bottom:16px">
-          <div style="padding:12px 14px;border-radius:13px;background:rgba(255,255,255,.03);border:1px solid var(--stroke)">
-            <small style="display:block;font-size:11px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Entry</small>
-            <b style="font-family:var(--font-alt);font-size:16.5px">1,420</b>
-          </div>
-          <div style="padding:12px 14px;border-radius:13px;background:rgba(255,255,255,.03);border:1px solid var(--stroke)">
-            <small style="display:block;font-size:11px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Targets</small>
-            <b style="font-family:var(--font-alt);font-size:16.5px;color:var(--up)">1,465 / 1,490</b>
-          </div>
-          <div style="padding:12px 14px;border-radius:13px;background:rgba(255,255,255,.03);border:1px solid var(--stroke)">
-            <small style="display:block;font-size:11px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Stop loss</small>
-            <b style="font-family:var(--font-alt);font-size:16.5px;color:var(--down)">1,385</b>
-          </div>
-          <div style="padding:12px 14px;border-radius:13px;background:rgba(255,255,255,.03);border:1px solid var(--stroke)">
-            <small style="display:block;font-size:11px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Horizon</small>
-            <b style="font-family:var(--font-alt);font-size:16.5px">Short</b>
-          </div>
-        </div>
-
-        <div style="font-size:14.5px;color:var(--muted);line-height:1.7;padding-top:14px;border-top:1px solid var(--stroke)">
-          <b style="color:var(--txt);display:block;margin-bottom:5px;font-size:13px;text-transform:uppercase;letter-spacing:.05em">Rationale</b>
-          This is where the analyst sets out the basis — technical structure, volume, sector
-          trend, fundamental trigger, and the risk factors involved. No note is published
-          without a rationale.
-        </div>
-
-        <div style="margin-top:14px;padding-top:13px;border-top:1px solid var(--stroke);font-size:12px;color:var(--muted-2)">
-          This is a <b style="color:var(--muted)">sample layout</b>, not an actual recommendation.
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ================= WHY US ================= -->
-  <section class="lux-sec">
-    <div class="lux-wrap">
-      <div class="lux-head">
-        <span class="lux-eyebrow rv"><span class="dot"></span> Why arvcoin</span>
-        <h2 class="lux-h2 rv d1">What sets <span class="shimmer">us apart</span></h2>
-      </div>
-
-      <div class="lux-grid g3">
-        <div class="lux lux-card lux-3d rv"><div class="ico">📖</div>
-          <h3>Full history, public</h3>
-          <p>Notes that worked and notes that did not — both stay visible. No cherry-picking
-             winners to inflate an accuracy figure. Once published, a note cannot be edited.</p>
-        </div>
-        <div class="lux lux-card lux-3d rv d1"><div class="ico">🧠</div>
-          <h3>Rationale is mandatory</h3>
-          <p>Every note explains why. You are not just following — you are understanding.
-             That is the real education.</p>
-        </div>
-        <div class="lux lux-card lux-3d rv d2"><div class="ico">🚫</div>
-          <h3>No guaranteed returns</h3>
-          <p>"Sure shot", "assured profit", "100% accuracy" — these phrases are technically
-             blocked in our publishing system. Markets do not offer guarantees.</p>
-        </div>
-        <div class="lux lux-card lux-3d rv d3"><div class="ico">🔐</div>
-          <h3>A free calculator</h3>
-          <p>The levels tool is free forever — no login, no payment. Compute support,
-             resistance, pivots and CPR yourself, and verify our work.</p>
-        </div>
-        <div class="lux lux-card lux-3d rv d4"><div class="ico">⚖️</div>
-          <h3>Compliance first</h3>
-          <p>Our registration status is stated plainly on every page. We spell out the FEMA
-             limits on forex and the 30% tax on crypto.</p>
-        </div>
-        <div class="lux lux-card lux-3d rv d5"><div class="ico">📱</div>
-          <h3>Website and app</h3>
-          <p>Open it in a browser or install it on your phone. Same research, same account,
-             synced across both.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ================= PLANS TEASER ================= -->
-  <section class="lux-sec" id="plans">
-    <div class="lux-wrap">
-      <div class="lux-head">
-        <span class="lux-eyebrow rv"><span class="dot"></span> Plans</span>
-        <h2 class="lux-h2 rv d1">Nominal charges, <span class="gold">clear coverage</span></h2>
-        <p class="lux-lead rv d2">
-          Pick the segments you actually want. No hidden fees, no auto-renewal traps.
+    <div class="grid g-3">
+      <div class="card card-float">
+        <h4>Deposits cannot lift it</h4>
+        <p class="small">
+          ARV's price is a function of market data alone — it never reads how many
+          units exist or how much money is held. New deposits issue new units at
+          the current price rather than bidding it up, so an early holder gains
+          nothing from a later one arriving. That is the difference between an
+          index unit and a number someone can push.
         </p>
       </div>
+      <div class="card card-float">
+        <h4>Quoted in rupees, on purpose</h4>
+        <p class="small">
+          You deposit rupees and the treasury holds Bitcoin, so ARV is quoted in
+          rupees — which means its printed change is what your money actually did,
+          currency movement included. Quote it in dollars instead and the headline
+          percentage would stop matching your statement.
+        </p>
+      </div>
+      <div class="card card-float">
+        <h4>Redemption is priced, not negotiated</h4>
+        <p class="small">
+          There is no order book and no counterparty. Units are issued and redeemed
+          against the index price, so there is no spread to cross and no queue to
+          wait in — but equally, no one to sell to at a premium. The price is the
+          price.
+        </p>
+      </div>
+    </div>
+  </section>
 
-      <div class="lux-grid g4" id="plan-grid"></div>
+  <!-- =============================================================== costs -->
+  <section class="wrap" style="padding:var(--sp-7) 0">
+    <h2>What it costs, in full</h2>
+    <p style="max-width:64ch">
+      Worked on a ₹10,000 deposit at the live price, with nothing omitted. The same
+      arithmetic runs on the buy screen before you confirm.
+    </p>
 
-      <p style="text-align:center;color:var(--muted-2);font-size:13px;margin-top:22px">
-        Prices exclude GST. Full details and comparison → <a href="pricing.html" style="color:var(--cyan)">Plans page</a>
+    <div class="grid g-2" style="align-items:start;margin-top:var(--sp-5)">
+      <div class="card card-flush">
+        <div class="card-head" style="padding:var(--sp-4);margin:0">
+          <h4>Depositing ₹10,000</h4>
+          <span class="badge">live price</span>
+        </div>
+        <div class="ledger-list" data-buy-example>
+          <div class="ledger-row"><span class="l">Loading…</span></div>
+        </div>
+      </div>
+
+      <div class="card card-flush">
+        <div class="card-head" style="padding:var(--sp-4);margin:0">
+          <h4>Redeeming after a 50% rise</h4>
+          <span class="badge warn">tax applies</span>
+        </div>
+        <div class="ledger-list" data-sell-example>
+          <div class="ledger-row"><span class="l">Loading…</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note-box warn" style="margin-top:var(--sp-5)">
+      <strong>The 30% is not deducted from your payout.</strong>
+      Only the exit fee, GST and 1% TDS are withheld at redemption. The 30% plus 4%
+      cess on your gain is your own liability, paid when you file — the TDS already
+      withheld counts against it. Losses on virtual digital assets cannot be set
+      off against gains or carried forward, so two trades that cancel out can still
+      leave tax owing. Every figure is itemised on the redeem screen and again in
+      your <a href="tax.html">tax statement</a>.
+    </div>
+  </section>
+
+  <!-- ============================================================== market -->
+  <section class="wrap" style="padding:var(--sp-7) 0">
+    <div class="row-between" style="margin-bottom:var(--sp-4)">
+      <h2 style="margin:0">Market</h2>
+      <a href="charts.html" class="btn btn-ghost btn-sm">Full charts →</a>
+    </div>
+    <p class="small muted" style="max-width:60ch;margin-bottom:var(--sp-5)">
+      Ethereum and Solana are shown for reference only. They carry zero weight in
+      the basket and have no effect on ARV's price.
+    </p>
+    <div class="grid g-3" data-watchlist></div>
+  </section>
+
+  <!-- ================================================================= cta -->
+  <section class="wrap" style="padding:var(--sp-7) 0 var(--sp-8)">
+    <div class="card" style="text-align:center;padding:var(--sp-7) var(--sp-5)">
+      <h2 style="margin-bottom:var(--sp-3)">Start with ₹100</h2>
+      <p style="max-width:48ch;margin:0 auto var(--sp-5)">
+        Pay by UPI, hold units, watch them against Bitcoin minute by minute, and
+        redeem back to UPI when you choose.
       </p>
-    </div>
-  </section>
-
-  <!-- ================= FAQ ================= -->
-  <section class="lux-sec" id="faq">
-    <div class="lux-narrow">
-      <div class="lux-head">
-        <span class="lux-eyebrow rv"><span class="dot"></span> FAQ</span>
-        <h2 class="lux-h2 rv d1">Straight <span class="shimmer">answers</span></h2>
-      </div>
-
-      <div class="rv d2">
-        <div class="faq-item">
-          <button class="faq-q">Is arvcoin registered with SEBI?</button>
-          <div class="faq-a"><p id="faq-reg"></p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q">How does payment work?</button>
-          <div class="faq-a"><p>Through a secure PCI-DSS compliant gateway (Razorpay) — UPI, card or netbanking. Your card and UPI details are never stored on our servers. Access activates as soon as payment is confirmed.</p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q">Which segments do you cover?</button>
-          <div class="faq-a"><p>Stocks (NSE/BSE cash equity), F&amp;O options (NIFTY, BANKNIFTY, FINNIFTY, stock derivatives), commodity (gold, silver, copper, zinc, lead, aluminium, nickel, crude oil, natural gas, agri), currency (USDINR, EURINR, GBPINR, JPYINR — INR pairs only), and crypto (BTC, ETH, SOL and others).</p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q">Do you offer guaranteed profits?</button>
-          <div class="faq-a"><p>No. Never. Guarantees are not possible in markets. Our publishing system technically blocks phrases like "guaranteed return", "sure shot" and "assured profit". In derivatives you can lose your entire capital.</p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q">Will you keep asking for an OTP?</button>
-          <div class="faq-a"><p>No. Email verification happens once, on your first login. After that we never ask again. Sign in with Google and there is no OTP at all, since Google has already verified your email.</p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q">Do you cover offshore forex (EUR/USD and similar)?</button>
-          <div class="faq-a"><p>No. For Indian residents, offshore and OTC forex platforms breach FEMA — penalties reach three times the transaction value, and those platforms appear on the RBI Alert List. We cover only RBI-approved INR pairs on recognised Indian exchanges.</p></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-q">Do you offer refunds?</button>
-          <div class="faq-a"><p>A subscription is fixed-term access to content. The refund terms are set out in full in the <a href="legal.html#terms" style="color:var(--cyan)">Terms</a>  — please read them before paying.</p></div>
-        </div>
+      <div class="row" style="justify-content:center;flex-wrap:wrap">
+        <a href="signup.html" class="btn btn-primary btn-lg">Create an account</a>
+        <a href="legal.html#risk" class="btn btn-ghost btn-lg">Read the risks</a>
       </div>
     </div>
   </section>
 
-  <!-- ================= CTA ================= -->
-  <section class="lux-sec">
-    <div class="lux-narrow">
-      <div class="lux lux-brd rv" style="padding:clamp(34px,5vw,58px);text-align:center">
-        <h2 class="lux-h2" style="margin-bottom:14px">Start <span class="shimmer">understanding</span> the market</h2>
-        <p class="lux-lead" style="margin:0 auto 30px">
-          Create a free account. Explore the research desk, daily recaps and educational
-          content — no payment required.
-        </p>
-        <div class="cta-row center">
-          <a href="signup.html" class="btn-lux">Create a free account →</a>
-          <a href="calls.html" class="btn-glass">Research desk</a>
-        </div>
-      </div>
-    </div>
-  </section>
+</main>
 
-  <!-- ================= FOOTER ================= -->
-  <footer class="lux-foot">
-    <div class="lux-wrap">
-      <div class="foot-grid">
-        <div class="foot-about">
-          <a href="index.html" class="brand">
-            <span class="brand-mark">
-              <svg viewBox="0 0 40 40" width="26" height="26">
-                <circle cx="20" cy="20" r="18" fill="none" stroke="url(#lg1)" stroke-width="2.5"/>
-                <path d="M13 26 L20 12 L27 26 M15.6 21 H24.4" fill="none" stroke="url(#lg1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </span>
-            <span class="brand-name">arv<span>coin</span></span>
-          </a>
-          <p>A market research and investor education platform. Stocks, options, commodity,
-             currency and crypto — always with the rationale.</p>
-        </div>
+<div data-footer></div>
 
-        <div>
-          <h4>Product</h4>
-          <a href="calls.html">Research desk</a>
-          <a href="pricing.html">Plans</a>
-          <a href="#segments">Segments</a>
-          <a href="#how">How it works</a>
-        </div>
-
-        <div>
-          <h4>Company</h4>
-          <a href="about.html">About</a>
-          <a href="legal.html#privacy">Privacy</a>
-          <a href="legal.html#terms">Terms</a>
-          <a href="legal.html#disclosures">Disclosures</a>
-        </div>
-
-        <div>
-          <h4>Account</h4>
-          <a href="signup.html">Sign up</a>
-          <a href="login.html">Log in</a>
-          <a href="dashboard.html">Dashboard</a>
-          <a href="legal.html#grievance">Grievance</a>
-        </div>
-      </div>
-
-      <div class="disclosure" id="foot-disclosure"></div>
-
-      <div class="foot-bottom">
-        <span>© <span id="yr"></span> arvcoin. All rights reserved.</span>
-        <span>Investments are subject to market risk.</span>
-      </div>
-    </div>
-  </footer>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="arv-config.js"></script>
-  <script src="3d.js" defer></script>
-  <script src="helix.js" defer></script>
-  <script src="lux.js" defer></script>
-  <script src="home.js" defer></script>
+<script type="module" src="js/pages/home.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+</script>
 </body>
 </html>

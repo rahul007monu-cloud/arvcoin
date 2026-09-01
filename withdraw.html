@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redeem ARV — ARV Coin</title>
+<meta name="theme-color" content="#05070d">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
+</head>
+<body>
+
+<canvas id="helix-canvas" aria-hidden="true"></canvas>
+<div data-nav></div>
+
+<main class="page wrap" style="padding-top:var(--sp-5);padding-bottom:var(--sp-7);max-width:1020px">
+
+  <h1 style="font-size:1.7rem">Redeem ARV</h1>
+  <p class="muted" style="max-width:64ch">
+    Units are redeemed against the index price. Every deduction is itemised
+    below before you confirm, including the tax you will owe later but which is
+    <strong>not</strong> withheld here.
+  </p>
+
+  <div class="steps">
+    <div class="step on" data-step="1"><span class="n">01</span><span class="t">Amount</span></div>
+    <div class="step" data-step="2"><span class="n">02</span><span class="t">Review tax</span></div>
+    <div class="step" data-step="3"><span class="n">03</span><span class="t">Payout</span></div>
+  </div>
+
+  <!-- ============================================================= STEP 1 -->
+  <section data-panel="1">
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:var(--sp-4);align-items:start">
+
+      <div class="card">
+        <div class="card-head">
+          <h3 style="font-size:1rem">How much to redeem?</h3>
+          <span class="badge" data-price-badge>—</span>
+        </div>
+
+        <div class="grid g-2" style="gap:var(--sp-3);margin-bottom:var(--sp-4)">
+          <div class="stat">
+            <span class="stat-k">You hold</span>
+            <span class="num strong" data-held>—</span>
+            <span class="tiny muted">units</span>
+          </div>
+          <div class="stat">
+            <span class="stat-k">Worth</span>
+            <span class="num strong" data-worth>—</span>
+          </div>
+        </div>
+
+        <div class="field" style="margin-bottom:var(--sp-3)">
+          <label for="units">Units to redeem</label>
+          <input id="units" class="num-input" type="text" inputmode="decimal"
+                 placeholder="0.00000000" autocomplete="off">
+          <span class="hint">Or pick a portion below</span>
+          <span class="err hidden" data-units-err></span>
+        </div>
+
+        <div class="quick-amounts" style="margin-bottom:var(--sp-4)">
+          <button class="btn btn-sm" data-pct="25">25%</button>
+          <button class="btn btn-sm" data-pct="50">50%</button>
+          <button class="btn btn-sm" data-pct="75">75%</button>
+          <button class="btn btn-sm" data-pct="100">All</button>
+        </div>
+
+        <div class="field" style="margin-bottom:var(--sp-4)">
+          <label for="vpa">Payout UPI ID</label>
+          <input id="vpa" type="text" placeholder="yourname@bank" autocomplete="off">
+          <span class="hint">Saved to your profile. The payout goes here.</span>
+        </div>
+
+        <div class="note-box warn" style="margin-bottom:var(--sp-4)" data-pan-warn hidden>
+          <strong>No PAN on record.</strong> Without a PAN, TDS is deducted at
+          <span data-nopan-rate>20%</span> instead of <span data-pan-rate>1%</span>
+          under section 206AA. <a href="profile.html">Add your PAN</a> first to
+          avoid that.
+        </div>
+
+        <button class="btn btn-primary btn-block btn-lg" data-continue disabled>
+          Review the numbers
+        </button>
+      </div>
+
+      <div class="card card-flush">
+        <div class="card-head" style="padding:var(--sp-4);margin:0">
+          <h3 style="font-size:1rem">Breakdown</h3>
+          <span class="badge info">live</span>
+        </div>
+        <div class="ledger-list" data-quote>
+          <div class="ledger-row"><span class="l">Enter units to redeem</span></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================= STEP 2 -->
+  <section data-panel="2" class="hidden">
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:var(--sp-4);align-items:start">
+
+      <div class="card card-flush">
+        <div class="card-head" style="padding:var(--sp-4);margin:0">
+          <h3 style="font-size:1rem">Confirm this redemption</h3>
+        </div>
+        <div class="ledger-list" data-final></div>
+      </div>
+
+      <div class="stack">
+        <div class="card card-tight">
+          <h4 style="font-size:0.95rem">Two different things</h4>
+          <p class="small">
+            <strong>TDS</strong> is withheld now — 1% of the gross value under
+            section 194S. You do not receive it; it is credited against your
+            eventual liability and appears in your Form 26AS.
+          </p>
+          <p class="small" style="margin-bottom:0">
+            <strong>The 30% plus 4% cess</strong> is not withheld. It is your own
+            liability under section 115BBH, payable when you file your return.
+            This app computes and reports it so it is not a surprise later. Note
+            that platform fees are not deductible against it, and losses cannot be
+            set off or carried forward.
+          </p>
+        </div>
+
+        <div class="card card-tight">
+          <h4 style="font-size:0.95rem">Lots being consumed</h4>
+          <div class="table-wrap">
+            <table class="data">
+              <thead><tr><th>Acquired</th><th class="num">Units</th><th class="num">Cost</th></tr></thead>
+              <tbody data-lots></tbody>
+            </table>
+          </div>
+          <div class="tiny muted" style="margin-top:var(--sp-3)">
+            Oldest first — FIFO. This determines the cost of acquisition, and so
+            the taxable gain.
+          </div>
+        </div>
+
+        <label class="check">
+          <input type="checkbox" data-ack2>
+          <span>
+            I have reviewed the deductions and understand the tax shown is my own
+            liability, not withheld by this platform.
+          </span>
+        </label>
+
+        <button class="btn btn-primary btn-block btn-lg" data-execute disabled>
+          Redeem now
+        </button>
+        <button class="btn btn-ghost btn-block" data-back>← Change amount</button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================= STEP 3 -->
+  <section data-panel="3" class="hidden">
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:var(--sp-4);align-items:start">
+
+      <div class="qr-panel">
+        <div>
+          <div class="stat-k" style="text-align:center;margin-bottom:var(--sp-2)">Being paid to you</div>
+          <div class="num" style="font-size:2rem;font-weight:700;text-align:center;color:var(--up)" data-payout>—</div>
+        </div>
+        <div class="qr-frame" data-payout-qr></div>
+        <div class="qr-vpa"><span data-payout-vpa>—</span></div>
+        <div class="small muted center">
+          Reference <strong class="mono" data-payout-ref>—</strong><br>
+          Expected within <span data-settle>24 hours</span>.
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card card-tight">
+          <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
+            <h4 style="font-size:0.95rem">Recorded</h4>
+            <span class="badge ok">append-only</span>
+          </div>
+          <div class="ledger-list" data-receipt></div>
+        </div>
+
+        <div class="note-box">
+          This redemption is now in your <a href="tax.html">tax statement</a> for
+          <strong data-fy>—</strong>. The TDS withheld is credited against the
+          liability shown there.
+        </div>
+
+        <div class="row">
+          <a href="dashboard.html" class="btn btn-primary">View portfolio</a>
+          <a href="transactions.html" class="btn btn-ghost">History</a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<div data-footer></div>
+<script type="module" src="js/pages/withdraw.js"></script>
+</body>
+</html>

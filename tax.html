@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tax statement — ARV Coin</title>
+<meta name="theme-color" content="#05070d">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
+</head>
+<body>
+
+<canvas id="helix-canvas" aria-hidden="true"></canvas>
+<div data-nav></div>
+
+<main class="page wrap" style="padding-top:var(--sp-5);padding-bottom:var(--sp-7);max-width:1120px">
+
+  <div class="row-between row-wrap" style="margin-bottom:var(--sp-4)">
+    <div>
+      <h1 style="font-size:1.7rem;margin-bottom:4px">Tax statement</h1>
+      <div class="small muted">
+        Virtual digital assets, section 115BBH · TDS under section 194S
+      </div>
+    </div>
+    <div class="row">
+      <select data-fy style="max-width:190px"></select>
+      <button class="btn btn-ghost" data-csv>Export CSV</button>
+    </div>
+  </div>
+
+  <!-- ============================================================= headline -->
+  <div class="grid g-4" style="margin-bottom:var(--sp-4)">
+    <div class="card card-tight"><div class="stat">
+      <span class="stat-k">Taxable gains</span>
+      <span class="stat-v" data-gains>—</span>
+      <span class="stat-sub">gains only, losses excluded</span>
+    </div></div>
+    <div class="card card-tight"><div class="stat">
+      <span class="stat-k">Tax + cess</span>
+      <span class="stat-v" data-tax>—</span>
+      <span class="stat-sub"><span data-rate>31.2%</span> effective</span>
+    </div></div>
+    <div class="card card-tight"><div class="stat">
+      <span class="stat-k">TDS already withheld</span>
+      <span class="stat-v" data-tds>—</span>
+      <span class="stat-sub">credited against the above</span>
+    </div></div>
+    <div class="card card-tight"><div class="stat">
+      <span class="stat-k" data-balance-label>Balance payable</span>
+      <span class="stat-v" data-balance>—</span>
+      <span class="stat-sub">at the time of filing</span>
+    </div></div>
+  </div>
+
+  <div class="grid" style="grid-template-columns:1fr 1fr;gap:var(--sp-4);align-items:start">
+
+    <!-- computation -->
+    <div class="card card-flush">
+      <div class="card-head" style="padding:var(--sp-4);margin:0">
+        <h3 style="font-size:1rem">Computation</h3>
+        <span class="badge" data-fy-badge>—</span>
+      </div>
+      <div class="ledger-list" data-computation></div>
+    </div>
+
+    <div class="stack">
+      <!-- the no-set-off cost -->
+      <div class="card card-tight" data-setoff-card hidden>
+        <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
+          <h4 style="font-size:0.95rem">What the no-set-off rule cost you</h4>
+          <span class="badge bad">s.115BBH</span>
+        </div>
+        <div class="ledger-list" data-setoff></div>
+      </div>
+
+      <div class="card card-tight">
+        <h4 style="font-size:0.95rem">How this is computed</h4>
+        <ul class="small" style="padding-left:1.1rem;margin:0;color:var(--tx-1)">
+          <li style="margin-bottom:8px">
+            <strong>Cost of acquisition only.</strong> Entry and exit fees, GST and
+            any other expense are <em>not</em> deductible. Only what you paid for
+            the units reduces the gain.
+          </li>
+          <li style="margin-bottom:8px">
+            <strong>FIFO.</strong> The oldest units you hold are treated as sold
+            first, which fixes the cost against each redemption.
+          </li>
+          <li style="margin-bottom:8px">
+            <strong>Gains are not netted against losses.</strong> Each redemption
+            stands alone. A loss cannot reduce another gain and cannot be carried
+            into a later year.
+          </li>
+          <li style="margin-bottom:8px">
+            <strong>30% plus 4% cess</strong> on the gain — 31.2% effective. Flat,
+            regardless of your slab or holding period.
+          </li>
+          <li>
+            <strong>1% TDS</strong> is withheld on gross proceeds once your
+            transfers for the year pass <span data-threshold>₹10,000</span>. It is
+            a credit, not an extra tax.
+          </li>
+        </ul>
+      </div>
+
+      <div class="note-box warn">
+        This is a computation from your recorded transactions, not a filing and not
+        tax advice. Verify the rates and the treatment with a chartered accountant
+        before you file — and give them the CSV rather than a screenshot.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ per-txn -->
+  <div class="card card-flush" style="margin-top:var(--sp-4)">
+    <div class="card-head" style="padding:var(--sp-4);margin:0">
+      <h3 style="font-size:1rem">Redemptions in this year</h3>
+      <span class="badge">Schedule VDA detail</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>Date</th><th>Reference</th><th class="num">Units</th>
+          <th class="num">Consideration</th><th class="num">Cost of acquisition</th>
+          <th class="num">Gain / loss</th><th class="num">Tax 30%</th>
+          <th class="num">Cess 4%</th><th class="num">TDS 1%</th>
+        </tr></thead>
+        <tbody data-detail>
+          <tr><td colspan="9" class="empty">Loading…</td></tr>
+        </tbody>
+        <tfoot data-detail-foot></tfoot>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<div data-footer></div>
+<script type="module" src="js/pages/tax.js"></script>
+</body>
+</html>

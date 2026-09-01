@@ -1,0 +1,848 @@
+/* ============================================================================
+   ARV Coin — design system
+   ----------------------------------------------------------------------------
+   A trading interface first, a marketing site second. That ordering drives
+   every choice here: tabular figures so digits do not jitter as prices tick,
+   a fixed colour vocabulary for up/down that never doubles as a brand accent,
+   and a dark base so the 3D helix and the chart can share a canvas without
+   fighting each other.
+   ============================================================================ */
+
+:root {
+  /* Base — deep, slightly blue-shifted so the amber Bitcoin accent reads warm */
+  --bg-0: #05070d;
+  --bg-1: #0a0e18;
+  --bg-2: #0f1523;
+  --bg-3: #161d2e;
+  --bg-4: #1d2639;
+
+  /* Glass surfaces */
+  --glass: rgba(18, 25, 40, 0.62);
+  --glass-strong: rgba(22, 30, 48, 0.86);
+  --glass-brd: rgba(255, 255, 255, 0.07);
+  --glass-brd-lit: rgba(255, 255, 255, 0.14);
+
+  /* Text */
+  --tx-0: #f3f6fc;
+  --tx-1: #b9c3d6;
+  --tx-2: #7d8aa3;
+  --tx-3: #52607a;
+
+  /* Bitcoin / ARV identity */
+  --btc: #f7931a;
+  --btc-lit: #ffb04d;
+  --btc-dim: rgba(247, 147, 26, 0.14);
+  --arv: #6ee7ff;
+  --arv-lit: #a5f0ff;
+  --arv-dim: rgba(110, 231, 255, 0.13);
+
+  /* Watchlist */
+  --eth: #8a92b2;
+  --sol: #14f195;
+
+  /* Market direction — reserved. Never used decoratively. */
+  --up: #16c784;
+  --up-dim: rgba(22, 199, 132, 0.13);
+  --down: #ea3943;
+  --down-dim: rgba(234, 57, 67, 0.13);
+  --flat: var(--tx-2);
+
+  /* Semantic */
+  --warn: #f5a524;
+  --warn-dim: rgba(245, 165, 36, 0.12);
+  --info: #4d9fff;
+  --info-dim: rgba(77, 159, 255, 0.12);
+
+  /* Type */
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', ui-monospace, 'Cascadia Mono', Menlo, monospace;
+
+  /* Rhythm */
+  --r-sm: 8px;
+  --r: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 72px;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 24px -6px rgba(0, 0, 0, 0.6);
+  --shadow-3: 0 24px 64px -16px rgba(0, 0, 0, 0.75);
+  --glow-btc: 0 0 32px -6px rgba(247, 147, 26, 0.4);
+  --glow-arv: 0 0 32px -6px rgba(110, 231, 255, 0.35);
+
+  --nav-h: 64px;
+  --wrap: 1320px;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ------------------------------------------------------------------ reset -- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg-0);
+  color: var(--tx-0);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* Every price, quantity and money figure. Tabular numerals stop the layout
+   shifting sideways each time a digit changes width, which on a live ticker is
+   the difference between "professional" and "broken". */
+.num, .price, td.num, .mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+  letter-spacing: -0.01em;
+}
+
+h1, h2, h3, h4 {
+  margin: 0 0 var(--sp-3);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  font-weight: 640;
+}
+h1 { font-size: clamp(2rem, 5vw, 3.4rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.1rem); }
+h3 { font-size: 1.2rem; }
+h4 { font-size: 1rem; }
+
+p { margin: 0 0 var(--sp-4); color: var(--tx-1); }
+
+a { color: var(--arv); text-decoration: none; transition: color 0.15s var(--ease); }
+a:hover { color: var(--arv-lit); }
+
+::selection { background: rgba(110, 231, 255, 0.28); }
+
+:focus-visible {
+  outline: 2px solid var(--arv);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------- helpers -- */
+
+.up    { color: var(--up); }
+.down  { color: var(--down); }
+.flat  { color: var(--flat); }
+.muted { color: var(--tx-2); }
+.dim   { color: var(--tx-3); }
+.small { font-size: 0.82rem; }
+.tiny  { font-size: 0.74rem; }
+.right { text-align: right; }
+.center{ text-align: center; }
+.nowrap{ white-space: nowrap; }
+.hidden{ display: none !important; }
+.strong{ font-weight: 620; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.wrap {
+  width: 100%;
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 0 var(--sp-5);
+}
+.wrap-narrow { max-width: 760px; }
+.wrap-wide { max-width: 1600px; }
+
+.stack > * + * { margin-top: var(--sp-4); }
+.row { display: flex; align-items: center; gap: var(--sp-3); }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.row-wrap { flex-wrap: wrap; }
+.spacer { flex: 1; }
+
+/* ------------------------------------------------------------------- 3D ---- */
+
+/* The helix canvas sits behind everything, never intercepts input. */
+/* Held at partial opacity on purpose. At full strength the strands compete with
+   body copy that sits over them; this is meant to be read past, not read. */
+#helix-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* Everything else rides above it. */
+.page { position: relative; z-index: 1; }
+
+/* Fallback when WebGL is unavailable — a static gradient field rather than a
+   blank void. */
+.helix-fallback {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 10%, rgba(247, 147, 26, 0.10), transparent 70%),
+    radial-gradient(ellipse 50% 60% at 85% 30%, rgba(110, 231, 255, 0.09), transparent 70%),
+    radial-gradient(ellipse 70% 40% at 50% 95%, rgba(77, 159, 255, 0.07), transparent 70%);
+}
+
+/* ------------------------------------------------------------------- nav --- */
+
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  height: var(--nav-h);
+  display: flex; align-items: center;
+  background: rgba(5, 7, 13, 0.78);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border-bottom: 1px solid var(--glass-brd);
+}
+
+.nav .wrap { display: flex; align-items: center; gap: var(--sp-5); }
+
+.brand {
+  display: flex; align-items: center; gap: var(--sp-3);
+  font-weight: 700; font-size: 1.05rem;
+  color: var(--tx-0); letter-spacing: -0.03em;
+  flex-shrink: 0;
+}
+.brand:hover { color: var(--tx-0); }
+
+.brand-mark {
+  width: 30px; height: 30px; flex-shrink: 0;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--btc), #ff6b35 55%, var(--arv));
+  display: grid; place-items: center;
+  font-size: 0.8rem; font-weight: 800; color: #05070d;
+  box-shadow: var(--glow-btc);
+}
+
+.nav-links { display: flex; gap: var(--sp-1); flex: 1; }
+
+.nav-links a {
+  padding: 7px 13px;
+  border-radius: var(--r-sm);
+  color: var(--tx-1);
+  font-size: 0.9rem; font-weight: 500;
+  transition: all 0.15s var(--ease);
+  white-space: nowrap;
+}
+.nav-links a:hover { background: var(--bg-3); color: var(--tx-0); }
+.nav-links a.on { background: var(--arv-dim); color: var(--arv-lit); }
+
+.nav-toggle {
+  display: none;
+  background: none; border: 1px solid var(--glass-brd);
+  color: var(--tx-1); border-radius: var(--r-sm);
+  width: 38px; height: 38px; cursor: pointer;
+  font-size: 1.1rem;
+}
+
+/* Compact live price in the nav bar. */
+.nav-ticker {
+  display: flex; align-items: baseline; gap: var(--sp-2);
+  padding: 5px 11px;
+  background: var(--bg-2);
+  border: 1px solid var(--glass-brd);
+  border-radius: var(--r-sm);
+  font-size: 0.86rem;
+}
+.nav-ticker .k { color: var(--tx-3); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; }
+
+/* --------------------------------------------------------------- surfaces -- */
+
+.card {
+  background: var(--glass);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  border: 1px solid var(--glass-brd);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5);
+  box-shadow: var(--shadow-2);
+}
+
+.card-solid { background: var(--bg-1); backdrop-filter: none; }
+.card-tight { padding: var(--sp-4); }
+.card-flush { padding: 0; overflow: hidden; }
+
+/* Floating tilt on hover. Subtle — 4px, not 40. A dashboard the user reads
+   numbers off should not wobble. */
+.card-float {
+  transition: transform 0.4s var(--ease-out), border-color 0.3s var(--ease),
+              box-shadow 0.4s var(--ease-out);
+  will-change: transform;
+}
+.card-float:hover {
+  transform: translateY(-4px);
+  border-color: var(--glass-brd-lit);
+  box-shadow: var(--shadow-3);
+}
+
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-4);
+  margin-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--glass-brd);
+}
+.card-head h3, .card-head h4 { margin: 0; }
+
+.grid { display: grid; gap: var(--sp-4); }
+.g-2 { grid-template-columns: repeat(2, 1fr); }
+.g-3 { grid-template-columns: repeat(3, 1fr); }
+.g-4 { grid-template-columns: repeat(4, 1fr); }
+.g-auto { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+/* -------------------------------------------------------------- stat tile -- */
+
+.stat { display: flex; flex-direction: column; gap: 5px; }
+.stat-k {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--tx-3); font-weight: 600;
+}
+.stat-v {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 1.55rem; font-weight: 620; letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+.stat-v-lg { font-size: 2.3rem; }
+.stat-sub { font-size: 0.82rem; color: var(--tx-2); }
+
+/* ------------------------------------------------------------------ price -- */
+
+.price-hero {
+  display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap;
+}
+.price-hero .v {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: clamp(2.4rem, 7vw, 4.2rem);
+  font-weight: 680; letter-spacing: -0.04em; line-height: 1;
+}
+
+/* A price that just moved flashes its direction briefly. This is the single
+   most useful affordance on a live ticker — it tells you the number is alive. */
+@keyframes flash-up   { 0% { background: var(--up-dim); }   100% { background: transparent; } }
+@keyframes flash-down { 0% { background: var(--down-dim); } 100% { background: transparent; } }
+.tick-up   { animation: flash-up 0.55s var(--ease) 1; border-radius: 5px; }
+.tick-down { animation: flash-down 0.55s var(--ease) 1; border-radius: 5px; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 100px;
+  font-size: 0.8rem; font-weight: 620;
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  background: var(--bg-3);
+}
+.chip.up   { background: var(--up-dim);   color: var(--up); }
+.chip.down { background: var(--down-dim); color: var(--down); }
+.chip.flat { background: var(--bg-3);     color: var(--flat); }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: 6px;
+  font-size: 0.7rem; font-weight: 650;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  background: var(--bg-3); color: var(--tx-2);
+  border: 1px solid var(--glass-brd);
+}
+.badge.ok   { background: var(--up-dim);   color: var(--up);   border-color: transparent; }
+.badge.bad  { background: var(--down-dim); color: var(--down); border-color: transparent; }
+.badge.warn { background: var(--warn-dim); color: var(--warn); border-color: transparent; }
+.badge.info { background: var(--info-dim); color: var(--info); border-color: transparent; }
+.badge.btc  { background: var(--btc-dim);  color: var(--btc-lit); border-color: transparent; }
+
+/* Live indicator — pulses only while the socket is actually connected. */
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--up); flex-shrink: 0;
+  box-shadow: 0 0 0 0 rgba(22, 199, 132, 0.6);
+  animation: pulse 2.2s infinite;
+}
+.live-dot.stale { background: var(--warn); animation: none; }
+.live-dot.off   { background: var(--tx-3); animation: none; }
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(22, 199, 132, 0.55); }
+  70%  { box-shadow: 0 0 0 7px rgba(22, 199, 132, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(22, 199, 132, 0); }
+}
+
+/* --------------------------------------------------------------- buttons --- */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  padding: 11px 20px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: var(--bg-3);
+  color: var(--tx-0);
+  font-family: var(--font); font-size: 0.92rem; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+  white-space: nowrap;
+  text-decoration: none;
+}
+.btn:hover { background: var(--bg-4); color: var(--tx-0); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn:disabled, .btn[aria-disabled='true'] {
+  opacity: 0.42; cursor: not-allowed; transform: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--btc), #ff7a2f);
+  color: #0a0704; font-weight: 700;
+  box-shadow: 0 4px 18px -4px rgba(247, 147, 26, 0.45);
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--btc-lit), #ff8c45);
+  color: #0a0704;
+  box-shadow: 0 8px 26px -6px rgba(247, 147, 26, 0.6);
+}
+
+.btn-accent {
+  background: linear-gradient(135deg, var(--arv), #3bb8d4);
+  color: #04141a; font-weight: 700;
+  box-shadow: 0 4px 18px -4px rgba(110, 231, 255, 0.4);
+}
+.btn-accent:hover { color: #04141a; }
+
+.btn-ghost { background: transparent; border-color: var(--glass-brd-lit); color: var(--tx-1); }
+.btn-ghost:hover { background: var(--bg-2); border-color: var(--arv); color: var(--tx-0); }
+
+.btn-danger { background: var(--down-dim); color: var(--down); border-color: rgba(234, 57, 67, 0.3); }
+.btn-danger:hover { background: rgba(234, 57, 67, 0.22); color: var(--down); }
+
+.btn-sm { padding: 7px 13px; font-size: 0.84rem; }
+.btn-lg { padding: 15px 30px; font-size: 1rem; }
+.btn-block { width: 100%; }
+
+/* ---------------------------------------------------------------- inputs --- */
+
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field label {
+  font-size: 0.8rem; font-weight: 600; color: var(--tx-1);
+}
+.field .hint { font-size: 0.76rem; color: var(--tx-3); }
+.field .err  { font-size: 0.78rem; color: var(--down); }
+
+input, select, textarea {
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--bg-1);
+  border: 1px solid var(--glass-brd);
+  border-radius: var(--r-sm);
+  color: var(--tx-0);
+  font-family: var(--font); font-size: 0.95rem;
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--arv);
+  box-shadow: 0 0 0 3px rgba(110, 231, 255, 0.12);
+}
+input::placeholder { color: var(--tx-3); }
+input[aria-invalid='true'] { border-color: var(--down); }
+
+input.num-input {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 1.3rem; font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Amount entry with an inline ₹ */
+.amount-input { position: relative; }
+.amount-input .cur {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--tx-2); font-family: var(--mono); font-size: 1.2rem;
+  pointer-events: none;
+}
+.amount-input input { padding-left: 36px; }
+
+.quick-amounts { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+
+/* Checkbox / radio rows */
+.check {
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  cursor: pointer; font-size: 0.88rem; color: var(--tx-1);
+  padding: var(--sp-3);
+  background: var(--bg-1);
+  border: 1px solid var(--glass-brd);
+  border-radius: var(--r-sm);
+  transition: border-color 0.15s var(--ease);
+}
+.check:hover { border-color: var(--glass-brd-lit); }
+.check input { width: auto; flex-shrink: 0; margin-top: 3px; accent-color: var(--arv); }
+
+/* ------------------------------------------------------------------ table -- */
+
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+table.data {
+  width: 100%; border-collapse: collapse; font-size: 0.88rem;
+}
+table.data th {
+  text-align: left; padding: 11px var(--sp-4);
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--tx-3); font-weight: 650;
+  border-bottom: 1px solid var(--glass-brd);
+  background: var(--bg-1);
+  position: sticky; top: 0; z-index: 1;
+  white-space: nowrap;
+}
+table.data td {
+  padding: 12px var(--sp-4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.035);
+  color: var(--tx-1);
+}
+table.data tbody tr { transition: background 0.12s var(--ease); }
+table.data tbody tr:hover { background: rgba(255, 255, 255, 0.022); }
+table.data td.num, table.data th.num { text-align: right; }
+table.data tfoot td {
+  font-weight: 650; color: var(--tx-0);
+  border-top: 1px solid var(--glass-brd-lit); border-bottom: none;
+  background: var(--bg-1);
+}
+
+/* ------------------------------------------------------------- breakdowns -- */
+
+/* The itemised fee/tax list on the confirm screens. Its job is to make every
+   deduction impossible to miss, so nothing is greyed out or collapsed. */
+.ledger-list { display: flex; flex-direction: column; gap: 1px; }
+
+.ledger-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--sp-4); padding: 10px var(--sp-4);
+  background: var(--bg-1);
+  font-size: 0.9rem;
+}
+.ledger-row:first-child { border-radius: var(--r-sm) var(--r-sm) 0 0; }
+.ledger-row:last-child  { border-radius: 0 0 var(--r-sm) var(--r-sm); }
+.ledger-row .l { color: var(--tx-1); }
+.ledger-row .a {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-weight: 600; white-space: nowrap;
+}
+.ledger-row .note {
+  flex-basis: 100%; font-size: 0.76rem; color: var(--tx-3);
+  margin-top: 3px; line-height: 1.4;
+}
+.ledger-row.k-gross { background: var(--bg-2); }
+.ledger-row.k-gross .a { font-size: 1.05rem; }
+.ledger-row.k-charge .a { color: var(--warn); }
+.ledger-row.k-tds    .a { color: var(--warn); }
+.ledger-row.k-net {
+  background: var(--up-dim); border-left: 3px solid var(--up);
+}
+.ledger-row.k-net .l { color: var(--tx-0); font-weight: 650; }
+.ledger-row.k-net .a { color: var(--up); font-size: 1.15rem; font-weight: 700; }
+.ledger-row.k-pnl .a { font-weight: 700; }
+.ledger-row.k-liability { background: rgba(245, 165, 36, 0.055); }
+.ledger-row.k-liability .a { color: var(--warn); }
+.ledger-row.k-liability-total {
+  background: var(--warn-dim); border-left: 3px solid var(--warn);
+}
+.ledger-row.k-liability-total .l { color: var(--tx-0); font-weight: 650; }
+.ledger-row.k-liability-total .a { color: var(--warn); font-size: 1.05rem; font-weight: 700; }
+.ledger-row.k-warning { background: var(--down-dim); border-left: 3px solid var(--down); }
+.ledger-row.k-warning .note { color: var(--tx-1); }
+.ledger-divider { height: var(--sp-4); }
+
+/* ------------------------------------------------------------------ notes -- */
+
+.note-box {
+  padding: var(--sp-4);
+  border-radius: var(--r-sm);
+  border-left: 3px solid var(--info);
+  background: var(--info-dim);
+  font-size: 0.87rem; color: var(--tx-1);
+}
+.note-box.warn { border-color: var(--warn); background: var(--warn-dim); }
+.note-box.bad  { border-color: var(--down); background: var(--down-dim); }
+.note-box.ok   { border-color: var(--up);   background: var(--up-dim); }
+.note-box strong { color: var(--tx-0); }
+.note-box p:last-child { margin-bottom: 0; }
+
+/* ---------------------------------------------------------------- toasts --- */
+
+.toast-host {
+  position: fixed; bottom: var(--sp-5); right: var(--sp-5);
+  z-index: 900; display: flex; flex-direction: column; gap: var(--sp-2);
+  max-width: min(400px, calc(100vw - 32px));
+}
+.toast {
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  padding: var(--sp-4);
+  background: var(--glass-strong);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-brd-lit);
+  border-left: 3px solid var(--info);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-3);
+  font-size: 0.88rem;
+  animation: toast-in 0.3s var(--ease-out);
+}
+.toast.ok   { border-left-color: var(--up); }
+.toast.bad  { border-left-color: var(--down); }
+.toast.warn { border-left-color: var(--warn); }
+.toast.out  { animation: toast-out 0.25s var(--ease) forwards; }
+@keyframes toast-in  { from { opacity: 0; transform: translateX(24px); } }
+@keyframes toast-out { to   { opacity: 0; transform: translateX(24px); } }
+
+/* --------------------------------------------------------------- loading --- */
+
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-2) 25%, var(--bg-3) 50%, var(--bg-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--r-sm);
+  color: transparent !important;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.spinner {
+  width: 16px; height: 16px; flex-shrink: 0;
+  border: 2px solid var(--glass-brd-lit);
+  border-top-color: var(--arv);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.empty {
+  padding: var(--sp-7) var(--sp-4);
+  text-align: center; color: var(--tx-3);
+}
+.empty .icon { font-size: 2rem; opacity: 0.4; margin-bottom: var(--sp-3); }
+
+/* ------------------------------------------------------------------- tabs -- */
+
+.tabs {
+  display: inline-flex; gap: 2px; padding: 3px;
+  background: var(--bg-1);
+  border: 1px solid var(--glass-brd);
+  border-radius: var(--r-sm);
+}
+.tab {
+  padding: 6px 13px; border: none; background: none;
+  color: var(--tx-2); font-family: var(--mono);
+  font-size: 0.82rem; font-weight: 600;
+  border-radius: 6px; cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+.tab:hover { color: var(--tx-0); }
+.tab.on { background: var(--bg-3); color: var(--arv-lit); }
+
+/* ------------------------------------------------------------------ chart -- */
+
+.chart-shell {
+  position: relative;
+  background: var(--bg-1);
+  border: 1px solid var(--glass-brd);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.chart-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-4); flex-wrap: wrap;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--glass-brd);
+}
+.chart-canvas { width: 100%; height: 440px; position: relative; }
+.chart-canvas.tall { height: 560px; }
+.chart-canvas.short { height: 260px; }
+
+.chart-legend {
+  display: flex; gap: var(--sp-4); flex-wrap: wrap;
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--glass-brd);
+  font-size: 0.8rem;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; color: var(--tx-2); }
+.legend-swatch { width: 10px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+
+/* OHLC readout that follows the crosshair */
+.ohlc-readout {
+  display: flex; gap: var(--sp-4); flex-wrap: wrap;
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 0.8rem; color: var(--tx-2);
+}
+.ohlc-readout b { color: var(--tx-0); font-weight: 600; }
+
+.chart-overlay-msg {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  background: rgba(10, 14, 24, 0.7);
+  backdrop-filter: blur(3px);
+  font-size: 0.9rem; color: var(--tx-2);
+  text-align: center; padding: var(--sp-5);
+  z-index: 3;
+}
+
+/* -------------------------------------------------------------------- QR --- */
+
+.qr-panel {
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-5);
+  background: var(--bg-1);
+  border: 1px solid var(--glass-brd);
+  border-radius: var(--r-lg);
+}
+.qr-frame {
+  padding: var(--sp-4);
+  background: #fff;
+  border-radius: var(--r);
+  line-height: 0;
+  box-shadow: var(--shadow-2);
+}
+.qr-frame svg, .qr-frame canvas, .qr-frame img { display: block; width: 220px; height: 220px; }
+.qr-unconfigured {
+  width: 220px; height: 220px;
+  display: grid; place-items: center; text-align: center;
+  padding: var(--sp-4);
+  background: var(--bg-2);
+  border: 2px dashed var(--glass-brd-lit);
+  border-radius: var(--r);
+  color: var(--tx-3); font-size: 0.8rem; line-height: 1.5;
+}
+.qr-vpa {
+  font-family: var(--mono); font-size: 0.95rem;
+  padding: 9px 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--glass-brd);
+  border-radius: var(--r-sm);
+  color: var(--tx-0);
+  display: flex; align-items: center; gap: var(--sp-3);
+}
+
+/* ------------------------------------------------------------------ steps -- */
+
+.steps { display: flex; gap: 0; margin-bottom: var(--sp-5); }
+.step {
+  flex: 1; display: flex; flex-direction: column; gap: 6px;
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 2px solid var(--bg-3);
+  color: var(--tx-3); font-size: 0.82rem;
+}
+.step.on   { border-top-color: var(--arv); color: var(--arv-lit); }
+.step.done { border-top-color: var(--up); color: var(--up); }
+.step .n { font-family: var(--mono); font-size: 0.72rem; font-weight: 700; }
+.step .t { font-weight: 600; }
+
+/* ----------------------------------------------------------------- footer -- */
+
+.foot {
+  margin-top: var(--sp-8);
+  padding: var(--sp-6) 0 var(--sp-5);
+  border-top: 1px solid var(--glass-brd);
+  background: rgba(5, 7, 13, 0.6);
+  font-size: 0.85rem; color: var(--tx-2);
+}
+.foot-grid {
+  display: grid; gap: var(--sp-5);
+  grid-template-columns: 1.6fr repeat(3, 1fr);
+  margin-bottom: var(--sp-5);
+}
+.foot h5 {
+  margin: 0 0 var(--sp-3); font-size: 0.74rem;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--tx-3);
+}
+.foot ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.foot a { color: var(--tx-2); }
+.foot a:hover { color: var(--arv); }
+.foot-bottom {
+  padding-top: var(--sp-4); border-top: 1px solid var(--glass-brd);
+  display: flex; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap;
+  font-size: 0.8rem; color: var(--tx-3);
+}
+
+/* Risk line. Standard practice on any product where a balance can fall — it
+   belongs on every page, not buried on a legal tab. */
+.risk-line {
+  font-size: 0.78rem; color: var(--tx-3);
+  line-height: 1.5; max-width: 70ch;
+}
+
+/* --------------------------------------------------------------- feed bar -- */
+
+.feed-status {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.76rem; color: var(--tx-3);
+  font-family: var(--mono);
+}
+
+/* ------------------------------------------------------------- responsive -- */
+
+@media (max-width: 1080px) {
+  .g-4 { grid-template-columns: repeat(2, 1fr); }
+  .foot-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 860px) {
+  .nav-links {
+    position: fixed; inset: var(--nav-h) 0 auto 0;
+    flex-direction: column; gap: 2px;
+    padding: var(--sp-4);
+    background: rgba(5, 7, 13, 0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--glass-brd);
+    display: none;
+  }
+  .nav-links.open { display: flex; }
+  .nav-links a { padding: 12px 14px; }
+  .nav-toggle { display: grid; place-items: center; }
+  .nav .wrap { gap: var(--sp-3); }
+  .nav-ticker { display: none; }
+}
+
+@media (max-width: 640px) {
+  :root { --sp-5: 16px; --sp-6: 24px; --sp-7: 32px; --sp-8: 48px; }
+  body { font-size: 14.5px; }
+  .wrap { padding: 0 var(--sp-4); }
+  .g-2, .g-3, .g-4, .g-auto { grid-template-columns: 1fr; }
+  .card { padding: var(--sp-4); border-radius: var(--r); }
+  .stat-v { font-size: 1.35rem; }
+  .stat-v-lg { font-size: 1.9rem; }
+  .chart-canvas { height: 320px; }
+  .chart-canvas.tall { height: 380px; }
+  .foot-grid { grid-template-columns: 1fr; }
+  .toast-host { left: var(--sp-4); right: var(--sp-4); bottom: var(--sp-4); max-width: none; }
+  .steps { flex-direction: column; gap: 2px; }
+  .step { border-top: none; border-left: 2px solid var(--bg-3); }
+  .step.on { border-left-color: var(--arv); }
+  .step.done { border-left-color: var(--up); }
+  #helix-canvas { opacity: 0.5; }
+}
+
+/* --------------------------------------------------------- accessibility -- */
+
+/* Honour the OS setting. A rotating 3D helix behind a financial dashboard is
+   exactly the kind of motion that triggers vestibular symptoms, and someone who
+   has asked their system to stop animations has asked this app too. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  #helix-canvas { display: none; }
+  .card-float:hover { transform: none; }
+}
+
+@media print {
+  .nav, .foot, #helix-canvas, .toast-host, .btn { display: none !important; }
+  body { background: #fff; color: #000; }
+  .card { border: 1px solid #ccc; background: #fff; box-shadow: none; }
+  * { color: #000 !important; }
+}

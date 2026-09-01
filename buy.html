@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buy ARV — ARV Coin</title>
+<meta name="theme-color" content="#05070d">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
+</head>
+<body>
+
+<canvas id="helix-canvas" aria-hidden="true"></canvas>
+<div data-nav></div>
+
+<main class="page wrap wrap-narrow" style="padding-top:var(--sp-5);padding-bottom:var(--sp-7);max-width:960px">
+
+  <h1 style="font-size:1.7rem">Buy ARV</h1>
+
+  <div class="steps">
+    <div class="step on" data-step="1"><span class="n">01</span><span class="t">Amount</span></div>
+    <div class="step" data-step="2"><span class="n">02</span><span class="t">Pay by UPI</span></div>
+    <div class="step" data-step="3"><span class="n">03</span><span class="t">Units issued</span></div>
+  </div>
+
+  <!-- ============================================================= STEP 1 -->
+  <section data-panel="1">
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:var(--sp-4);align-items:start">
+
+      <div class="card">
+        <div class="card-head">
+          <h3 style="font-size:1rem">How much?</h3>
+          <span class="badge" data-price-badge>—</span>
+        </div>
+
+        <div class="field" style="margin-bottom:var(--sp-4)">
+          <label for="amt">Amount in rupees</label>
+          <div class="amount-input">
+            <span class="cur">₹</span>
+            <input id="amt" class="num-input" type="text" inputmode="decimal"
+                   value="10000" autocomplete="off" aria-describedby="amt-hint">
+          </div>
+          <span class="hint" id="amt-hint">Minimum <span data-min>₹100</span></span>
+          <span class="err hidden" data-amt-err></span>
+        </div>
+
+        <div class="quick-amounts" style="margin-bottom:var(--sp-5)">
+          <button class="btn btn-sm" data-quick="50000">₹500</button>
+          <button class="btn btn-sm" data-quick="100000">₹1,000</button>
+          <button class="btn btn-sm" data-quick="500000">₹5,000</button>
+          <button class="btn btn-sm" data-quick="1000000">₹10,000</button>
+          <button class="btn btn-sm" data-quick="10000000">₹1,00,000</button>
+        </div>
+
+        <label class="check" style="margin-bottom:var(--sp-4)">
+          <input type="checkbox" data-ack>
+          <span>
+            I understand ARV tracks Bitcoin, that its value can fall as well as
+            rise, and that I may get back less than I put in. I have read the
+            <a href="legal.html#risk" target="_blank" rel="noopener">risk disclosure</a>.
+          </span>
+        </label>
+
+        <button class="btn btn-primary btn-block btn-lg" data-continue disabled>
+          Continue
+        </button>
+      </div>
+
+      <div class="card card-flush">
+        <div class="card-head" style="padding:var(--sp-4);margin:0">
+          <h3 style="font-size:1rem">What you get</h3>
+          <span class="badge info">live</span>
+        </div>
+        <div class="ledger-list" data-quote>
+          <div class="ledger-row"><span class="l">Enter an amount above</span></div>
+        </div>
+        <div class="tiny muted" style="padding:var(--sp-4)">
+          Units are issued at the price when your payment is confirmed, not the
+          price shown now. Between those two moments the market moves, so the
+          final unit count can differ slightly from this quote.
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================= STEP 2 -->
+  <section data-panel="2" class="hidden">
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:var(--sp-4);align-items:start">
+
+      <div class="qr-panel">
+        <div>
+          <div class="stat-k" style="text-align:center;margin-bottom:var(--sp-2)">Pay this amount</div>
+          <div class="num" style="font-size:2rem;font-weight:700;text-align:center" data-pay-amount>—</div>
+        </div>
+
+        <div class="qr-frame" data-qr></div>
+
+        <div class="qr-vpa" data-vpa-row hidden>
+          <span data-vpa>—</span>
+          <button class="btn btn-sm btn-ghost" data-copy-vpa>Copy</button>
+        </div>
+
+        <a class="btn btn-primary btn-block hidden" data-intent-link>Open UPI app</a>
+
+        <div class="small muted center">
+          Reference <strong class="mono" data-ref>—</strong><br>
+          Include this in the payment note so the credit can be matched.
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card card-tight">
+          <h4 style="font-size:0.95rem">After you pay</h4>
+          <p class="small">
+            A UPI QR carries a request one way and returns nothing — scanning it
+            tells your bank app what to do and tells this app nothing at all.
+            So your deposit stays <strong>awaiting payment</strong> until the
+            credit is matched against the bank account, and units are issued at
+            that moment's price.
+          </p>
+          <p class="small" style="margin-bottom:0">
+            Expected within <strong data-settle>24 hours</strong>. You will see it
+            in <a href="transactions.html">your history</a> as soon as it lands.
+          </p>
+        </div>
+
+        <div class="card card-tight" data-admin-confirm hidden>
+          <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
+            <h4 style="font-size:0.95rem">Operator confirmation</h4>
+            <span class="badge warn">privileged</span>
+          </div>
+          <p class="small">
+            Confirm the bank credit to issue units at the current price. In the
+            hosted setup this is restricted server-side to an operator account,
+            and never triggered by the payer's browser.
+          </p>
+          <div class="field" style="margin-bottom:var(--sp-3)">
+            <label for="upiref">UPI transaction reference</label>
+            <input id="upiref" type="text" placeholder="e.g. 4291XXXXXXXX" autocomplete="off">
+          </div>
+          <button class="btn btn-accent btn-block" data-confirm>Confirm payment received</button>
+        </div>
+
+        <button class="btn btn-ghost btn-block" data-back>← Change amount</button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================= STEP 3 -->
+  <section data-panel="3" class="hidden">
+    <div class="card" style="text-align:center;padding:var(--sp-7) var(--sp-5)">
+      <div style="font-size:2.5rem;margin-bottom:var(--sp-3)">◆</div>
+      <h2 style="margin-bottom:var(--sp-2)">Units issued</h2>
+      <div class="num" style="font-size:2.6rem;font-weight:700;color:var(--arv)" data-done-units>—</div>
+      <p class="muted" style="margin:var(--sp-3) 0 var(--sp-5)">
+        at <strong data-done-nav>—</strong> per unit ·
+        reference <span class="mono" data-done-ref>—</span>
+      </p>
+      <div class="row" style="justify-content:center;flex-wrap:wrap">
+        <a href="dashboard.html" class="btn btn-primary">View portfolio</a>
+        <a href="charts.html" class="btn btn-ghost">Open charts</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div data-footer></div>
+<script type="module" src="js/pages/buy.js"></script>
+</body>
+</html>

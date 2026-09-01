@@ -1,44 +1,45 @@
 {
-  "name": "arvcoin — Market Research Desk",
-  "short_name": "arvcoin",
-  "description": "Market research aur investor education — stocks, F&O options, commodity, currency aur crypto. Levels calculator free.",
+  "name": "ARV Coin",
+  "short_name": "ARV",
+  "description": "An index unit priced at ₹1 at launch, tracking Bitcoin one for one. Live charts, transparent fees, and Indian VDA tax computed on every redemption.",
   "start_url": "index.html",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#05060f",
-  "theme_color": "#05060f",
-  "categories": ["finance", "education"],
+  "orientation": "portrait-primary",
+  "background_color": "#05070d",
+  "theme_color": "#05070d",
+  "categories": ["finance"],
+  "lang": "en-IN",
+  "dir": "ltr",
   "icons": [
     {
       "src": "favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "shortcuts": [
-    {
-      "name": "Levels calculator",
-      "short_name": "Levels",
-      "description": "Support, resistance aur pivot points nikaalo",
-      "url": "levels.html"
-    },
-    {
-      "name": "Research feed",
-      "short_name": "Research",
-      "description": "Levels analysis aur market recap",
-      "url": "calls.html"
-    },
-    {
-      "name": "Dashboard",
-      "short_name": "Dashboard",
-      "url": "dashboard.html"
-    },
-    {
-      "name": "Log in",
-      "short_name": "Log in",
-      "url": "login.html"
-    }
+    { "name": "Charts", "url": "charts.html" },
+    { "name": "Portfolio", "url": "dashboard.html" },
+    { "name": "Buy ARV", "url": "buy.html" }
   ]
 }
