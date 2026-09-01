@@ -1,0 +1,5 @@
+Stops GitHub Pages running Jekyll over this repo.
+
+Jekyll silently drops files and directories beginning with an underscore, which
+would remove supabase/functions/_shared/. Nothing here needs templating — it is
+a static site with no build step — so Jekyll only has downsides.
