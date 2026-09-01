@@ -382,15 +382,33 @@
     // removed 1.3 MB from the critical path, which a phone feels immediately.
     theme: 'sterling',
 
+    // Hero.
+    //
+    // Rendered entirely in CSS — no video, no images, no 3D. That is a
+    // deliberate choice rather than a limitation: a background video costs a
+    // megabyte or two before anything is readable, and on a phone it is the
+    // single easiest way to make a site feel slow. Everything here is a gradient,
+    // so the hero paints on the first frame and weighs nothing.
+    //
+    // The material is built in four layers, in order:
+    //
+    //   plate      a deep charcoal base with a soft overhead light
+    //   engine     fine concentric engine-turning, as on a milled metal plate
+    //   sweep      a specular highlight that drifts across, like light on steel
+    //   grain      a faint noise overlay so large flat areas are not plastic
+    //
+    // Only `sweep` animates, on transform and opacity alone, so it stays on the
+    // compositor and never touches layout.
     hero: {
-      // Drop a file in and set this. Until then an animated brushed-silver
-      // gradient stands in, and the swap is this one line.
-      videoSrc: '',
-      posterSrc: '',
-      // Mobile gets the poster, never the video. Autoplaying megabytes of video
-      // on a metered connection is a cost the visitor did not agree to.
-      videoOnMobile: false,
-      overlayOpacity: 0.62
+      style: 'sterling',
+      engineTurning: true,
+      specularSweep: true,
+      grain: true,
+      sweepSeconds: 18,
+      // Mobile keeps the plate and the grain but drops the moving highlight.
+      // A large blurred element animating behind the fold is the most expensive
+      // thing on the page and the least noticed.
+      sweepOnMobile: false
     },
 
     motion: {

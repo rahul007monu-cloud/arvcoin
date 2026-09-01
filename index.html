@@ -4,220 +4,287 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ARV Coin — one rupee, one unit, Bitcoin's every move</title>
-<meta name="description" content="ARV is an index unit priced at ₹1 at launch that tracks Bitcoin one for one. Live minute charts, transparent fees, and Indian VDA tax computed on every redemption.">
-<meta name="theme-color" content="#05070d">
+<meta name="description" content="ARV is an index unit priced at ₹1 at launch that tracks Bitcoin one for one. Live candles, an order book that settles at the index price, and Indian VDA tax computed on every sale.">
+<meta name="theme-color" content="#07070a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.json">
-<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/core.css">
 <script src="arv-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js" defer></script>
 </head>
 <body>
 
-<canvas id="helix-canvas" aria-hidden="true"></canvas>
-
 <div data-nav></div>
 
 <main class="page">
 
-  <!-- ================================================================ hero -->
-  <section class="wrap" style="padding-top:var(--sp-8);padding-bottom:var(--sp-7)">
-    <div class="grid" style="grid-template-columns:1.15fr 1fr;align-items:center;gap:var(--sp-7)">
+  <!-- =============================================================== hero -->
+  <section class="hero">
+    <div class="hero-media" data-hero-media></div>
 
-      <div>
-        <div class="row" style="margin-bottom:var(--sp-4)">
-          <span class="badge btc">Tracks Bitcoin 1:1</span>
-          <span class="badge" data-index-quote>Quoted in ₹</span>
+    <div class="wrap hero-inner">
+      <div class="grid" style="grid-template-columns:1.1fr .9fr;gap:var(--sp-7);align-items:center">
+
+        <div>
+          <div class="hero-eyebrow" data-reveal>Index unit · tracks Bitcoin</div>
+
+          <h1 data-reveal="weighty" style="margin-bottom:var(--sp-4)">
+            One rupee.<br>One unit.<br>
+            <span class="metal-lit">Bitcoin's every move.</span>
+          </h1>
+
+          <p data-reveal style="--reveal-delay:120ms;font-size:1.05rem;max-width:50ch">
+            ARV opened at <strong>₹1.0000</strong> on
+            <span data-launch>1 September 2021</span>. Since then its price has been
+            exactly Bitcoin's percentage change, applied to that rupee. Nothing else
+            moves it — not demand, not deposits, not us.
+          </p>
+
+          <div class="row row-wrap" data-reveal style="--reveal-delay:220ms;margin:var(--sp-5) 0">
+            <a href="trade.html" class="btn btn-primary btn-lg">Trade ARV</a>
+            <a href="#how" class="btn btn-ghost btn-lg">How it works</a>
+          </div>
+
+          <div class="candles candles-hero" data-hero-candles aria-hidden="true"></div>
         </div>
 
-        <h1 style="margin-bottom:var(--sp-4)">
-          One rupee.<br>One unit.<br>
-          <span style="background:linear-gradient(135deg,var(--btc),var(--arv));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">Bitcoin's every move.</span>
-        </h1>
-
-        <p style="font-size:1.08rem;max-width:52ch">
-          ARV started at <strong>₹1.0000</strong> on
-          <span data-launch-date>1 January 2025</span>. From that moment its price has
-          been exactly Bitcoin's percentage change, applied to that rupee. Bitcoin
-          doubles, ARV is ₹2. Bitcoin falls 8%, ARV is ₹0.92. Nothing else moves it.
-        </p>
-
-        <div class="row row-wrap" style="margin:var(--sp-5) 0">
-          <a href="buy.html" class="btn btn-primary btn-lg">Buy ARV</a>
-          <a href="charts.html" class="btn btn-ghost btn-lg">Open charts</a>
-        </div>
-
-        <div class="row row-wrap small muted" style="gap:var(--sp-4)">
-          <span>◆ Live minute candles</span>
-          <span>◆ Fees shown before you commit</span>
-          <span>◆ Tax computed on every redemption</span>
-        </div>
-      </div>
-
-      <!-- live price card -->
-      <div class="card card-float">
-        <div class="card-head">
-          <div class="row" style="gap:9px">
+        <!-- live price -->
+        <div class="card card-lift" data-reveal style="--reveal-delay:300ms">
+          <div class="card-head">
+            <div class="row" style="gap:9px">
+              <span class="coin arv"><span>ARV</span></span>
+              <div>
+                <div class="strong">ARV / INR</div>
+                <div class="tiny muted">Index unit</div>
+              </div>
+            </div>
             <span class="live-dot off" data-hero-dot></span>
-            <h3 style="font-size:1rem">ARV Coin</h3>
           </div>
-          <div class="tabs" data-hero-tf>
-            <button class="tab" data-tf="1h">1H</button>
-            <button class="tab on" data-tf="1D">1D</button>
-            <button class="tab" data-tf="1W">1W</button>
+
+          <div class="price-hero" style="margin-bottom:var(--sp-2)">
+            <span class="v" data-hero-price>₹—</span>
+            <span class="chip flat" data-hero-change>—</span>
+          </div>
+          <div class="small muted" style="margin-bottom:var(--sp-4)">
+            24h · since launch <span class="strong" data-hero-launch>—</span>
+          </div>
+
+          <div class="chart-canvas short" data-hero-chart
+               style="margin:0 calc(var(--sp-5) * -1) var(--sp-4)"></div>
+
+          <div class="grid g-2" style="gap:var(--sp-3)">
+            <div class="stat">
+              <span class="stat-k">Bitcoin</span>
+              <span class="num strong" data-btc-inr>—</span>
+              <span class="stat-sub" data-btc-usd>—</span>
+            </div>
+            <div class="stat">
+              <span class="stat-k">5-year high</span>
+              <span class="num strong" data-ath>—</span>
+              <span class="stat-sub">low <span data-atl>—</span></span>
+            </div>
           </div>
         </div>
 
-        <div class="price-hero" style="margin-bottom:var(--sp-2)">
-          <span class="v" data-hero-price>₹—</span>
-          <span class="chip flat" data-hero-change>—</span>
-        </div>
-        <div class="small muted" style="margin-bottom:var(--sp-5)">
-          <span data-hero-window>24h</span> change ·
-          since launch <span class="strong" data-hero-launch>—</span>
-        </div>
-
-        <div class="chart-canvas short" data-hero-chart style="margin:0 calc(var(--sp-5) * -1) var(--sp-4)"></div>
-
-        <div class="grid g-2" style="gap:var(--sp-3)">
-          <div class="stat">
-            <span class="stat-k">Bitcoin</span>
-            <span class="num strong" data-btc-inr>—</span>
-            <span class="stat-sub"><span data-btc-usd>—</span></span>
-          </div>
-          <div class="stat">
-            <span class="stat-k">ARV = BTC ×</span>
-            <span class="num strong" data-ratio>—</span>
-            <span class="stat-sub">identical percentage</span>
-          </div>
-        </div>
       </div>
-
     </div>
   </section>
 
-  <!-- ========================================================== mechanics -->
-  <section class="wrap" style="padding:var(--sp-7) 0">
-    <h2>How the price is built</h2>
-    <p style="max-width:64ch">
-      There is one formula, and it is the whole product. No committee sets the
-      price, no operator adjusts it, and money arriving or leaving does not move it.
-    </p>
-
-    <div class="card card-solid" style="margin:var(--sp-5) 0;overflow-x:auto">
-      <div class="mono" style="font-size:1.02rem;line-height:2.2;white-space:nowrap">
-        <span class="muted">ARV(t)</span> =
-        <span style="color:var(--arv)">₹1</span> ×
-        <span style="color:var(--btc)">BTC(t)</span> ÷
-        <span style="color:var(--btc)">BTC(launch)</span>
-      </div>
-      <div class="small muted" style="margin-top:var(--sp-3)">
-        Bitcoin at launch was <strong data-base-inr>—</strong>
-        (<span data-base-usd>$93,347.59</span> at USD/INR
-        <span data-base-fx>85.60</span>). Both figures are locked in
-        <code>arv-config.js</code> and never change.
-      </div>
+  <!-- ============================================================= market -->
+  <section class="section wrap" id="market">
+    <div class="row-between" style="margin-bottom:var(--sp-5)">
+      <h2 class="underline-draw" style="margin:0">Market</h2>
+      <a href="trade.html" class="arrow btn btn-ghost btn-sm">Open the book</a>
     </div>
 
-    <div class="grid g-3">
-      <div class="card card-float">
+    <div class="card card-flush" data-reveal>
+      <div data-watchlist>
+        <div class="empty"><span class="spinner"></span></div>
+      </div>
+      <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4);border-top:1px solid var(--line)">
+        Ethereum and Solana are shown for context. They carry zero weight and have
+        no effect on ARV's price — only Bitcoin does.
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ how -->
+  <section class="section wrap" id="how">
+    <div class="section-head">
+      <div class="section-num" data-reveal>01 — Mechanics</div>
+      <h2 class="underline-draw" data-reveal>One formula, and that is the whole product</h2>
+      <p data-reveal style="--reveal-delay:80ms">
+        No committee sets the price. No operator adjusts it. Money arriving or
+        leaving does not move it.
+      </p>
+    </div>
+
+    <div class="formula" data-reveal>
+      <span class="arv">ARV(t)</span>
+      <span class="op">=</span> <span class="arv">₹1</span>
+      <span class="op">×</span> <span class="btc">BTC(t)</span>
+      <span class="op">÷</span> <span class="btc">BTC(launch)</span>
+    </div>
+
+    <div class="identity" data-reveal style="--reveal-delay:120ms;margin-top:var(--sp-4)">
+      <div class="identity-side">
+        <div class="k">Bitcoin since launch</div>
+        <div class="v" data-id-btc>—</div>
+      </div>
+      <div class="identity-eq">≡</div>
+      <div class="identity-side">
+        <div class="k">ARV since launch</div>
+        <div class="v" data-id-arv>—</div>
+      </div>
+    </div>
+    <p class="tiny muted center" data-reveal style="margin-top:var(--sp-3)">
+      The same number by construction. If these ever diverge, the index is
+      misconfigured — which is why both are on screen rather than just one.
+    </p>
+
+    <hr class="rule">
+
+    <div class="grid g-3" data-reveal-group>
+      <div class="card card-lift" data-reveal>
         <h4>Deposits cannot lift it</h4>
-        <p class="small">
-          ARV's price is a function of market data alone — it never reads how many
-          units exist or how much money is held. New deposits issue new units at
-          the current price rather than bidding it up, so an early holder gains
-          nothing from a later one arriving. That is the difference between an
-          index unit and a number someone can push.
+        <p class="small" style="margin:0">
+          The price never reads how many units exist or how much money is held. New
+          money issues new units at the current price rather than bidding it up, so
+          an early holder gains nothing from a later one arriving. That is the
+          difference between an index unit and a number somebody can push.
         </p>
       </div>
-      <div class="card card-float">
-        <h4>Quoted in rupees, on purpose</h4>
-        <p class="small">
+      <div class="card card-lift" data-reveal>
+        <h4>Quoted in rupees, deliberately</h4>
+        <p class="small" style="margin:0">
           You deposit rupees and the treasury holds Bitcoin, so ARV is quoted in
           rupees — which means its printed change is what your money actually did,
-          currency movement included. Quote it in dollars instead and the headline
-          percentage would stop matching your statement.
+          currency movement included. Quote it in dollars and the headline would
+          stop matching your statement.
         </p>
       </div>
-      <div class="card card-float">
-        <h4>Redemption is priced, not negotiated</h4>
-        <p class="small">
-          There is no order book and no counterparty. Units are issued and redeemed
-          against the index price, so there is no spread to cross and no queue to
-          wait in — but equally, no one to sell to at a premium. The price is the
-          price.
+      <div class="card card-lift" data-reveal>
+        <h4>Every fill at the index price</h4>
+        <p class="small" style="margin:0">
+          There is an order book, but it is a queue rather than an auction. No
+          spread to cross, no haggling. A limit order is a trigger — act when ARV
+          reaches this level — not an offer somebody has to accept.
         </p>
       </div>
     </div>
   </section>
 
-  <!-- =============================================================== costs -->
-  <section class="wrap" style="padding:var(--sp-7) 0">
-    <h2>What it costs, in full</h2>
-    <p style="max-width:64ch">
-      Worked on a ₹10,000 deposit at the live price, with nothing omitted. The same
-      arithmetic runs on the buy screen before you confirm.
-    </p>
+  <!-- =========================================================== the book -->
+  <section class="section wrap">
+    <div class="section-head">
+      <div class="section-num" data-reveal>02 — Buying and selling</div>
+      <h2 class="underline-draw" data-reveal>Buy instantly. Sell to a real buyer, or to us.</h2>
+    </div>
 
-    <div class="grid g-2" style="align-items:start;margin-top:var(--sp-5)">
-      <div class="card card-flush">
+    <div class="grid g-2" data-reveal-group>
+      <div class="card" data-reveal>
+        <div class="row" style="gap:10px;margin-bottom:var(--sp-3)">
+          <span class="badge ok">Buy</span><span class="strong">Always instant</span>
+        </div>
+        <p class="small">
+          A buy fills against anyone waiting to sell, and the treasury covers the
+          rest. You never queue for a seller to appear.
+        </p>
+        <p class="small" style="margin:0">
+          Pay by UPI into your rupee balance first, then buy with it — the same way
+          an exchange works. Money never moves between users' bank accounts.
+        </p>
+      </div>
+
+      <div class="card" data-reveal>
+        <div class="row" style="gap:10px;margin-bottom:var(--sp-3)">
+          <span class="badge warn">Sell</span><span class="strong">Buyer first, then the guarantee</span>
+        </div>
+        <p class="small">
+          A sell goes to a real buyer if one is waiting. If none is, it rests in the
+          book — and after <strong data-fallback>60 minutes</strong> the treasury
+          buys it at the index price.
+        </p>
+        <p class="small" style="margin:0">
+          That fallback exists because in a falling market everyone wants out and
+          nobody wants in. Without it, holders would be stuck. With it, there is
+          always an exit.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================== costs -->
+  <section class="section wrap" id="costs">
+    <div class="section-head">
+      <div class="section-num" data-reveal>03 — What it costs</div>
+      <h2 class="underline-draw" data-reveal>Every deduction, before you commit</h2>
+      <p data-reveal>
+        Worked on ₹1,00,000 at the live price. The same arithmetic runs on the trade
+        screen and again in the ledger — one implementation, so what you agree to is
+        what gets recorded.
+      </p>
+    </div>
+
+    <div class="grid g-2" style="align-items:start" data-reveal-group>
+      <div class="card card-flush" data-reveal>
         <div class="card-head" style="padding:var(--sp-4);margin:0">
-          <h4>Depositing ₹10,000</h4>
-          <span class="badge">live price</span>
+          <h4>Buying ₹1,00,000</h4><span class="badge">live</span>
         </div>
         <div class="ledger-list" data-buy-example>
-          <div class="ledger-row"><span class="l">Loading…</span></div>
+          <div class="ledger-row"><span class="l muted">Loading…</span></div>
         </div>
       </div>
 
-      <div class="card card-flush">
+      <div class="card card-flush" data-reveal>
         <div class="card-head" style="padding:var(--sp-4);margin:0">
-          <h4>Redeeming after a 50% rise</h4>
-          <span class="badge warn">tax applies</span>
+          <h4>Selling after a 50% rise</h4><span class="badge warn">tax applies</span>
         </div>
         <div class="ledger-list" data-sell-example>
-          <div class="ledger-row"><span class="l">Loading…</span></div>
+          <div class="ledger-row"><span class="l muted">Loading…</span></div>
         </div>
       </div>
     </div>
 
-    <div class="note-box warn" style="margin-top:var(--sp-5)">
-      <strong>The 30% is not deducted from your payout.</strong>
-      Only the exit fee, GST and 1% TDS are withheld at redemption. The 30% plus 4%
-      cess on your gain is your own liability, paid when you file — the TDS already
-      withheld counts against it. Losses on virtual digital assets cannot be set
-      off against gains or carried forward, so two trades that cancel out can still
-      leave tax owing. Every figure is itemised on the redeem screen and again in
-      your <a href="tax.html">tax statement</a>.
+    <div class="note-box warn" data-reveal style="margin-top:var(--sp-5)">
+      <strong>The 30% is not taken from your payout.</strong>
+      Only the exit fee, GST and 1% TDS are withheld when you sell. The 30% plus 4%
+      cess on your gain is your own liability at filing — the TDS already withheld
+      counts against it. And losses on virtual digital assets cannot be set off
+      against gains or carried forward, so two trades that cancel out can still
+      leave tax owing. All of it is itemised before you confirm, and again in your
+      <a href="tax.html">tax statement</a>.
     </div>
   </section>
 
-  <!-- ============================================================== market -->
-  <section class="wrap" style="padding:var(--sp-7) 0">
-    <div class="row-between" style="margin-bottom:var(--sp-4)">
-      <h2 style="margin:0">Market</h2>
-      <a href="charts.html" class="btn btn-ghost btn-sm">Full charts →</a>
+  <!-- ============================================================== refer -->
+  <section class="section wrap">
+    <div class="section-head">
+      <div class="section-num" data-reveal>04 — Refer</div>
+      <h2 class="underline-draw" data-reveal>5% of what you bring in, once</h2>
+      <p data-reveal>
+        Share your code. When someone you referred makes their first deposit, 5% of
+        it lands in your rupee balance. One payment per person, no second level, no
+        ongoing cut.
+      </p>
     </div>
-    <p class="small muted" style="max-width:60ch;margin-bottom:var(--sp-5)">
-      Ethereum and Solana are shown for reference only. They carry zero weight in
-      the basket and have no effect on ARV's price.
-    </p>
-    <div class="grid g-3" data-watchlist></div>
+    <div class="grid g-auto" data-reveal-group data-tiers>
+      <div class="card card-tight" data-reveal><div class="empty"><span class="spinner"></span></div></div>
+    </div>
   </section>
 
-  <!-- ================================================================= cta -->
-  <section class="wrap" style="padding:var(--sp-7) 0 var(--sp-8)">
-    <div class="card" style="text-align:center;padding:var(--sp-7) var(--sp-5)">
-      <h2 style="margin-bottom:var(--sp-3)">Start with ₹100</h2>
-      <p style="max-width:48ch;margin:0 auto var(--sp-5)">
-        Pay by UPI, hold units, watch them against Bitcoin minute by minute, and
-        redeem back to UPI when you choose.
+  <!-- ================================================================ cta -->
+  <section class="section-lg wrap">
+    <div class="card" data-reveal style="text-align:center;padding:var(--sp-8) var(--sp-5)">
+      <h2 class="serif" style="margin-bottom:var(--sp-3)">Start with ₹100</h2>
+      <p style="max-width:46ch;margin:0 auto var(--sp-5)">
+        Pay by UPI, hold units, watch them against Bitcoin trade by trade, and sell
+        back to rupees whenever you choose.
       </p>
       <div class="row" style="justify-content:center;flex-wrap:wrap">
-        <a href="signup.html" class="btn btn-primary btn-lg">Create an account</a>
+        <a href="signup.html" class="btn btn-primary btn-lg">Open an account</a>
         <a href="legal.html#risk" class="btn btn-ghost btn-lg">Read the risks</a>
       </div>
     </div>
@@ -230,9 +297,7 @@
 <script type="module" src="js/pages/home.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js').catch(function () {});
-    });
+    addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function(){}); });
   }
 </script>
 </body>

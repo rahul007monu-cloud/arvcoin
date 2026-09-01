@@ -638,10 +638,12 @@ function fetch_fx(): float
         return (float)$cached;
     }
 
+    // Short names, not URLs. `source` is VARCHAR(40) and a full query string
+    // overflows it, which fails the whole ingest for the sake of a label.
     foreach ([
-        'https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR',
-        'https://open.er-api.com/v6/latest/USD',
-    ] as $url) {
+        'frankfurter' => 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR',
+        'erapi'       => 'https://open.er-api.com/v6/latest/USD',
+    ] as $name => $url) {
         $body = http_get($url, 10);
         if ($body === null) {
             continue;
@@ -650,7 +652,7 @@ function fetch_fx(): float
         $rate = $j['rates']['INR'] ?? null;
         if ($rate && $rate > 0) {
             q('INSERT INTO fx_rates (day, usd_inr, source) VALUES (?, ?, ?)
-               ON DUPLICATE KEY UPDATE usd_inr = VALUES(usd_inr)', [$today, $rate, $url]);
+               ON DUPLICATE KEY UPDATE usd_inr = VALUES(usd_inr)', [$today, $rate, $name]);
             return (float)$rate;
         }
     }

@@ -214,7 +214,7 @@ async function loadMain() {
     chart.overlay(el, null);
 
     ui.setText('[data-candle-count]', st.candles.length + ' candles \u00b7 ' +
-      ui.fmtDate(st.candles[0].t) + ' \u2192 now' +
+      ui.fmtDate(st.candles[0].t) + ' to now' +
       (res.fxDegraded ? ' \u00b7 FX history unavailable, using current rate' : ''));
 
     st.live = engine.createLiveCandle(st.tf, st.candles[st.candles.length - 1]);
