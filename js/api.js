@@ -193,6 +193,42 @@ export function changePassword(currentPassword, newPassword) {
 }
 
 /**
+ * Which sign-in methods this install offers.
+ *
+ * Asked rather than assumed, because the Google client ID is a server setting an
+ * operator may never have filled in. A site without one should show no Google
+ * button at all — a button that cannot work is worse than its absence.
+ *
+ * Also carries the nonce, which is why this is fetched per page load and not
+ * cached: it is minted against the session and used once.
+ */
+export function authProviders() {
+  return request('auth', 'providers', { method: 'GET' });
+}
+
+/**
+ * Exchange a Google credential for a session.
+ *
+ * `acceptedTerms` and `referralCode` matter only when this ends up creating an
+ * account, but they are always sent: the browser cannot tell in advance whether
+ * this email already has one, and the server refuses to create an account without
+ * consent.
+ */
+export async function googleSignIn(credential, opts) {
+  var o = opts || {};
+  await ensureCsrf();
+  var r = await request('auth', 'google', {
+    data: {
+      credential: credential,
+      referralCode: o.referralCode || '',
+      acceptedTerms: !!o.acceptedTerms
+    }
+  });
+  if (r.user) setUser(r.user);
+  return r;
+}
+
+/**
  * Send an unauthenticated visitor to the sign-in page, remembering where they
  * were so they land back there afterwards.
  */

@@ -76,6 +76,29 @@
           <button type="submit" class="btn btn-primary btn-block btn-lg">Create account</button>
         </form>
 
+        <!--
+          Google, when the operator has configured a client ID.
+
+          Below the form rather than above it: the email field takes autofocus, and
+          a social button above a focused field further down the page makes the
+          focus jump look like a fault.
+
+          The terms checkbox above governs this route too — the button reads it
+          before contacting Google, and the server refuses to create an account
+          without it either way.
+        -->
+        <div data-panel="credentials">
+          <div class="hidden" data-google>
+            <div class="or-rule"><span>or</span></div>
+            <div class="google-slot" data-google-btn></div>
+            <p class="hint" style="text-align:center">
+              Google confirms your email, so there is no code to enter.
+              You will still need your PAN for KYC before buying.
+            </p>
+          </div>
+          <p class="hint hidden" data-google-note></p>
+        </div>
+
         <!-- ==================================================== step 2: OTP -->
         <div data-panel="otp" class="hidden">
           <div class="note-box" style="margin-bottom:var(--sp-4)">
@@ -92,8 +115,13 @@
               <span class="err hidden" data-otp-err></span>
             </div>
             <label class="check">
-              <input type="checkbox" data-trust checked>
-              <span>Remember this device for 30 days.</span>
+              <input type="checkbox" data-shared>
+              <span>
+                This is a shared or public computer — ask for a code every time.
+                <span class="hint" style="display:block;margin-top:2px">
+                  Otherwise we will not ask again on this device for 24 hours.
+                </span>
+              </span>
             </label>
             <button type="submit" class="btn btn-primary btn-block btn-lg">Verify and continue</button>
           </form>
