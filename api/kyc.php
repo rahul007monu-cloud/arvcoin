@@ -156,13 +156,37 @@ function handle_submit(): void
         json_fail(409, 'That PAN is already registered to another account.');
     }
 
-    q('UPDATE kyc
-          SET full_name = ?, dob = ?, pan = ?, address_line = ?, city = ?, state = ?,
-              pincode = ?, upi_vpa = COALESCE(NULLIF(?, ""), upi_vpa),
-              aadhaar_last4 = ?, status = "pending", submitted_at = UTC_TIMESTAMP(),
-              reject_reason = ""
-        WHERE user_id = ?',
-      [$fullName, $dob, $pan, $address, $city, $state, $pincode, $upiVpa, $aadhaar4, $u['id']]);
+    // An upsert, not an UPDATE.
+    //
+    // This was a bare UPDATE, and for an account whose kyc row was missing it did
+    // nothing at all: no row matched, so nothing was written, the SELECT below
+    // returned null, and kyc_public(null) threw a TypeError that the global
+    // handler turned into "Something went wrong on our side." The person had
+    // filled in eight fields correctly and got a generic server error, twice,
+    // with their details discarded each time.
+    //
+    // handle_get() a few lines up already guards for the same missing row, which
+    // is the tell: the row was known to be optional on the way out and assumed to
+    // exist on the way in. Creating it is the right answer either way — there is
+    // no reading of this endpoint where "no row yet" should mean "refuse".
+    q('INSERT INTO kyc (user_id, full_name, dob, pan, address_line, city, state,
+                        pincode, upi_vpa, aadhaar_last4, status, submitted_at, reject_reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "pending", UTC_TIMESTAMP(), "")
+       ON DUPLICATE KEY UPDATE
+              full_name = VALUES(full_name), dob = VALUES(dob), pan = VALUES(pan),
+              address_line = VALUES(address_line), city = VALUES(city),
+              state = VALUES(state), pincode = VALUES(pincode),
+              -- Keep an existing payout address when the form leaves it blank.
+              upi_vpa = COALESCE(NULLIF(VALUES(upi_vpa), ""), upi_vpa),
+              aadhaar_last4 = VALUES(aadhaar_last4),
+              status = "pending", submitted_at = UTC_TIMESTAMP(), reject_reason = ""',
+      [$u['id'], $fullName, $dob, $pan, $address, $city, $state, $pincode, $upiVpa, $aadhaar4]);
+
+    // The wallet has the same shape of problem: nothing creates it here, and its
+    // absence surfaces later as a null balance rather than as an error anybody can
+    // act on.
+    q('INSERT INTO wallets (user_id) VALUES (?)
+       ON DUPLICATE KEY UPDATE user_id = user_id', [$u['id']]);
 
     // Keep the display name in step so the dashboard greeting matches the KYC.
     q('UPDATE users SET full_name = ? WHERE id = ? AND full_name = ""', [$fullName, $u['id']]);
@@ -179,28 +203,40 @@ function handle_submit(): void
     ]);
 }
 
-function kyc_public(array $k): array
+/**
+ * The client-facing shape of a KYC record.
+ *
+ * Takes null, and answers "none". It used to require an array, which made every
+ * caller responsible for remembering that the row is optional — one of them did
+ * remember and one did not, and the one that did not returned a 500 to somebody
+ * who had filled the form in correctly. A shape function is the wrong place to
+ * enforce that a row exists.
+ */
+function kyc_public(?array $k): array
 {
-    $pan = (string)$k['pan'];
+    if ($k === null) {
+        return ['status' => 'none'];
+    }
+    $pan = (string)($k['pan'] ?? '');
     return [
-        'status'          => $k['status'],
-        'fullName'        => $k['full_name'],
-        'dob'             => $k['dob'],
+        'status'          => $k['status'] ?? 'none',
+        'fullName'        => $k['full_name'] ?? '',
+        'dob'             => $k['dob'] ?? null,
         // Masked on the way out. There is no screen that needs a full PAN
         // rendered back into a browser.
         'panMasked'       => $pan !== '' ? substr($pan, 0, 2) . 'XXXXX' . substr($pan, -1) : '',
         'hasPan'          => $pan !== '',
-        'panVerified'     => (bool)$k['pan_verified'],
-        'addressLine'     => $k['address_line'],
-        'city'            => $k['city'],
-        'state'           => $k['state'],
-        'pincode'         => $k['pincode'],
-        'upiVpa'          => $k['upi_vpa'],
-        'aadhaarLast4'    => $k['aadhaar_last4'],
-        'aadhaarVerified' => (bool)$k['aadhaar_verified'],
-        'submittedAt'     => $k['submitted_at'],
-        'reviewedAt'      => $k['reviewed_at'],
-        'rejectReason'    => $k['reject_reason'],
+        'panVerified'     => (bool)($k['pan_verified'] ?? false),
+        'addressLine'     => $k['address_line'] ?? '',
+        'city'            => $k['city'] ?? '',
+        'state'           => $k['state'] ?? '',
+        'pincode'         => $k['pincode'] ?? '',
+        'upiVpa'          => $k['upi_vpa'] ?? '',
+        'aadhaarLast4'    => $k['aadhaar_last4'] ?? '',
+        'aadhaarVerified' => (bool)($k['aadhaar_verified'] ?? false),
+        'submittedAt'     => $k['submitted_at'] ?? null,
+        'reviewedAt'      => $k['reviewed_at'] ?? null,
+        'rejectReason'    => $k['reject_reason'] ?? '',
         // Said out loud so nobody assumes an unverified Aadhaar means more than
         // it does.
         'aadhaarNote'     => 'Only the last four digits are held. Full Aadhaar verification '

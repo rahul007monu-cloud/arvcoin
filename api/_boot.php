@@ -559,11 +559,28 @@ function send_mail(string $to, string $subject, string $bodyText): bool
 /* ================================================== global error trap ===== */
 
 set_exception_handler(static function (Throwable $e): void {
-    error_log('[arv] uncaught: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    // A reference, printed on screen and written to the log with the actual cause.
+    //
+    // Without one, every 500 in this application looks identical to the person
+    // hitting it and to whoever is trying to help: "Something went wrong on our
+    // side" is the same sentence whether a column is missing, a row is absent, or
+    // the database is down. Diagnosing the KYC form took three rounds of guessing
+    // for exactly that reason — the message could not be matched to a log line.
+    //
+    // Random rather than a hash of the message: it identifies the *occurrence*, so
+    // two reports of "the same error" can be told apart, and it leaks nothing about
+    // the internals to whoever sees it.
+    $ref = strtoupper(bin2hex(random_bytes(3)));
+
+    error_log(sprintf('[arv] uncaught [%s]: %s @ %s:%d', $ref,
+                      $e->getMessage(), $e->getFile(), $e->getLine()));
+
     $debug = (bool)(cfg()['debug'] ?? false);
     json_fail(500, $debug
         ? ($e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine())
-        : 'Something went wrong on our side. Nothing was charged.');
+        : 'Something went wrong on our side. Nothing was charged. '
+          . 'If you report this, quote reference ' . $ref . '.',
+        ['ref' => $ref]);
 });
 
 set_error_handler(static function (int $no, string $str, string $file, int $line): bool {

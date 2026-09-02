@@ -28,7 +28,10 @@ declare(strict_types=1);
  * Bumped whenever arv_schema() or arv_migrations() changes, so an operator can see
  * at a glance whether a deployment has caught up with its own database.
  */
-const ARV_SCHEMA_VERSION = 5;
+// 6 rather than 5 so the repair step below runs on deployments that have already
+// taken the google_sub change. The catch-up is gated on this number, so a repair
+// added after a version has shipped needs its own.
+const ARV_SCHEMA_VERSION = 6;
 
 function arv_schema(): array
 {
@@ -707,6 +710,40 @@ function arv_migrations(PDO $pdo): array
                       ADD COLUMN google_sub VARCHAR(40) NULL AFTER email_verified,
                       ADD UNIQUE KEY uq_users_google (google_sub)');
         $done[] = 'users: added google_sub';
+    }
+
+    // Repair, not a schema change: give every account the rows it cannot work
+    // without.
+    //
+    // `kyc` and `wallets` are one-per-user and created alongside the user, so in
+    // principle nobody can be missing one. In practice an account was, and the
+    // consequences were invisible until the worst moment: submitting KYC updated
+    // no row, discarded the details, and answered with a generic 500, while a
+    // missing wallet reports a null balance rather than an error.
+    //
+    // Cheap and idempotent — two anti-joins that select nothing once everybody has
+    // both — so it runs on every catch-up rather than once, and an account that
+    // loses a row later is repaired the next time anybody loads a page.
+    $missingKyc = (int)$pdo->query(
+        'SELECT COUNT(*) FROM users u LEFT JOIN kyc k ON k.user_id = u.id WHERE k.user_id IS NULL'
+    )->fetchColumn();
+    if ($missingKyc > 0) {
+        $pdo->exec('INSERT INTO kyc (user_id, status, full_name)
+                    SELECT u.id, "none", u.full_name FROM users u
+                     LEFT JOIN kyc k ON k.user_id = u.id
+                     WHERE k.user_id IS NULL');
+        $done[] = "kyc: created {$missingKyc} missing row(s)";
+    }
+
+    $missingWallet = (int)$pdo->query(
+        'SELECT COUNT(*) FROM users u LEFT JOIN wallets w ON w.user_id = u.id WHERE w.user_id IS NULL'
+    )->fetchColumn();
+    if ($missingWallet > 0) {
+        $pdo->exec('INSERT INTO wallets (user_id)
+                    SELECT u.id FROM users u
+                     LEFT JOIN wallets w ON w.user_id = u.id
+                     WHERE w.user_id IS NULL');
+        $done[] = "wallets: created {$missingWallet} missing row(s)";
     }
 
     if ($done) {
