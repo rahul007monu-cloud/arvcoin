@@ -193,6 +193,11 @@
   // account before the wallet moves.
   //
   var PAYMENTS = {
+    // NOT the payment address. The one that matters is `settings.upi_vpa` in the
+    // database, editable in Operations → Settings and returned by deposit.php with
+    // every request. This stays empty on purpose: a second copy of a payment
+    // address is a second place to forget, and a stale one here would mean money
+    // sent to whatever it used to say.
     vpa: '',
     payeeName: 'ARV Coin',
     merchantCode: '',
