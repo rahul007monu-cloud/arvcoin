@@ -34,8 +34,11 @@ declare(strict_types=1);
 require __DIR__ . '/_boot.php';
 require __DIR__ . '/_money.php';
 require __DIR__ . '/_match.php';
+// Brings _schema.php with it, for the migration step. Requiring _schema.php here
+// as well is a redeclaration fatal — a plain require does not care that
+// require_once already loaded it, and the whole endpoint dies with an empty
+// response, which took the price feed down with it.
 require __DIR__ . '/_feed.php';
-require __DIR__ . '/_schema.php';
 
 @set_time_limit(300);
 ignore_user_abort(true);
@@ -68,7 +71,7 @@ try {
             // does nothing for a column added to a table that already exists — so a
             // deployed update would otherwise reference a column its own database
             // has never had. Costs one information_schema query when current.
-            $migrated = arv_migrations(db());
+            $migrated = schema_catch_up();
             if ($migrated) {
                 $out['migrated'] = $migrated;
             }
