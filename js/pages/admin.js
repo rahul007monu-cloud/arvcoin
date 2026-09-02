@@ -320,6 +320,11 @@ async function loadKyc() {
 
 /* ---------------------------------------------------------------- settings -- */
 
+// Each row is [key, label, type, hint?]. The server keeps its own allow-list of
+// what is writable; this list is only what the operator is shown. The two used to
+// drift — google_client_id, trust_hours and login_otp_always were made writable
+// on the server but never given a field here, so there was no way to turn Google
+// sign-in on at all. Anything editable belongs in both places.
 var EDITABLE = [
   ['upi_vpa', 'UPI ID for deposits', 'text'],
   ['entry_fee_pct', 'Entry fee %', 'number'],
@@ -332,7 +337,15 @@ var EDITABLE = [
   ['deposit_max_minutes', 'Deposit window (max min)', 'number'],
   ['withdraw_max_minutes', 'Withdraw window (max min)', 'number'],
   ['price_max_age_seconds', 'Pause trading after (seconds)', 'number'],
-  ['maintenance_mode', 'Maintenance mode', 'bool']
+  ['maintenance_mode', 'Maintenance mode', 'bool'],
+
+  // Sign-in.
+  ['google_client_id', 'Google client ID', 'text',
+   'Paste to switch Google sign-in on. Ends in .apps.googleusercontent.com. Leave blank to keep it off. This is the Client ID, not the secret — there is no secret in this flow.'],
+  ['login_otp_always', 'Always email a code at login', 'bool',
+   'On, and every sign-in needs a code, ignoring the trust window below.'],
+  ['trust_hours', 'Trust a device for (hours)', 'number',
+   'After one code, that device is not asked again for this long. 24 by default. Sign-out ends it.']
 ];
 
 async function loadSettings() {
@@ -342,14 +355,15 @@ async function loadSettings() {
     var s = r.settings || {};
 
     host.innerHTML = EDITABLE.map(function (row) {
-      var key = row[0], label = row[1], type = row[2];
+      var key = row[0], label = row[1], type = row[2], hint = row[3];
       var val = s[key] != null ? s[key] : '';
       var input = type === 'bool'
         ? '<select data-setting="' + key + '">'
           + '<option value="1"' + (val === '1' ? ' selected' : '') + '>on</option>'
           + '<option value="0"' + (val !== '1' ? ' selected' : '') + '>off</option></select>'
         : '<input data-setting="' + key + '" type="text" value="' + ui.esc(val) + '">';
-      return '<div class="field"><label>' + ui.esc(label) + '</label>' + input + '</div>';
+      return '<div class="field"><label>' + ui.esc(label) + '</label>' + input
+        + (hint ? '<span class="hint">' + ui.esc(hint) + '</span>' : '') + '</div>';
     }).join('');
 
     ui.els('[data-setting]').forEach(function (input) {
