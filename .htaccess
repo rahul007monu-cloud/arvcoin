@@ -1,48 +1,84 @@
-# arvcoin — Apache config (Hostinger)
+# Apache configuration for static hosting (Hostinger, cPanel, shared hosts).
+# Ignored by Netlify, Vercel and Cloudflare Pages — configure those in their own
+# dashboards.
 
-# Google / popup logins ko chalne dene ke liye
-<IfModule mod_headers.c>
-  Header always set Cross-Origin-Opener-Policy "same-origin-allow-popups"
-</IfModule>
+# ---------------------------------------------------------------- MIME types --
+# Some shared hosts serve .js as application/javascript with no charset, or fail
+# to recognise .mjs at all, and the browser then refuses to execute the module.
+# Everything here is ES modules, so getting this wrong breaks the whole app.
+AddType text/javascript .js
+AddType text/javascript .mjs
+AddType application/manifest+json .webmanifest
+AddType image/svg+xml .svg
 
-# Service worker aur config files kabhi cache na hon —
-# warna users purana code pakad ke baith jaate hain
-<IfModule mod_headers.c>
-  <FilesMatch "^(sw\.js|firebase-config\.js|arv-config\.js|emailjs-config\.js)$">
+# ------------------------------------------------------------------- caching --
+<IfModule mod_expires.c>
+  ExpiresActive On
+
+  # Never cache HTML: a stale shell can pin users to an old service worker.
+  ExpiresByType text/html "access plus 0 seconds"
+
+  # The service worker must always be revalidated, or a deploy never lands.
+  <FilesMatch "sw\.js$">
+    ExpiresDefault "access plus 0 seconds"
     Header set Cache-Control "no-cache, no-store, must-revalidate"
-    Header set Pragma "no-cache"
-    Header set Expires "0"
   </FilesMatch>
+
+  # Config is edited in place, so it must not be cached either.
+  <FilesMatch "arv-config\.js$">
+    ExpiresDefault "access plus 0 seconds"
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  ExpiresByType text/javascript "access plus 1 hours"
+  ExpiresByType text/css "access plus 1 hours"
+  ExpiresByType image/svg+xml "access plus 7 days"
+  ExpiresByType image/png "access plus 7 days"
 </IfModule>
 
-# Static assets ko thoda cache karo
-<IfModule mod_headers.c>
-  <FilesMatch "\.(svg|png|jpg|jpeg|gif|webp|woff2?)$">
-    Header set Cache-Control "public, max-age=604800"
-  </FilesMatch>
-</IfModule>
-
-# Compression
+# ---------------------------------------------------------------- compression -
 <IfModule mod_deflate.c>
-  AddOutputFilterByType DEFLATE text/html text/css text/plain text/xml application/javascript application/json image/svg+xml
+  AddOutputFilterByType DEFLATE text/html text/css text/javascript
+  AddOutputFilterByType DEFLATE application/json image/svg+xml
 </IfModule>
 
-# Custom 404
-ErrorDocument 404 /404.html
+# ------------------------------------------------------------------- security -
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+  Header set X-Frame-Options "SAMEORIGIN"
+  Header set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
 
+  # HSTS. Only meaningful once HTTPS is actually in place — the service worker
+  # and the exchange WebSockets both require it.
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
+</IfModule>
+
+# ------------------------------------------------------------------ HTTPS ----
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # Old crypto/wallet pages -> current pages
-  RewriteRule ^kyc\.html$ /dashboard.html [R=301,L]
-  RewriteRule ^wallet\.html$ /dashboard.html [R=301,L]
+  RewriteCond %{HTTPS} off
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
 
-  # Allow clean URLs without the .html extension, so /admin serves
-  # admin.html and /levels serves levels.html. Static hosting otherwise
-  # 404s on an extension-less path, which is easy to hit by hand.
-  # Only rewrites when the .html file actually exists.
+  # Clean URLs: /charts serves charts.html
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_FILENAME}\.html -f
   RewriteRule ^(.+)$ $1.html [L]
 </IfModule>
+
+ErrorDocument 404 /404.html
+
+# ------------------------------------------------------------------- hygiene --
+# Nothing here should ever be web-readable.
+<FilesMatch "\.(md|sql|ts|log|yml|yaml)$">
+  Require all denied
+</FilesMatch>
+
+RedirectMatch 404 /\.git
+RedirectMatch 404 /supabase/
+RedirectMatch 404 /\.verify
+
+Options -Indexes

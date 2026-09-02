@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Withdraw — ARV Coin</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#07070a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
+</head>
+<body>
+
+<div data-nav></div>
+
+<main class="page wrap" style="max-width:1000px;padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
+
+  <h1 class="serif" style="font-size:1.8rem">Withdraw</h1>
+  <p class="muted" style="max-width:64ch">
+    Rupees go from your balance to your UPI ID. To take out more than your rupee
+    balance, <a href="trade.html?side=sell">sell ARV first</a> — that credits
+    rupees here.
+  </p>
+
+  <div class="note-box warn hidden" style="margin-bottom:var(--sp-4)" data-kyc-gate>
+    <strong>KYC needed.</strong> Money can only leave to a verified account.
+    <a href="profile.html#kyc" class="arrow">Complete KYC</a>
+  </div>
+
+  <div class="grid g-2" style="align-items:start">
+
+    <!-- ============================================================= form -->
+    <div class="card">
+      <div class="card-head">
+        <h3 style="font-size:1rem">Amount</h3>
+        <span class="badge" data-balance>—</span>
+      </div>
+
+      <div class="field" style="margin-bottom:var(--sp-3)">
+        <label for="amt">Rupees to withdraw</label>
+        <div class="amount-input">
+          <span class="cur">₹</span>
+          <input id="amt" class="num-input" type="text" inputmode="decimal"
+                 autocomplete="off" placeholder="0">
+        </div>
+        <span class="hint">Minimum <span data-min>₹100</span> · no withdrawal fee</span>
+        <span class="err hidden" data-amt-err></span>
+      </div>
+
+      <div class="quick" style="margin-bottom:var(--sp-4)" data-quick></div>
+
+      <div class="field" style="margin-bottom:var(--sp-4)">
+        <label for="vpa">Pay to this UPI ID</label>
+        <input id="vpa" type="text" autocomplete="off" placeholder="yourname@bank">
+        <span class="hint">
+          Check it carefully. A wrong UPI ID means the payout bounces and has to be
+          sent again.
+        </span>
+        <span class="err hidden" data-vpa-err></span>
+      </div>
+
+      <div class="timer" data-window style="margin-bottom:var(--sp-4)"></div>
+
+      <button class="btn btn-primary btn-block btn-lg" data-submit disabled>
+        Request withdrawal
+      </button>
+
+      <p class="tiny muted" style="margin:var(--sp-3) 0 0">
+        The amount is held from your balance the moment you request it, so what you
+        see is always what you can still spend.
+      </p>
+    </div>
+
+    <!-- ============================================================= side -->
+    <div class="stack">
+      <div class="card card-tight">
+        <h4 style="font-size:.95rem">Selling is a separate step</h4>
+        <p class="small">
+          Withdrawing moves rupees out. It is not a sale, so there is no tax on it —
+          the tax happened when you sold ARV, and it is itemised on that trade.
+        </p>
+        <p class="small" style="margin-bottom:0">
+          1% TDS is withheld at the moment of a sale under section 194S. The 30%
+          plus cess on the gain is your own liability at filing, and your
+          <a href="tax.html">tax statement</a> totals it for the year.
+        </p>
+      </div>
+
+      <div class="card card-tight">
+        <h4 style="font-size:.95rem">Your ARV holding</h4>
+        <div class="row-between" style="margin-bottom:var(--sp-2)">
+          <span class="small muted">Units</span>
+          <span class="num strong" data-units>—</span>
+        </div>
+        <div class="row-between" style="margin-bottom:var(--sp-3)">
+          <span class="small muted">Worth</span>
+          <span class="num strong" data-worth>—</span>
+        </div>
+        <a href="trade.html?side=sell" class="btn btn-sell btn-sm btn-block">Sell ARV for rupees</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ========================================================== past ones -->
+  <div class="card card-flush" style="margin-top:var(--sp-5)">
+    <div class="card-head" style="padding:var(--sp-4);margin:0">
+      <h3 style="font-size:1rem">Withdrawals</h3>
+    </div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>Reference</th><th>When</th><th class="num">Amount</th>
+          <th>To</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody data-history><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<div data-footer></div>
+<script type="module" src="js/pages/withdraw.js"></script>
+</body>
+</html>

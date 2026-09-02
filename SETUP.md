@@ -1,198 +1,257 @@
-# Firebase setup — step by step
+# Setup
 
-Follow this once to connect arvcoin to a Firebase project. Everything is done
-in the browser except the final rules deploy.
+PHP 8 and MySQL. Nothing to build, nothing to compile, no node_modules on the
+server — the files in this repo are the deployment.
 
-> **Status: steps 1–3 are done.** The project is created and connected:
->
-> | | |
-> |---|---|
-> | Project ID | `arvcoin-fbd29` |
-> | Project number | `44275546012` |
-> | Auth domain | `arvcoin-fbd29.firebaseapp.com` |
->
-> `firebase-config.js` is updated and `.firebaserc` pins the project, so
-> `firebase deploy` no longer needs a `--project` flag.
->
-> Users from the old inaccessible project do not carry over — they will need
-> to sign up again.
+Two ways to run it: on a Hostinger plan (or any cPanel-style host), or locally
+against a MySQL you already have.
 
 ---
 
-## 1. Create the project
+## 1. On Hostinger — about fifteen minutes
 
-1. Open <https://console.firebase.google.com>
-2. Confirm the account in the top-right avatar is the one you want to own this
-3. Click **Create a project**
-4. Name it `arvcoin` — note the **Project ID** it generates underneath
-   (likely `arvcoin-app` or similar). **Write that ID down**, you need it later
-5. Google Analytics is optional. Disabling it is fine
-6. Click **Create project**
+### 1.1 Create the database
 
----
+hPanel → **Databases → MySQL Databases**. Create a database and a user, and give
+the user all privileges on it. Note down four things:
 
-## 2. Register the web app
+- database name (Hostinger prefixes it, e.g. `u123456789_arv`)
+- username (also prefixed)
+- password
+- host — `localhost` on shared plans
 
-1. On the project overview, click the **web icon** `</>`
-2. App nickname: `arvcoin web`
-3. Leave "Firebase Hosting" **unchecked** — the site is hosted on Hostinger
-4. Click **Register app**
-5. You will see a `firebaseConfig` block. **Copy all of it.**
+### 1.2 Get the files onto the server
 
-It looks like this:
+If the domain is already connected to this repo through hPanel →
+**Advanced → Git**, merging into `main` deploys it. Otherwise upload the contents
+of the repo into `public_html`.
 
-```js
-const firebaseConfig = {
-  apiKey: "AIza...",
-  authDomain: "arvcoin-app.firebaseapp.com",
-  projectId: "arvcoin-app",
-  storageBucket: "arvcoin-app.firebasestorage.app",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:abc123def456",
-  measurementId: "G-XXXXXXXXXX"
-};
+Either way, `public_html` should contain `index.html`, `install.php`, `api/`,
+`css/`, `js/`, `icons/`, `manifest.json`, `sw.js` and `.htaccess` at the top level.
+
+### 1.3 Run the installer
+
+Open `https://yourdomain.com/install.php`.
+
+It checks the server first — PHP version, `pdo_mysql`, `curl`, whether `api/` and
+`uploads/` are writable — and refuses to go on if something is missing, saying
+which. Then it asks for:
+
+| Field | Notes |
+|---|---|
+| Database host / port / name / user / password | from step 1.1 |
+| Operator name, email, password | this becomes the admin account; minimum 10 characters |
+| Site URL | used in emails and referral links; changeable later |
+| From address for mail | OTPs are sent from here |
+| UPI VPA | where deposits are paid; leave blank and the QR shows a clearly-marked placeholder |
+
+Pressing install creates 18 tables, 8 append-only triggers and the default
+settings, then writes `api/config.local.php` containing the database password and
+a freshly generated app key.
+
+**Then it deletes itself.** It already refuses to run twice once the tables exist,
+but an installer left on a live host is a standing invitation and removing it is the
+step people forget. If the unlink fails — usually file permissions — the success page
+says so and asks you to delete it by hand; it does not pretend.
+
+> **`api/config.local.php` must never be committed.** It is in `.gitignore`
+> already. The app key signs sessions and hashes OTPs, so a leaked one is a way
+> into every account — if it ever reaches the repo, rotate both the key and the
+> database password.
+
+### 1.4 Add the cron job
+
+hPanel → **Advanced → Cron Jobs**. Every minute:
+
+```
+curl -s https://yourdomain.com/api/cron.php
 ```
 
----
+No query string, deliberately. hPanel rejects a cron command containing characters
+like `?` and `=` with "some characters are not allowed", and `job` defaults to `all`
+anyway — so `cron.php?job=all` and `cron.php` do exactly the same thing, and only one
+of them can be pasted into the form.
 
-## 3. Paste it into `firebase-config.js`
+If your host prefers a PHP-type cron over a URL, this also works and skips HTTP
+entirely:
 
-Open `firebase-config.js` in the repo and replace the values. Keep the
-`window.ARV_FIREBASE_CONFIG =` wrapper exactly as it is:
-
-```js
-window.ARV_FIREBASE_CONFIG = {
-  apiKey: "PASTE_YOURS",
-  authDomain: "PASTE_YOURS",
-  projectId: "PASTE_YOURS",
-  storageBucket: "PASTE_YOURS",
-  messagingSenderId: "PASTE_YOURS",
-  appId: "PASTE_YOURS",
-  measurementId: "PASTE_YOURS"
-};
+```
+php /home/uXXXXXXXX/public_html/api/cron.php
 ```
 
-These values are **public by design** — they ship in the frontend of every
-Firebase web app. They are not secrets.
+This ingests the price, appends candles, builds the chart on its first few runs,
+matches resting orders, expires stale ones and recalculates reward tiers.
+
+**The site works before you do this**, because a page load that finds the price
+behind refreshes it itself. But that only happens while somebody is looking, so an
+idle site has an idle chart and a resting sell order waits for a visitor rather than
+for the clock. Add the cron.
+
+If your plan's minimum interval is five minutes, raise `price_max_age_seconds` in
+Operations → Settings to match, or the price will read as stale between runs and
+trading will keep pausing.
+
+To turn the fallback off once the scheduler is known good — so no visitor ever pays
+for a price fetch — set `web_tick` to `0` in Operations → Settings.
+
+### 1.5 The chart builds itself
+
+Nothing to do. The cron notices an empty chart and fills it, one timeframe per run:
+daily since launch, then hourly, then minute — roughly 1,827 / 2,160 / 10,080
+candles, complete about three minutes after the scheduler starts.
+
+One timeframe per run rather than all three, because all three take about
+thirty-five seconds and a scheduled job should finish inside its own minute. Progress
+is kept in `auto_backfill_next`, which walks `1D → 1h → 1m → done`.
+
+If an exchange refuses to page history it retries on the next run, and after twenty
+refusals it stops and records `stalled` rather than hammering a free endpoint all
+day. **Operations → Backfill history** is still there to run it by hand.
+
+### 1.6 Set the UPI VPA
+
+Only if you left it blank in the installer. Operations → **Settings** → `upi_vpa`.
+Until it is set the deposit page shows a placeholder saying so, rather than a QR
+code that scans to nothing.
+
+### 1.7 Check it
+
+- `https://yourdomain.com/api/market.php?action=snapshot` returns a price with
+  `stale: false`
+- Operations → **Reconcile** reports the ledger and the wallets agreeing exactly
+- Sign up as a normal user, deposit ₹100, confirm it as the operator, buy, sell
 
 ---
 
-## 4. Turn on Authentication
+## 2. Locally
 
-1. Left menu → **Build → Authentication** → **Get started**
-2. **Sign-in method** tab → enable **Email/Password** → Save
-3. Enable **Google** as well:
-   - Pick a support email from the dropdown
-   - Save
-4. **Settings** tab → **Authorised domains** → **Add domain** → `arvcoin.com`
-
-Without step 4, Google sign-in fails on the live site.
-
----
-
-## 5. Create the Firestore database
-
-1. Left menu → **Build → Firestore Database** → **Create database**
-2. Choose **Start in production mode** — the repo ships proper rules, so an
-   open test mode is unnecessary and unsafe
-3. Location: **asia-south1 (Mumbai)** for the lowest latency in India.
-   **This cannot be changed later.**
-4. Click **Enable**
-
----
-
-## 6. Deploy the security rules
-
-This is the step that actually enforces access gating. Nothing works properly
-without it.
+Needs PHP 8 with `pdo_mysql`, and a MySQL or MariaDB you can create a database in.
 
 ```bash
-npm install -g firebase-tools     # once
-firebase login                    # opens a browser
-firebase deploy --only firestore:rules,firestore:indexes
+mysql -u root -e "CREATE DATABASE arv CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+php -S localhost:8080
 ```
 
-No `--project` flag needed — `.firebaserc` pins it to `arvcoin-fbd29`.
+Open `http://localhost:8080/install.php` and fill in the same form, with
+`localhost` as the host and your local credentials.
 
-**No terminal available?** Paste the rules manually instead:
+There is nothing else to run. Loading any page refreshes the price when it has gone
+behind, and the chart builds itself. To force it along:
 
-1. Firestore Database → **Rules** tab
-2. Delete everything in the editor
-3. Open `firestore.rules` from the repo, copy the whole file, paste it in
-4. Click **Publish**
+```bash
+curl -s "http://localhost:8080/api/cron.php?job=all"
+```
 
-The indexes can be added later — Firestore will show a direct "create index"
-link in the browser console the first time a query needs one.
+Four of those calls take an install from empty to a full five-year chart.
 
----
+`php -S` is single-threaded, so a request that fires several API calls will feel
+slower than the real thing. Use `php -S localhost:8080 -t . &` plus a second
+worker, or just accept it — it is a development server.
 
-## 7. Make yourself admin
+### Mail locally
 
-1. Sign up on the live site with your email
-2. Go to `arvcoin.com/dashboard.html` → **Settings** → copy your **UID**
-3. Firebase Console → Firestore Database → **Start collection**
-4. Collection ID: `admins`
-5. Document ID: **paste your UID**
-6. Add two fields:
+Without a working `mail()`, OTPs cannot be delivered. `send_mail()` logs the whole
+message when delivery fails, so the code is in your PHP error log:
 
-   | Field | Type | Value |
-   |---|---|---|
-   | `admin` | boolean | `true` |
-   | `analyst` | boolean | `true` |
+```bash
+tail -f /path/to/php-error.log | grep -i otp
+```
 
-7. Save
-8. On the site: **sign out, then sign back in** — the role is read at sign-in
-
-`arvcoin.com/admin.html` now opens.
+That is a development convenience and nothing more — on the server, mail must
+actually work, because the OTP is the only thing standing between an email address
+and an account.
 
 ---
 
-## 8. Optional — email OTP
+## 3. Settings worth knowing
 
-`emailjs-config.js` holds EmailJS keys for the one-time verification email. If
-they are missing or invalid, signup still works and the OTP is printed to the
-browser console in DEMO mode.
+All of these live in the `settings` table and are editable in Operations →
+Settings. No deploy needed.
 
-To set it up properly: sign up free at <https://www.emailjs.com>, create an
-email service and a template containing `{{passcode}}` in the body and
-`{{email}}` in the "To Email" field, then paste the three IDs into
-`emailjs-config.js`.
+| Key | Default | What it does |
+|---|---|---|
+| `price_max_age_seconds` | 600 | Refuse to trade on a feed older than this |
+| `entry_fee_pct` / `exit_fee_pct` | 0.5 / 0.5 | Platform fee |
+| `gst_pct` | 18 | GST on the fee, not on the trade |
+| `slippage_pct` | 0.05 | Spread applied to the execution price |
+| `sell_fallback_minutes` | 60 | When the treasury takes an unmatched sell |
+| `order_expiry_hours` | 168 | Resting orders expire after a week |
+| `min_order_paise` | 10000 | ₹100 |
+| `deposit_max_minutes` | 15 | The window quoted to the user |
+| `withdraw_max_minutes` | 60 | Same, for withdrawals |
+| `referral_pct` | 5 | Commission on a referee's first deposit |
+| `kyc_required` | 1 | Verification before the first buy |
+| `maintenance_mode` | 0 | Everyone but operators sees a notice |
+| `tds_pct` / `tds_pct_no_pan` | 1 / 20 | s.194S and s.206AA |
+| `web_tick` | 1 | Let a page load refresh a stale price. Set to 0 once the cron is trusted |
+| `web_tick_min_seconds` | 45 | Floor between fallback fetches, so a dead feed cannot be retried on every request |
+| `auto_backfill` | 1 | Let the cron build an empty chart |
+| `auto_backfill_next` | 1D | Progress: `1D → 1h → 1m → done`. Set back to `1D` to rebuild |
+
+The launch reference — `launch_at`, `base_btc_usd`, `base_fx_usd_inr` — is also in
+`settings`, but **changing it after anyone has traded rewrites the entire price
+history**, and every holder's chart with it. It is set once, at install.
 
 ---
 
-## Checklist
+## 4. Regenerating the icons
 
-- [x] Project created — `arvcoin-fbd29`
-- [x] Web app registered, config copied
-- [x] `firebase-config.js` updated
-- [ ] Email/Password sign-in enabled
-- [ ] Google sign-in enabled
-- [ ] `arvcoin.com` added to authorised domains
-- [ ] Firestore created in production mode, asia-south1
-- [ ] `firestore.rules` deployed or pasted
-- [ ] Signed up on the live site
-- [ ] `admins/{your-uid}` document created with `admin: true` and `analyst: true`
-- [ ] Signed out and back in
-- [ ] `admin.html` opens
+Only needed after editing `favicon.svg`. The PNGs are committed, so a deploy needs
+no build step.
+
+```bash
+npm i -D playwright && npx playwright install chromium
+node tools/build-icons.mjs
+```
 
 ---
 
-## Troubleshooting
+## 5. Going live properly
 
-**"Missing or insufficient permissions"**
-The rules are not deployed. Redo step 6.
+- **HTTPS.** hPanel → SSL, then force it. `.htaccess` already redirects, but the
+  certificate has to exist first. A session cookie over plain HTTP is a session
+  anyone on the network can take.
+- **Back up the database.** hPanel → Backups, and take one manually before any
+  schema change. The ledger is the record; losing it loses everything.
+- **Watch the cron.** `cron_runs` records every execution with its status. If
+  ingest starts failing, trading pauses — you want to know before a user tells you.
+- **Reconcile regularly.** Operations → Reconcile compares the ledger against every
+  wallet. It should always be exact. If it is not, do not adjust a wallet — find
+  the missing entry.
+- **Mail deliverability.** Set SPF and DKIM for the domain, or OTP emails land in
+  spam and nobody can finish signing up.
+- **`uploads/` is data, never code.** `deposit.php` writes an `.htaccess` there
+  that switches the PHP engine off. Confirm it exists after the first upload — a
+  file called `shot.png` that is really PHP is otherwise a shell.
 
-**Google sign-in opens then closes with an error**
-`arvcoin.com` is missing from authorised domains. Step 4.
+---
 
-**`admin.html` redirects to the dashboard**
-Either the `admins/{uid}` document is missing, the UID does not match exactly,
-the fields are strings instead of booleans, or you have not signed out and
-back in since creating it.
+## 6. When something is wrong
 
-**Nothing loads and the console says `auth/invalid-api-key`**
-`firebase-config.js` still has old or partial values. Step 3.
+**Every page says the price feed is not running.**
+Both the cron and the page-load fallback are failing, which almost always means
+`curl` is disabled or the host blocks outbound HTTPS. Run
+`curl -s https://yourdomain.com/api/cron.php?job=all` by hand and read the JSON it
+returns — it names every exchange it tried.
 
-**Analysis or notes will not publish**
-Check you are on `admin.html` as an analyst, and that the rules are deployed.
-The browser console shows the exact rule that rejected the write.
+**The chart is empty and stays empty.**
+Check `auto_backfill_next` in Operations → Settings. If it says `stalled`, twenty
+consecutive attempts were refused by every exchange; `cron_runs` will have the
+reason. Set it back to `1D` to retry.
+
+**"The server returned something unexpected."**
+PHP died and printed a warning before the JSON. Check the error log; it is almost
+always a missing `api/config.local.php` or a database that refused the connection.
+
+**Orders are refused with a 503.**
+Working as intended: the feed is stale. Check `cron_runs` and the `arv_candles`
+timestamp.
+
+**Reconciliation is off by a few paise.**
+Look for a fill that wrote a ledger entry but not its fee, or the reverse. Correct
+it with an `adjustment` entry — never by editing a wallet, and never by editing the
+original row. The triggers will refuse the edit anyway.
+
+**A deposit was credited twice.**
+The same UTR reached two deposits. `deposits.utr` is indexed for exactly this;
+find both rows, and reverse one with a compensating ledger entry.

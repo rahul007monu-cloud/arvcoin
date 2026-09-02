@@ -1,147 +1,140 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#05060f" />
-  <title>Create account — arvcoin</title>
-  <meta name="description" content="Create your arvcoin account and start micro-investing from ₹10." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="auth.css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open an account — ARV Coin</title>
+<meta name="theme-color" content="#07070a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
 </head>
 <body>
-  <canvas id="bg-canvas"></canvas>
-  <div class="grid-overlay"></div>
-  <div class="noise-overlay"></div>
 
-  <div class="auth-wrap">
-    <aside class="auth-brand">
-      <div class="ab-glow"></div>
-      <div class="ab-top">
-        <a href="index.html" class="brand">
-          <span class="brand-mark">
-            <svg viewBox="0 0 40 40" width="34" height="34" aria-hidden="true">
-              <defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#7c5cff"/><stop offset="0.5" stop-color="#00e0ff"/><stop offset="1" stop-color="#00ffa3"/>
-              </linearGradient></defs>
-              <circle cx="20" cy="20" r="18" fill="none" stroke="url(#lg1)" stroke-width="2.5"/>
-              <path d="M13 26 L20 12 L27 26 M15.6 21 H24.4" fill="none" stroke="url(#lg1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-          <span class="brand-name">arv<span>coin</span></span>
-        </a>
-      </div>
+<div data-nav></div>
 
-      <div class="auth-coin">
-        <svg viewBox="0 0 40 40" width="96" height="96"><path d="M13 27 L20 11 L27 27 M15 21.5 H25" fill="none" stroke="#00ffc2" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </div>
+<main class="page">
+  <section class="hero" style="padding:var(--sp-7) 0">
+    <div class="hero-media" data-hero-media></div>
 
-      <div class="auth-tag">
-        <h2>Start your <span class="grad">wealth journey</span> today.</h2>
-        <p>Create your account in under a minute. Free access to the levels calculator and educational content.</p>
-        <ul class="auth-points">
-          <li><span class="tick">✓</span> Free levels calculator</li>
-          <li><span class="tick">✓</span> Daily market recaps</li>
-          <li><span class="tick">✓</span> Bank-grade security</li>
-        </ul>
-      </div>
-    </aside>
+    <div class="wrap hero-inner" style="max-width:480px">
+      <div class="card" data-reveal>
 
-    <main class="auth-form-side">
-      <div class="auth-card">
-        <a href="index.html" class="back-home">← Back to home</a>
-        <div class="a-brand">
-          <h1>Create account</h1>
+        <div style="text-align:center;margin-bottom:var(--sp-5)">
+          <h1 class="serif" style="font-size:1.9rem;margin-bottom:6px">Open an account</h1>
+          <p class="small muted" style="margin:0">
+            Start from ₹100. Pay by UPI.
+          </p>
         </div>
-        <p class="a-sub">Let's create your arvcoin account.</p>
 
-        <form id="signup-form" novalidate>
-          <div class="field" id="f-name">
+        <!-- referral, shown only when a code came in on the link -->
+        <div class="note-box ok hidden" style="margin-bottom:var(--sp-4)" data-ref-note>
+          Referred by <strong data-ref-code></strong>. They earn
+          <strong data-ref-pct>5%</strong> of your first deposit — it costs you nothing.
+        </div>
+
+        <!-- ================================================ step 1: details -->
+        <form data-form class="stack" data-panel="credentials">
+          <div class="field">
             <label for="name">Full name</label>
-            <div class="input-wrap">
-              <span class="ic">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
-              </span>
-              <input type="text" id="name" placeholder="Your name" autocomplete="name" />
-            </div>
-            <span class="err">Enter your full name.</span>
+            <input id="name" name="fullName" type="text" autocomplete="name" required>
+            <span class="hint">As it appears on your PAN — the tax statement uses it.</span>
           </div>
 
-          <div class="field" id="f-email">
+          <div class="field">
             <label for="email">Email</label>
-            <div class="input-wrap">
-              <span class="ic">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></svg>
-              </span>
-              <input type="email" id="email" placeholder="you@email.com" autocomplete="email" />
-            </div>
-            <span class="err">Valid email daalo.</span>
+            <input id="email" name="email" type="email" autocomplete="email"
+                   inputmode="email" required>
+            <span class="hint">We send a code here to confirm it is yours.</span>
           </div>
 
-          <div class="field" id="f-mobile">
-            <label for="mobile">Mobile number</label>
-            <div class="input-wrap">
-              <span class="ic">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>
-              </span>
-              <input type="tel" id="mobile" placeholder="10-digit mobile" autocomplete="tel" maxlength="10" />
-            </div>
-            <span class="err">10-digit mobile number daalo.</span>
+          <div class="field">
+            <label for="pw">Password</label>
+            <input id="pw" name="password" type="password" autocomplete="new-password"
+                   minlength="8" required>
+            <span class="hint">At least 8 characters.</span>
           </div>
 
-          <div class="field" id="f-pass">
-            <label for="password">Password</label>
-            <div class="input-wrap">
-              <span class="ic">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-              </span>
-              <input type="password" id="password" placeholder="Strong password banao" autocomplete="new-password" />
-              <button type="button" class="toggle-eye" data-target="password" aria-label="Show password">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-              </button>
-            </div>
-            <div class="strength" id="strength"><span></span><span></span><span></span><span></span></div>
-            <span class="err">Password must be at least 6 characters.</span>
+          <div class="field hidden" data-ref-field>
+            <label for="ref">Referral code</label>
+            <input id="ref" name="referralCode" type="text" maxlength="16"
+                   style="text-transform:uppercase" autocomplete="off">
           </div>
 
-          <div class="auth-row" style="margin-top:18px">
-            <label><input type="checkbox" id="terms" /> I agree to the <a href="#">Terms</a> & <a href="#">Privacy</a></label>
-          </div>
+          <label class="check">
+            <input type="checkbox" data-accept required>
+            <span>
+              I have read the
+              <a href="legal.html#risk" target="_blank" rel="noopener">risk disclosure</a>
+              and <a href="legal.html#terms" target="_blank" rel="noopener">terms</a>.
+              I understand ARV tracks Bitcoin, that its value can fall as well as
+              rise, and that I may get back less than I put in.
+            </span>
+          </label>
 
-          <!-- Cloudflare Turnstile (free captcha) — REAL site key (arvcoin) -->
-          <div class="cf-turnstile" data-sitekey="0x4AAAAAADxjXqOsk6FWgGLU" data-theme="dark"></div>
-
-          <button type="submit" class="btn btn-primary btn-lg full">Create account</button>
-          <div class="a-msg" id="msg"></div>
+          <button type="submit" class="btn btn-primary btn-block btn-lg">Create account</button>
         </form>
 
-        <div class="divider-or">or sign up with</div>
-        <div class="social-btns">
-          <button class="social-btn" type="button" data-provider="google">
-            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.2c-.3 1.4-1.1 2.6-2.3 3.4v2.8h3.7C21.8 18.6 23 15.8 23 12.3Z"/><path fill="#34A853" d="M12 24c3.1 0 5.7-1 7.6-2.8l-3.7-2.8c-1 .7-2.3 1.1-3.9 1.1-3 0-5.5-2-6.4-4.8H1.8v3C3.7 21.4 7.5 24 12 24Z"/><path fill="#FBBC05" d="M5.6 14.7c-.2-.7-.4-1.4-.4-2.2s.1-1.5.4-2.2v-3H1.8C1 8.9.6 10.4.6 12s.4 3.1 1.2 4.7l3.8-3Z"/><path fill="#EA4335" d="M12 4.8c1.7 0 3.2.6 4.4 1.7l3.3-3.3C17.7 1.2 15.1 0 12 0 7.5 0 3.7 2.6 1.8 6.3l3.8 3C6.5 6.8 9 4.8 12 4.8Z"/></svg>
-            Google
-          </button>
-          <button class="social-btn" type="button" data-provider="apple">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.9c0-2.1 1.7-3.1 1.8-3.2-1-1.4-2.5-1.6-3-1.7-1.3-.1-2.5.8-3.2.8-.6 0-1.7-.7-2.8-.7-1.4 0-2.8.8-3.5 2.1-1.5 2.6-.4 6.4 1.1 8.5.7 1 1.5 2.2 2.6 2.1 1-.04 1.4-.7 2.7-.7 1.2 0 1.6.7 2.7.6 1.1-.02 1.8-1 2.5-2 .8-1.2 1.1-2.3 1.1-2.3s-2.1-.8-2.1-3.3ZM14.3 6.3c.6-.7 1-1.7.9-2.7-.9 0-1.9.6-2.5 1.3-.5.6-1 1.6-.9 2.6 1 .1 1.9-.5 2.5-1.2Z"/></svg>
-            Apple
-          </button>
+        <!-- ==================================================== step 2: OTP -->
+        <div data-panel="otp" class="hidden">
+          <div class="note-box" style="margin-bottom:var(--sp-4)">
+            We emailed a 6-digit code to <strong data-otp-email>your address</strong>.
+            It expires in 10 minutes.
+          </div>
+
+          <form data-otp-form class="stack">
+            <div class="field">
+              <label for="code">Verification code</label>
+              <input id="code" class="otp-input" type="text" inputmode="numeric"
+                     autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}"
+                     placeholder="000000" required>
+              <span class="err hidden" data-otp-err></span>
+            </div>
+            <label class="check">
+              <input type="checkbox" data-trust checked>
+              <span>Remember this device for 30 days.</span>
+            </label>
+            <button type="submit" class="btn btn-primary btn-block btn-lg">Verify and continue</button>
+          </form>
+
+          <div class="row" style="justify-content:space-between;margin-top:var(--sp-4)">
+            <button class="btn btn-ghost btn-sm" data-resend>Send a new code</button>
+            <button class="btn btn-ghost btn-sm" data-back>Change email</button>
+          </div>
         </div>
 
-        <p class="auth-switch">Already have an account? <a href="login.html">Log in</a></p>
-      </div>
-    </main>
-  </div>
+        <div class="rule" style="margin:var(--sp-5) 0"></div>
 
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="3d.js" defer></script>
-  <script src="auth.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-  <script src="firebase-config.js"></script>
-  <script src="emailjs-config.js"></script>
-  <script type="module" src="firebase-auth.js"></script>
+        <p class="small muted center" style="margin:0">
+          Already registered? <a href="login.html">Sign in</a>
+        </p>
+
+        <div class="note-box warn hidden" style="margin-top:var(--sp-4)" data-not-installed>
+          <strong>Not set up yet.</strong> This site has no database configured.
+          Open <code>install.php</code> to finish setup.
+        </div>
+      </div>
+
+      <!-- What happens next, so the KYC step is not a surprise -->
+      <div class="card card-tight" data-reveal style="--reveal-delay:150ms;margin-top:var(--sp-4)">
+        <h5 style="margin-bottom:var(--sp-3)">What comes next</h5>
+        <div class="steps" style="margin:0">
+          <div class="step on"><span class="n">01</span><span class="t">Confirm email</span></div>
+          <div class="step"><span class="n">02</span><span class="t">KYC with PAN</span></div>
+          <div class="step"><span class="n">03</span><span class="t">Deposit by UPI</span></div>
+          <div class="step"><span class="n">04</span><span class="t">Buy ARV</span></div>
+        </div>
+        <p class="tiny muted" style="margin:var(--sp-3) 0 0">
+          KYC needs your PAN because it decides the TDS rate on every sale. We do
+          not store your Aadhaar number.
+        </p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div data-footer></div>
+<script type="module" src="js/pages/auth.js"></script>
 </body>
 </html>

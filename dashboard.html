@@ -1,204 +1,230 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#05060f" />
-  <title>Dashboard — arvcoin</title>
-  <meta name="description" content="Your arvcoin research dashboard — levels analysis, research calls, market recap." />
-  <meta name="robots" content="noindex" />
-  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="lux.css" />
-  <link rel="stylesheet" href="dashboard.css" />
-  <link rel="stylesheet" href="calls.css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wallet — ARV Coin</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#07070a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js" defer></script>
 </head>
-<body class="dash-body">
-  <canvas id="bg-canvas"></canvas>
-  <div class="aurora"><span class="a1"></span><span class="a2"></span></div>
-  <div class="grid-overlay"></div>
+<body>
 
-  <div class="dash-shell">
-    <!-- ============ SIDEBAR ============ -->
-    <aside class="side" id="side">
-      <a href="index.html" class="side-brand">
-        <span class="brand-mark">
-          <svg viewBox="0 0 40 40" width="30" height="30">
-            <defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#7c5cff"/><stop offset="0.5" stop-color="#00e0ff"/><stop offset="1" stop-color="#00ffa3"/>
-            </linearGradient></defs>
-            <circle cx="20" cy="20" r="18" fill="none" stroke="url(#lg1)" stroke-width="2.5"/>
-            <path d="M13 26 L20 12 L27 26 M15.6 21 H24.4" fill="none" stroke="url(#lg1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </span>
-        <span class="brand-name">arv<span>coin</span></span>
-      </a>
+<div data-nav></div>
 
-      <nav class="side-nav">
-        <a class="side-link active" data-view="home"><i>▦</i> Overview</a>
-        <a class="side-link" href="calls.html"><i>◹</i> Research feed</a>
-        <a class="side-link" href="levels.html"><i>🧮</i> Levels calculator</a>
-        <a class="side-link" data-view="recap"><i>≣</i> Market recap</a>
-        <a class="side-link" data-view="lessons"><i>🎓</i> Lessons</a>
-        <a class="side-link" data-view="plan"><i>◈</i> My plan</a>
-        <a class="side-link" data-view="settings"><i>⚙</i> Settings</a>
-        <a class="side-link" id="admin-link" href="admin.html" style="display:none"><i>✎</i> Publish</a>
-      </nav>
+<main class="page wrap" style="padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
 
-      <div class="side-promo" id="side-promo" style="display:none">
-        <p class="sp-title">Upgrade</p>
-        <p class="sp-sub" id="sp-sub">Unlock every segment — F&amp;O, commodity, currency.</p>
-        <a class="btn btn-primary sp-btn" href="pricing.html">View plans</a>
-      </div>
-
-      <a href="#" class="side-logout" id="logout"><i>⏻</i> Log out</a>
-    </aside>
-
-    <!-- ============ MAIN ============ -->
-    <main class="dash-main">
-      <header class="topbar">
-        <button class="menu-btn" id="menu-btn" aria-label="Menu">☰</button>
-        <div class="tb-hello">
-          <small id="greet">Welcome 👋</small>
-          <h2 id="hello-name">Investor</h2>
-        </div>
-        <div class="tb-right">
-          <a class="pill-stat" id="plan-pill" href="pricing.html" style="text-decoration:none">—</a>
-          <div class="tb-avatar" id="tb-avatar" data-view="settings">A</div>
-        </div>
-      </header>
-
-      <div class="dash-scroll">
-
-        <!-- ===== OVERVIEW ===== -->
-        <section class="view active" data-view="home">
-
-          <!-- education notice -->
-          <div class="lux-note" id="mode-note" style="margin-bottom:20px"></div>
-
-          <!-- plan status -->
-          <div class="lux" style="padding:26px;margin-bottom:20px">
-            <div style="display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:flex-start">
-              <div>
-                <small style="color:var(--muted-2);font-size:12px;text-transform:uppercase;letter-spacing:.06em">Your plan</small>
-                <h2 style="font-size:26px;font-weight:800;margin:6px 0 4px" id="plan-name">No active plan</h2>
-                <p style="color:var(--muted);font-size:14px" id="plan-meta">Free account — the levels calculator and free content are available.</p>
-              </div>
-              <a href="pricing.html" class="btn-lux" id="plan-cta">View plans →</a>
-            </div>
-
-            <div style="margin-top:22px">
-              <small style="color:var(--muted-2);font-size:12px;text-transform:uppercase;letter-spacing:.06em">Segment coverage</small>
-              <div class="inst-chips" id="seg-chips" style="margin-top:10px"></div>
-            </div>
-          </div>
-
-          <!-- quick actions -->
-          <div class="lux-grid g3" style="margin-bottom:20px">
-            <a href="levels.html" class="lux lux-card lux-3d" style="text-decoration:none">
-              <div class="ico">🧮</div>
-              <h3>Levels calculator</h3>
-              <p>Compute support, resistance, pivots and CPR for any instrument. Free, always.</p>
-            </a>
-            <a href="calls.html" class="lux lux-card lux-3d" style="text-decoration:none">
-              <div class="ico">◹</div>
-              <h3>Research feed</h3>
-              <p>Levels analysis, structural observations and market recaps in one place.</p>
-            </a>
-            <a href="pricing.html" class="lux lux-card lux-3d" style="text-decoration:none">
-              <div class="ico">◈</div>
-              <h3>Expand coverage</h3>
-              <p>Stocks, F&amp;O, commodity (gold, silver, copper), currency, crypto.</p>
-            </a>
-          </div>
-
-          <!-- latest analysis -->
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-            <h2 style="font-size:19px;font-weight:700">Latest analysis</h2>
-            <a href="calls.html" style="color:var(--cyan);font-size:14px">View all →</a>
-          </div>
-          <div class="call-list" id="latest-feed">
-            <div class="skel"></div><div class="skel"></div>
-          </div>
-        </section>
-
-        <!-- ===== RECAP ===== -->
-        <section class="view" data-view="recap">
-          <h2 style="font-size:22px;font-weight:800;margin-bottom:6px">Market recap</h2>
-          <p style="color:var(--muted);font-size:14.5px;margin-bottom:22px">
-            A factual summary of what happened, and why.
-          </p>
-          <div class="call-list" id="recap-feed"><div class="skel"></div></div>
-        </section>
-
-        <!-- ===== LESSONS ===== -->
-        <section class="view" data-view="lessons">
-          <h2 style="font-size:22px;font-weight:800;margin-bottom:6px">Lessons</h2>
-          <p style="color:var(--muted);font-size:14.5px;margin-bottom:22px">
-            Market concepts, from the basics to advanced.
-          </p>
-          <div class="call-list" id="lesson-feed"><div class="skel"></div></div>
-        </section>
-
-        <!-- ===== MY PLAN ===== -->
-        <section class="view" data-view="plan">
-          <h2 style="font-size:22px;font-weight:800;margin-bottom:22px">My plan</h2>
-          <div class="lux" style="padding:26px;margin-bottom:18px">
-            <div class="lux-table">
-              <div class="tr"><span>Plan</span><b id="p-name">—</b></div>
-              <div class="tr"><span>Status</span><b id="p-status">—</b></div>
-              <div class="tr"><span>Valid till</span><b id="p-till">—</b></div>
-              <div class="tr"><span>Days left</span><b id="p-days">—</b></div>
-              <div class="tr"><span>Segments</span><b id="p-segs">—</b></div>
-            </div>
-            <div class="cta-row" style="margin-top:22px">
-              <a href="pricing.html" class="btn-lux">Upgrade or renew</a>
-            </div>
-          </div>
-          <div class="lux-note info">
-            <span class="n-ico">ℹ️</span>
-            <div>There is no auto-renewal. Access stops when the term ends — no silent charges.</div>
-          </div>
-        </section>
-
-        <!-- ===== SETTINGS ===== -->
-        <section class="view" data-view="settings">
-          <h2 style="font-size:22px;font-weight:800;margin-bottom:22px">Settings</h2>
-          <div class="lux" style="padding:26px;margin-bottom:18px">
-            <div class="lux-table">
-              <div class="tr"><span>Name</span><b id="s-name">—</b></div>
-              <div class="tr"><span>Email</span><b id="s-email">—</b></div>
-              <div class="tr"><span>Email verified</span><b id="s-verified">—</b></div>
-              <div class="tr"><span>Account created</span><b id="s-created">—</b></div>
-              <div class="tr"><span>User ID (UID)</span><b id="s-uid" style="font-family:var(--font-alt);font-size:12.5px;word-break:break-all">—</b></div>
-            </div>
-            <button type="button" class="btn-glass" id="copy-uid" style="margin-top:16px">Copy UID</button>
-            <p style="color:var(--muted-2);font-size:12.5px;margin-top:12px;line-height:1.6">
-              Your UID is needed to grant yourself admin access from the Firebase Console.
-            </p>
-          </div>
-          <div class="lux" style="padding:26px">
-            <h3 style="font-size:16px;font-weight:700;margin-bottom:14px">Account</h3>
-            <div class="cta-row">
-              <button class="btn-glass" id="btn-logout2">Log out</button>
-            </div>
-          </div>
-        </section>
-
-        <div class="disclosure" id="disc" style="margin-top:30px"></div>
-      </div>
-    </main>
+  <!-- ============================================================ greeting -->
+  <div class="row-between row-wrap" style="margin-bottom:var(--sp-5)">
+    <div>
+      <h1 class="serif" style="font-size:1.8rem;margin-bottom:2px">
+        <span data-greeting>Welcome</span>
+      </h1>
+      <div class="small muted" data-sub>Your rupee balance and ARV holding</div>
+    </div>
+    <div class="row row-wrap">
+      <a href="deposit.html" class="btn btn-ghost">Add funds</a>
+      <a href="trade.html" class="btn btn-primary">Trade</a>
+    </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="firebase-config.js"></script>
-  <script src="arv-config.js"></script>
-  <script src="3d.js" defer></script>
-  <script src="lux.js" defer></script>
-  <script type="module" src="dashboard.js"></script>
+  <!-- ========================================================= gate notices -->
+  <div class="note-box warn hidden" style="margin-bottom:var(--sp-4)" data-kyc-notice>
+    <strong>KYC not complete.</strong>
+    You can browse and hold, but a first purchase and any withdrawal need it.
+    <a href="profile.html#kyc" class="arrow">Complete KYC</a>
+  </div>
+  <div class="note-box warn hidden" style="margin-bottom:var(--sp-4)" data-paused-notice>
+    <strong>Trading is paused.</strong>
+    <span data-paused-reason></span> Your balances are unaffected.
+  </div>
+
+  <!-- ============================================================== wallet -->
+  <div class="card" data-reveal="weighty" style="margin-bottom:var(--sp-4)">
+    <div class="wallet-split">
+
+      <!-- rupees -->
+      <div>
+        <div class="stat-k" style="margin-bottom:var(--sp-2)">Rupee balance</div>
+        <div class="stat-v stat-v-lg" data-inr>—</div>
+        <div class="small muted" style="margin-top:6px">
+          <span class="wallet-locked hidden" data-inr-locked></span>
+        </div>
+        <div class="row" style="margin-top:var(--sp-4)">
+          <a href="deposit.html" class="btn btn-sm">Deposit</a>
+          <a href="withdraw.html" class="btn btn-sm btn-ghost">Withdraw</a>
+        </div>
+        <div class="tiny muted" style="margin-top:var(--sp-3)">
+          Rupees sit here between a deposit and a purchase, and again after a sale.
+          Nothing moves between users' bank accounts.
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- ARV -->
+      <div>
+        <div class="stat-k" style="margin-bottom:var(--sp-2)">ARV holding</div>
+        <div class="stat-v stat-v-lg" data-units>—</div>
+        <div class="small muted" style="margin-top:6px">
+          worth <span class="strong" data-value>—</span>
+          <span class="wallet-locked hidden" data-units-locked></span>
+        </div>
+        <div class="row" style="margin-top:var(--sp-4)">
+          <a href="trade.html?side=buy" class="btn btn-sm btn-buy">Buy</a>
+          <a href="trade.html?side=sell" class="btn btn-sm btn-sell">Sell</a>
+        </div>
+        <div class="tiny muted" style="margin-top:var(--sp-3)">
+          Units track Bitcoin one for one. Selling credits rupees here, which you
+          then withdraw.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================================================================ P&L -->
+  <div class="grid g-4" data-reveal-group style="margin-bottom:var(--sp-4)">
+    <div class="card card-tight card-lift" data-reveal><div class="stat">
+      <span class="stat-k">ARV price</span>
+      <span class="stat-v" data-price>—</span>
+      <span class="stat-sub"><span class="chip flat" data-change>—</span> 24h</span>
+    </div></div>
+
+    <div class="card card-tight card-lift" data-reveal><div class="stat">
+      <span class="stat-k">Invested</span>
+      <span class="stat-v" data-invested>—</span>
+      <span class="stat-sub">at <span data-avg-cost>—</span> average</span>
+    </div></div>
+
+    <div class="card card-tight card-lift" data-reveal><div class="stat">
+      <span class="stat-k">Unrealised</span>
+      <span class="stat-v" data-unrealised>—</span>
+      <span class="stat-sub"><span class="chip flat" data-unrealised-pct>—</span></span>
+    </div></div>
+
+    <div class="card card-tight card-lift" data-reveal><div class="stat">
+      <span class="stat-k">Realised</span>
+      <span class="stat-v" data-realised>—</span>
+      <span class="stat-sub">from completed sales</span>
+    </div></div>
+  </div>
+
+  <div class="split">
+
+    <div class="stack">
+      <!-- ============================================================ chart -->
+      <div class="chart-shell" data-reveal>
+        <div class="chart-bar">
+          <div>
+            <strong>ARV / INR</strong>
+            <div class="tiny muted" data-cost-line-note>Your average cost is marked on the chart</div>
+          </div>
+          <div class="tabs" data-range-tabs></div>
+        </div>
+        <div class="chart-canvas" data-chart></div>
+        <div class="chart-legend">
+          <div class="legend-item" data-feed-status><span class="live-dot off"></span>connecting…</div>
+          <div class="spacer"></div>
+          <div class="legend-item" data-candle-count></div>
+        </div>
+      </div>
+
+      <!-- ===================================================== open orders -->
+      <div class="card card-flush" data-reveal>
+        <div class="card-head" style="padding:var(--sp-4);margin:0">
+          <h3 style="font-size:1rem">Open orders</h3>
+          <a href="trade.html" class="btn btn-ghost btn-sm arrow">Trade</a>
+        </div>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr>
+              <th>Reference</th><th>Side</th><th>Type</th>
+              <th class="num">Remaining</th><th class="num">Trigger</th>
+              <th>Status</th><th></th>
+            </tr></thead>
+            <tbody data-orders>
+              <tr><td colspan="7" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ======================================================== activity -->
+      <div class="card card-flush" data-reveal>
+        <div class="card-head" style="padding:var(--sp-4);margin:0">
+          <h3 style="font-size:1rem">Recent activity</h3>
+          <a href="transactions.html" class="btn btn-ghost btn-sm arrow">All history</a>
+        </div>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr>
+              <th>When</th><th>What</th><th class="num">Units</th>
+              <th class="num">Price</th><th class="num">Amount</th>
+            </tr></thead>
+            <tbody data-activity>
+              <tr><td colspan="5" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ side -->
+    <div class="stack">
+
+      <!-- what selling everything would net -->
+      <div class="card card-tight" data-reveal>
+        <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
+          <h4 style="font-size:.95rem">If you sold everything now</h4>
+        </div>
+        <div class="ledger-list" data-whatif>
+          <div class="ledger-row"><span class="l muted">—</span></div>
+        </div>
+        <div class="tiny muted" style="margin-top:var(--sp-3)">
+          The 30% plus cess is your own liability at filing, not something withheld
+          here. Only the exit fee, GST and 1% TDS come off the payout.
+        </div>
+      </div>
+
+      <!-- market -->
+      <div class="card card-flush" data-reveal>
+        <div class="card-head" style="padding:var(--sp-4);margin:0">
+          <h4 style="font-size:.95rem">Market</h4>
+        </div>
+        <div data-watchlist><div class="empty"><span class="spinner"></span></div></div>
+      </div>
+
+      <!-- refer -->
+      <div class="card card-tight" data-reveal>
+        <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
+          <h4 style="font-size:.95rem">Refer and earn</h4>
+          <span class="badge metal" data-tier hidden></span>
+        </div>
+        <p class="small" style="margin-bottom:var(--sp-3)">
+          <span data-ref-pct>5%</span> of the first deposit anyone you refer makes,
+          credited straight to your rupee balance.
+        </p>
+        <div class="qr-vpa" style="justify-content:space-between">
+          <span class="mono" data-ref-code>—</span>
+          <button class="btn btn-sm btn-ghost" data-copy-ref>Copy link</button>
+        </div>
+        <a href="referral.html" class="btn btn-ghost btn-sm btn-block arrow" style="margin-top:var(--sp-3)">
+          See your referrals
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<div data-footer></div>
+<script type="module" src="js/pages/dashboard.js"></script>
 </body>
 </html>

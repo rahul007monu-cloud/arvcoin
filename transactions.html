@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>History — ARV Coin</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#07070a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
+</head>
+<body>
+
+<div data-nav></div>
+
+<main class="page wrap" style="max-width:1120px;padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
+
+  <div class="row-between row-wrap" style="margin-bottom:var(--sp-5)">
+    <div>
+      <h1 class="serif" style="font-size:1.8rem;margin-bottom:2px">History</h1>
+      <div class="small muted">
+        Every rupee and every unit that moved, once each. Nothing here is ever edited.
+      </div>
+    </div>
+    <div class="row row-wrap" style="gap:8px">
+      <select data-fy style="width:auto;min-width:130px"></select>
+      <button class="btn btn-ghost btn-sm" data-csv>Export CSV</button>
+    </div>
+  </div>
+
+  <!-- ============================================================== totals -->
+  <section class="card card-tight" style="margin-bottom:var(--sp-4)">
+    <div class="grid g-4" style="gap:var(--sp-5)">
+      <div class="stat">
+        <span class="stat-k">In</span>
+        <span class="stat-v up" data-in>—</span>
+        <span class="stat-sub">deposits, sales, commission</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Out</span>
+        <span class="stat-v down" data-out>—</span>
+        <span class="stat-sub">purchases, withdrawals, charges</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Net rupee movement</span>
+        <span class="stat-v" data-net>—</span>
+        <span class="stat-sub" data-scope>—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Charges paid</span>
+        <span class="stat-v" data-charges>—</span>
+        <span class="stat-sub" data-charges-sub>fees, GST and TDS</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= filters -->
+  <div class="row-between row-wrap" style="margin-bottom:var(--sp-4);gap:var(--sp-3)">
+    <div class="tabs" data-groups>
+      <button class="tab on" data-group="">All</button>
+      <button class="tab" data-group="money">Money in &amp; out</button>
+      <button class="tab" data-group="trading">Trading</button>
+      <button class="tab" data-group="charges">Charges</button>
+      <button class="tab" data-group="rewards">Rewards</button>
+    </div>
+    <div class="tabs" data-views>
+      <button class="tab on" data-view="ledger">Ledger</button>
+      <button class="tab" data-view="trades">Fills</button>
+    </div>
+  </div>
+
+  <!-- ============================================================== ledger -->
+  <section class="card card-flush" data-pane="ledger">
+    <div class="table-wrap" data-rows>
+      <div class="empty"><span class="spinner"></span></div>
+    </div>
+    <div style="padding:var(--sp-4);text-align:center">
+      <button class="btn btn-ghost btn-sm hidden" data-more>Load older entries</button>
+      <div class="tiny muted hidden" data-end>That is the beginning of your account.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================== fills -->
+  <section class="card card-flush hidden" data-pane="trades">
+    <div class="table-wrap" data-trades>
+      <div class="empty"><span class="spinner"></span></div>
+    </div>
+    <p class="tiny muted" style="padding:var(--sp-4);margin:0">
+      One row per fill. A sale shows the cost basis the oldest lots gave it and the
+      gain that follows — the same figures that reach your
+      <a href="tax.html">tax statement</a>. <em>Treasury</em> as counterparty means
+      we took the other side; the price is the index either way.
+    </p>
+  </section>
+
+  <p class="tiny muted" style="margin-top:var(--sp-4);max-width:70ch">
+    This is the book of record, and your balance is a running total of it. A
+    correction appears as its own entry rather than a change to the original, so
+    the two can always be checked against each other. If a number here ever
+    disagrees with your <a href="dashboard.html">wallet</a>, this one is right —
+    tell us and we will reconcile it.
+  </p>
+
+</main>
+
+<div data-footer></div>
+<script type="module" src="js/pages/transactions.js"></script>
+</body>
+</html>

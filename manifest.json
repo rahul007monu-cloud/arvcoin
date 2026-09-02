@@ -1,44 +1,48 @@
 {
-  "name": "arvcoin — Market Research Desk",
-  "short_name": "arvcoin",
-  "description": "Market research aur investor education — stocks, F&O options, commodity, currency aur crypto. Levels calculator free.",
+  "name": "ARV Coin",
+  "short_name": "ARV",
+  "description": "One unit, priced at ₹1 at launch, tracking Bitcoin one for one in rupees. Live index price, an order book that settles at that price, and Indian VDA tax computed on every sale.",
+  "id": "arv-coin",
   "start_url": "index.html",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#05060f",
-  "theme_color": "#05060f",
-  "categories": ["finance", "education"],
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "portrait-primary",
+  "background_color": "#07070a",
+  "theme_color": "#07070a",
+  "categories": ["finance"],
+  "lang": "en-IN",
+  "dir": "ltr",
   "icons": [
     {
       "src": "favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "shortcuts": [
-    {
-      "name": "Levels calculator",
-      "short_name": "Levels",
-      "description": "Support, resistance aur pivot points nikaalo",
-      "url": "levels.html"
-    },
-    {
-      "name": "Research feed",
-      "short_name": "Research",
-      "description": "Levels analysis aur market recap",
-      "url": "calls.html"
-    },
-    {
-      "name": "Dashboard",
-      "short_name": "Dashboard",
-      "url": "dashboard.html"
-    },
-    {
-      "name": "Log in",
-      "short_name": "Log in",
-      "url": "login.html"
-    }
+    { "name": "Trade", "short_name": "Trade", "url": "trade.html" },
+    { "name": "Wallet", "short_name": "Wallet", "url": "dashboard.html" },
+    { "name": "Deposit", "short_name": "Deposit", "url": "deposit.html" },
+    { "name": "History", "short_name": "History", "url": "transactions.html" }
   ]
 }

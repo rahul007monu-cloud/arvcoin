@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profile &amp; KYC — ARV Coin</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#07070a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
+</head>
+<body>
+
+<div data-nav></div>
+
+<main class="page wrap" style="max-width:900px;padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
+
+  <div class="row-between row-wrap" style="margin-bottom:var(--sp-5)">
+    <div>
+      <h1 class="serif" style="font-size:1.8rem;margin-bottom:2px">Profile</h1>
+      <div class="small muted" data-email>—</div>
+    </div>
+    <span class="badge" data-kyc-badge>—</span>
+  </div>
+
+  <!-- ================================================================ KYC -->
+  <section id="kyc" class="card" style="margin-bottom:var(--sp-4)">
+    <div class="card-head">
+      <h3 style="font-size:1rem">Verification</h3>
+      <span class="badge" data-kyc-status>—</span>
+    </div>
+
+    <div class="note-box ok hidden" style="margin-bottom:var(--sp-4)" data-kyc-done>
+      <strong>Verified.</strong> You can buy and withdraw. To change these details,
+      contact operations.
+    </div>
+    <div class="note-box warn hidden" style="margin-bottom:var(--sp-4)" data-kyc-pending>
+      <strong>Under review.</strong> Usually within 24 hours. You will be able to
+      buy as soon as it clears.
+    </div>
+    <div class="note-box bad hidden" style="margin-bottom:var(--sp-4)" data-kyc-rejected>
+      <strong>Not accepted.</strong> <span data-kyc-reason></span>
+      Correct it below and submit again.
+    </div>
+
+    <form data-kyc-form class="stack">
+      <div class="grid g-2" style="gap:var(--sp-4)">
+        <div class="field">
+          <label for="fullName">Full name</label>
+          <input id="fullName" type="text" autocomplete="name" required>
+          <span class="hint">Exactly as it appears on your PAN.</span>
+        </div>
+        <div class="field">
+          <label for="dob">Date of birth</label>
+          <input id="dob" type="date" required>
+          <span class="hint">You must be 18 or over.</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="pan">PAN</label>
+        <input id="pan" type="text" maxlength="10" placeholder="ABCDE1234F"
+               style="text-transform:uppercase" autocomplete="off" required>
+        <span class="hint">
+          Five letters, four digits, one letter. This decides the TDS rate on every
+          sale — without it, section 206AA applies
+          <strong data-nopan>20%</strong> instead of <strong data-pan-rate>1%</strong>.
+        </span>
+        <span class="err hidden" data-pan-err></span>
+      </div>
+
+      <div class="field">
+        <label for="addr">Address</label>
+        <input id="addr" type="text" autocomplete="street-address" required>
+      </div>
+
+      <div class="grid g-3" style="gap:var(--sp-4)">
+        <div class="field">
+          <label for="city">City</label>
+          <input id="city" type="text" autocomplete="address-level2">
+        </div>
+        <div class="field">
+          <label for="state">State</label>
+          <select id="state" required><option value="">Select…</option></select>
+        </div>
+        <div class="field">
+          <label for="pin">PIN code</label>
+          <input id="pin" type="text" inputmode="numeric" maxlength="6" autocomplete="postal-code" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="vpa">Payout UPI ID</label>
+        <input id="vpa" type="text" placeholder="yourname@bank" autocomplete="off">
+        <span class="hint">Withdrawals go here. You can change it later.</span>
+      </div>
+
+      <!-- Aadhaar: last four only, and the reason is stated -->
+      <div class="field">
+        <label for="aadhaar4">Aadhaar — last 4 digits <span class="muted">(optional)</span></label>
+        <input id="aadhaar4" type="text" inputmode="numeric" maxlength="4" placeholder="1234" autocomplete="off">
+        <span class="hint">
+          Only four digits, and only for matching. We do not ask for or store a full
+          Aadhaar number — holding one without being a licensed verification agency
+          is an offence under the Aadhaar Act, 2016. Full verification, when we add
+          it, will run through a licensed provider that returns a yes or no and
+          never hands us the number.
+        </span>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg" data-kyc-submit>
+        Submit for verification
+      </button>
+    </form>
+  </section>
+
+  <div class="grid g-2" style="align-items:start">
+
+    <!-- ====================================================== tax position -->
+    <div class="card card-tight">
+      <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
+        <h4 style="font-size:.95rem">Your tax position</h4>
+        <span class="badge" data-fy>—</span>
+      </div>
+      <div class="ledger-list" data-tax-position></div>
+      <p class="tiny muted" style="margin:var(--sp-3) 0 0">
+        TDS is a credit, not an extra tax — it is set against what you owe and shows
+        in Form 26AS. Your <a href="tax.html">tax statement</a> has the full year.
+      </p>
+    </div>
+
+    <!-- =========================================================== account -->
+    <div class="stack">
+      <div class="card card-tight">
+        <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
+          <h4 style="font-size:.95rem">Fees you pay</h4>
+          <span class="badge metal hidden" data-tier></span>
+        </div>
+        <div class="ledger-list" data-fees></div>
+        <a href="referral.html" class="btn btn-ghost btn-sm btn-block arrow" style="margin-top:var(--sp-3)">
+          Lower them by referring
+        </a>
+      </div>
+
+      <div class="card card-tight">
+        <h4 style="font-size:.95rem">Change password</h4>
+        <form data-pw-form class="stack">
+          <div class="field">
+            <label for="cur">Current password</label>
+            <input id="cur" type="password" autocomplete="current-password" required>
+          </div>
+          <div class="field">
+            <label for="next">New password</label>
+            <input id="next" type="password" autocomplete="new-password" minlength="8" required>
+          </div>
+          <button type="submit" class="btn btn-sm">Change password</button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<div data-footer></div>
+<script type="module" src="js/pages/profile.js"></script>
+</body>
+</html>

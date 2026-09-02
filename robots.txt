@@ -1,4 +1,16 @@
 User-agent: *
 Allow: /
 
+# Account pages are behind auth and have nothing to index.
+Disallow: /dashboard.html
+Disallow: /buy.html
+Disallow: /withdraw.html
+Disallow: /transactions.html
+Disallow: /tax.html
+Disallow: /profile.html
+Disallow: /admin.html
+Disallow: /login.html
+Disallow: /signup.html
+Disallow: /supabase/
+
 Sitemap: https://arvcoin.com/sitemap.xml

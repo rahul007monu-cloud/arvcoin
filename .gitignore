@@ -1,37 +1,58 @@
-# dependencies
+# Local verification harness — tests and a static server, not part of the app
+.verify/
+
+# ---------------------------------------------------------------------------
+# NEVER COMMIT THIS FILE.
+#
+# install.php writes the MySQL password, the app signing key and the mail
+# settings here. It lives only on the server. If it is ever committed, rotate
+# the database password and the app key immediately — the key signs sessions and
+# hashes OTPs, so a leaked one is a way into every account.
+# ---------------------------------------------------------------------------
+api/config.local.php
+
+# Payment screenshots users upload — other people's bank statements.
+uploads/
+
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
 
-# expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-*.tsbuildinfo
-
-# native
-ios/
-android/
-*.orig.*
-
-# env / secrets
+# Environment and secrets
+# The service_role key belongs in Supabase function secrets, never in the repo.
 .env
 .env.*
 !.env.example
+*.pem
+*.key
 
-# Firebase service account keys — NEVER commit these.
-# Ye keys poore project ka full admin access deti hain.
-serviceAccountKey.json
-**/serviceAccountKey.json
-*-firebase-adminsdk-*.json
-firebase-adminsdk*.json
+# Supabase CLI local state
+supabase/.branches/
+supabase/.temp/
+supabase/.env
 
-# logs
-npm-debug.*
-yarn-debug.*
-yarn-error.*
+# Build and cache
+dist/
+build/
+.cache/
+*.tsbuildinfo
 
-# macOS / editor
-.DS_Store
-*.log
-.idea/
+# Editors
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*

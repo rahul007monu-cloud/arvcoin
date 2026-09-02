@@ -1,433 +1,212 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#05060f" />
-  <title>Publish — arvcoin admin</title>
-  <meta name="robots" content="noindex, nofollow" />
-  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="calls.css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Operations — ARV Coin</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#07070a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
 </head>
 <body>
-  <canvas id="bg-canvas"></canvas>
-  <div class="grid-overlay"></div>
 
-  <header class="nav scrolled">
-    <div class="nav-inner">
-      <a href="index.html" class="brand">
-        <span class="brand-mark">
-          <svg viewBox="0 0 40 40" width="30" height="30">
-            <defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#7c5cff"/><stop offset="0.5" stop-color="#00e0ff"/><stop offset="1" stop-color="#00ffa3"/>
-            </linearGradient></defs>
-            <circle cx="20" cy="20" r="18" fill="none" stroke="url(#lg1)" stroke-width="2.5"/>
-            <path d="M13 26 L20 12 L27 26 M15.6 21 H24.4" fill="none" stroke="url(#lg1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </span>
-        <span class="brand-name">arv<span>coin</span></span>
-      </a>
-      <div class="nav-cta">
-        <a href="calls.html" class="btn btn-ghost">Feed</a>
-        <a href="dashboard.html" class="btn btn-ghost">Dashboard</a>
+<div data-nav></div>
+
+<main class="page wrap wrap-wide" style="padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
+
+  <div class="row-between row-wrap" style="margin-bottom:var(--sp-4)">
+    <div>
+      <h1 class="serif" style="font-size:1.8rem;margin-bottom:2px">Operations</h1>
+      <div class="small muted">
+        Every action here is re-authorised on the server. Showing a button is not
+        what grants permission to press it.
       </div>
     </div>
-  </header>
-
-  <div class="app-wrap">
-    <div class="ph">
-      <div>
-        <h1>Publish <span class="grad">research</span></h1>
-        <p>Analyst control room. Every note passes a compliance check.</p>
-      </div>
-      <div class="ph-right">
-        <span class="pill-stat" id="pill-role">—</span>
-        <span class="pill-stat" id="pill-ra">RA: —</span>
-      </div>
+    <div class="row">
+      <span class="feed-status" data-feed-status><span class="live-dot off"></span>—</span>
+      <button class="btn btn-ghost btn-sm" data-refresh>Refresh</button>
     </div>
-
-    <!-- RA registration gate -->
-    <div class="gate-warn" id="ra-gate" style="display:none">
-      <b>🚫 Publishing is disabled — RA registration is not set</b>
-      Publishing buy or sell recommendations on securities for a fee requires SEBI Research
-      Analyst registration (SEBI RA Regulations, 2014). This gate exists so an unregistered
-      recommendation can never be published by accident.<br><br>
-      <code>arv-config.js</code> → <code>RA_REGISTRATION.number</code> with your registration
-      number (or a partner RA/IA's, under a revenue-share arrangement). Publishing enables
-      immediately once it is set.<br><br>
-      In the meantime you can publish <b>Levels analysis</b>, <b>Lessons</b> and
-      <b>Market recaps</b> — those are educational content and need no registration.
-    </div>
-
-    <!-- what to publish -->
-    <div class="seg-tabs" id="kind-tabs">
-      <button class="seg-tab active" data-kind="analysis"><i>🧮</i> Levels analysis <span class="lock">✓ live</span></button>
-      <button class="seg-tab" data-kind="call"><i>◹</i> Research call</button>
-      <button class="seg-tab" data-kind="lesson"><i>🎓</i> Lesson</button>
-      <button class="seg-tab" data-kind="recap"><i>≣</i> Market recap</button>
-      <button class="seg-tab" data-kind="pricing"><i>₹</i> Pricing &amp; payment</button>
-      <button class="seg-tab" data-kind="approvals"><i>✓</i> Approvals <span class="lock" id="appr-count"></span></button>
-    </div>
-
-    <div class="adm-grid">
-
-      <!-- ===================== FORM ===================== -->
-      <div class="card">
-        <div class="adm-msg" id="msg"></div>
-        <div class="lint-out" id="lint"></div>
-
-        <!-- ---------- ANALYSIS FORM (RA gate se free) ---------- -->
-        <form id="form-analysis">
-          <h2>Levels analysis</h2>
-          <p class="card-sub">
-            Enter the high, low and close — levels compute automatically. No registration needed,
-            publishes immediately.
-          </p>
-
-          <div class="lux-note good" style="margin-bottom:20px;font-size:13.5px">
-            <span class="n-ico">✓</span>
-            <div>
-              This is <b>calculator output plus your structural view</b>. It has no buy/sell
-              action, entry, target or stop-loss field — which is why it publishes without
-              RA registration and reaches subscribers immediately.
-            </div>
-          </div>
-
-          <div class="fld-row">
-            <div class="fld">
-              <label for="a-segment">Segment</label>
-              <select id="a-segment"></select>
-            </div>
-            <div class="fld">
-              <label for="a-instrument">Instrument</label>
-              <input id="a-instrument" placeholder="RELIANCE / NIFTY / GOLD / COPPER" autocomplete="off" />
-            </div>
-          </div>
-
-          <div class="fld-row-3">
-            <div class="fld">
-              <label for="a-high">Previous high</label>
-              <input id="a-high" type="number" step="any" inputmode="decimal" placeholder="1450" />
-            </div>
-            <div class="fld">
-              <label for="a-low">Previous low</label>
-              <input id="a-low" type="number" step="any" inputmode="decimal" placeholder="1395" />
-            </div>
-            <div class="fld">
-              <label for="a-close">Previous close</label>
-              <input id="a-close" type="number" step="any" inputmode="decimal" placeholder="1432" />
-            </div>
-          </div>
-
-          <div id="a-levels-out" style="display:none;margin-bottom:18px"></div>
-
-          <div class="fld">
-            <label for="a-observation">Structural observation (minimum 20 characters)</label>
-            <textarea id="a-observation" placeholder="Price is above the computed pivot and the CPR is narrow. Volume ran above average in the previous session. A supply zone appears around R1..."></textarea>
-            <p class="hint">
-              Structure, volume, CPR, level clusters — what you observed. Wording like "buy",
-              "target" or "SL" is blocked automatically.
-            </p>
-          </div>
-
-          <div class="fld-row">
-            <div class="fld">
-              <label for="a-timeframe">Timeframe</label>
-              <select id="a-timeframe">
-                <option value="intraday">Intraday</option>
-                <option value="daily" selected>Daily</option>
-                <option value="weekly">Weekly</option>
-              </select>
-            </div>
-            <div class="fld">
-              <label for="a-free">Access</label>
-              <select id="a-free">
-                <option value="false">Subscribers only</option>
-                <option value="true">Free (SEO and funnel)</option>
-              </select>
-            </div>
-          </div>
-
-          <button type="submit" class="btn btn-primary btn-lg" id="btn-analysis">Publish analysis</button>
-        </form>
-
-        <!-- ---------- CALL FORM ---------- -->
-        <form id="form-call" style="display:none">
-          <h2>New research note</h2>
-          <p class="card-sub">A rationale is required — a bare tip without research is not research.</p>
-
-          <div class="fld-row">
-            <div class="fld">
-              <label for="c-segment">Segment</label>
-              <select id="c-segment"></select>
-            </div>
-            <div class="fld">
-              <label for="c-action">Action</label>
-              <select id="c-action">
-                <option value="BUY">BUY</option>
-                <option value="SELL">SELL</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="fld-row">
-            <div class="fld" id="f-inst">
-              <label for="c-instrument">Instrument</label>
-              <input id="c-instrument" placeholder="RELIANCE / NIFTY 24000 CE / GOLD" autocomplete="off" />
-            </div>
-            <div class="fld">
-              <label for="c-exchange">Exchange</label>
-              <select id="c-exchange">
-                <option>NSE</option><option>BSE</option><option>MCX</option>
-                <option>NCDEX</option><option>MSE</option><option>Crypto</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="fld" id="fx-warn" style="display:none">
-            <div class="gate-warn" style="margin:0">
-              <b>⚠️ Currency segment</b>
-              RBI-approved INR pairs on recognised Indian exchanges (NSE/BSE/MSE) only.
-              Offshore and OTC forex breaches FEMA — penalties reach three times the transaction value.
-            </div>
-          </div>
-
-          <div class="fld-row-3">
-            <div class="fld" id="f-entry">
-              <label for="c-entry">Entry</label>
-              <input id="c-entry" type="number" step="any" placeholder="1420" />
-            </div>
-            <div class="fld" id="f-targets">
-              <label for="c-targets">Targets (comma)</label>
-              <input id="c-targets" placeholder="1465, 1490" autocomplete="off" />
-            </div>
-            <div class="fld" id="f-sl">
-              <label for="c-sl">Stop loss</label>
-              <input id="c-sl" type="number" step="any" placeholder="1385" />
-            </div>
-          </div>
-
-          <div class="fld-row-3">
-            <div class="fld">
-              <label for="c-entrytype">Entry type</label>
-              <select id="c-entrytype">
-                <option value="limit">Limit</option>
-                <option value="market">Market</option>
-                <option value="above">Buy above</option>
-                <option value="below">Sell below</option>
-              </select>
-            </div>
-            <div class="fld">
-              <label for="c-horizon">Horizon</label>
-              <select id="c-horizon">
-                <option value="intraday">Intraday</option>
-                <option value="short" selected>Short (1-4 wk)</option>
-                <option value="medium">Medium (1-6 mo)</option>
-                <option value="long">Long (6 mo+)</option>
-              </select>
-            </div>
-            <div class="fld">
-              <label for="c-risk">Risk</label>
-              <select id="c-risk">
-                <option value="low">Low</option>
-                <option value="moderate" selected>Moderate</option>
-                <option value="high">High</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="fld" id="f-rationale">
-            <label for="c-rationale">Rationale (min 20 chars)</label>
-            <textarea id="c-rationale" placeholder="Research basis — technical setup, fundamentals, sector view, risk factors..."></textarea>
-            <p class="hint">This is shown to subscribers and forms part of the SEBI record. Wording like "guaranteed", "sure shot" or "assured profit" is blocked.</p>
-          </div>
-
-          <button type="submit" class="btn btn-primary btn-lg" id="btn-call">Publish note</button>
-        </form>
-
-        <!-- ---------- LESSON FORM ---------- -->
-        <form id="form-lesson" style="display:none">
-          <h2>New lesson</h2>
-          <p class="card-sub">Educational content — no registration required.</p>
-
-          <div class="fld-row">
-            <div class="fld">
-              <label for="l-segment">Segment</label>
-              <select id="l-segment"></select>
-            </div>
-            <div class="fld">
-              <label for="l-level">Level</label>
-              <select id="l-level">
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="fld">
-            <label for="l-title">Title</label>
-            <input id="l-title" placeholder="Option Greeks — understanding Delta" autocomplete="off" />
-          </div>
-
-          <div class="fld">
-            <label for="l-summary">Summary</label>
-            <textarea id="l-summary" placeholder="What this lesson covers..."></textarea>
-          </div>
-
-          <div class="fld">
-            <label for="l-body">Body (markdown supported)</label>
-            <textarea id="l-body" style="min-height:180px" placeholder="Poora lesson content..."></textarea>
-          </div>
-
-          <div class="fld-row">
-            <div class="fld">
-              <label for="l-order">Order</label>
-              <input id="l-order" type="number" value="10" />
-            </div>
-            <div class="fld">
-              <label for="l-free">Access</label>
-              <select id="l-free">
-                <option value="true">Free (SEO and funnel)</option>
-                <option value="false">Subscribers only</option>
-              </select>
-            </div>
-          </div>
-
-          <button type="submit" class="btn btn-primary btn-lg" id="btn-lesson">Publish lesson</button>
-        </form>
-
-        <!-- ---------- RECAP FORM ---------- -->
-        <form id="form-recap" style="display:none">
-          <h2>Daily market recap</h2>
-          <p class="card-sub">A factual summary of what happened. Not what will happen next.</p>
-
-          <div class="fld">
-            <label for="r-date">Date</label>
-            <input id="r-date" type="date" />
-          </div>
-
-          <div class="fld">
-            <label for="r-summary">What happened</label>
-            <textarea id="r-summary" placeholder="Nifty up 0.6%, banking led the gains, IT lagged..."></textarea>
-          </div>
-
-          <div class="fld">
-            <label for="r-why">Why it happened</label>
-            <textarea id="r-why" placeholder="Factors — global cues, FII flows, sector news, macro data..."></textarea>
-            <p class="hint">Write in the past tense. No forward-looking view here — that would become a recommendation.</p>
-          </div>
-
-          <button type="submit" class="btn btn-primary btn-lg" id="btn-recap">Publish recap</button>
-        </form>
-
-        <!-- ---------- PRICING & PAYMENT ---------- -->
-        <form id="form-pricing" style="display:none">
-          <h2>Pricing &amp; payment</h2>
-          <p class="card-sub">
-            Change prices and payment details here — no code editing needed.
-            Saved values override the defaults and apply to the live site immediately.
-          </p>
-
-          <div class="lux-note info" style="margin-bottom:22px;font-size:13.5px">
-            <span class="n-ico">₹</span>
-            <div>These settings are stored in the database, so they survive every
-              deployment. Prices exclude GST.</div>
-          </div>
-
-          <h3 style="font-size:15px;font-weight:700;margin:0 0 14px">Plan prices</h3>
-          <div id="plan-editors"></div>
-
-          <h3 style="font-size:15px;font-weight:700;margin:28px 0 14px">Payment details</h3>
-
-          <div class="fld">
-            <label for="s-upi">UPI ID</label>
-            <input id="s-upi" placeholder="yourname@paytm / yourname@okhdfcbank" autocomplete="off" />
-            <p class="hint">Shown to users on the checkout page so they can pay directly.</p>
-          </div>
-
-          <div class="fld">
-            <label for="s-payee">Payee name</label>
-            <input id="s-payee" placeholder="Name shown in the UPI app" autocomplete="off" />
-          </div>
-
-          <div class="fld">
-            <label for="s-qr">Payment QR code — image URL</label>
-            <input id="s-qr" placeholder="https://arvcoin.com/qr.png" autocomplete="off" />
-            <p class="hint">
-              Upload your QR image anywhere public (your Hostinger <code>public_html</code>
-              folder is easiest) and paste the URL here. Leave this blank and a QR code will
-              be generated automatically from your UPI ID.
-            </p>
-          </div>
-
-          <div class="fld">
-            <label for="s-instructions">Payment instructions</label>
-            <textarea id="s-instructions" placeholder="Scan the QR or pay to the UPI ID above, then paste your transaction reference below. Access is activated within 30 minutes."></textarea>
-          </div>
-
-          <div class="fld">
-            <label for="s-support">Support contact shown at checkout</label>
-            <input id="s-support" placeholder="support@arvcoin.com or a WhatsApp number" autocomplete="off" />
-          </div>
-
-          <div id="qr-preview" style="display:none;margin-bottom:20px"></div>
-
-          <button type="submit" class="btn btn-primary btn-lg" id="btn-pricing">Save settings</button>
-        </form>
-
-        <!-- ---------- APPROVALS ---------- -->
-        <div id="form-approvals" style="display:none">
-          <h2>Payment approvals</h2>
-          <p class="card-sub">
-            Users who paid by QR or UPI and submitted a reference. Verify it in your bank
-            or UPI app, then approve to activate their subscription.
-          </p>
-          <div id="approval-list"></div>
-        </div>
-      </div>
-
-      <!-- ===================== SIDE ===================== -->
-      <div>
-        <div class="card" style="margin-bottom:18px">
-          <h2>Live preview</h2>
-          <p class="card-sub">This is how a subscriber will see it.</p>
-          <div class="preview-call">
-            <div class="pv-label">Preview</div>
-            <div id="preview"></div>
-          </div>
-        </div>
-
-        <div class="card">
-          <h2>Compliance reminders</h2>
-          <p class="card-sub">Before every publish.</p>
-          <div class="disc-box" style="margin:0;border:0;padding:0;background:none">
-            <p>• Guaranteed, assured or fixed returns — never. Automatically blocked.</p>
-            <p>• Accuracy figures must come from the full history, never cherry-picked winners.</p>
-            <p>• A published note cannot be edited or deleted. Outcomes are updated with an audit trail.</p>
-            <p>• RA registration does not cover personalised advice — that requires IA registration.</p>
-            <p>• Currency: INR pairs on Indian exchanges only.</p>
-            <p>• Never describe ARV as an investment or an appreciating asset.</p>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <a href="calls.html" class="back-link">← Feed</a>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="3d.js" defer></script>
-  <script src="firebase-config.js"></script>
-  <script src="arv-config.js"></script>
-  <script src="compliance-lint.js"></script>
-  <script src="levels.js"></script>
-  <script src="lux.js" defer></script>
-  <script type="module" src="admin.js"></script>
+  <div data-warnings style="margin-bottom:var(--sp-4)"></div>
+
+  <!-- ============================================================== queues -->
+  <div class="grid g-4" style="margin-bottom:var(--sp-4)">
+    <div class="card card-tight"><div class="stat">
+      <span class="stat-k">Deposits waiting</span>
+      <span class="stat-v" data-q-deposits>—</span>
+      <span class="stat-sub"><span data-q-deposits-late>—</span> past the window</span>
+    </div></div>
+    <div class="card card-tight"><div class="stat">
+      <span class="stat-k">Withdrawals to send</span>
+      <span class="stat-v" data-q-withdrawals>—</span>
+      <span class="stat-sub"><span data-q-withdrawals-late>—</span> overdue</span>
+    </div></div>
+    <div class="card card-tight"><div class="stat">
+      <span class="stat-k">KYC to review</span>
+      <span class="stat-v" data-q-kyc>—</span>
+      <span class="stat-sub">24 hour target</span>
+    </div></div>
+    <div class="card card-tight"><div class="stat">
+      <span class="stat-k">ARV price</span>
+      <span class="stat-v" data-price>—</span>
+      <span class="stat-sub" data-price-age>—</span>
+    </div></div>
+  </div>
+
+  <!-- ====================================================== reconciliation -->
+  <section class="card" style="margin-bottom:var(--sp-4)">
+    <div class="card-head">
+      <div>
+        <h3 style="font-size:1.05rem;margin:0">Treasury reconciliation</h3>
+        <div class="tiny muted">
+          What the ledger says must be held, against what is actually held
+        </div>
+      </div>
+      <span class="badge warn">check daily</span>
+    </div>
+
+    <div class="grid g-2" style="gap:var(--sp-5);align-items:start">
+      <div>
+        <div class="ledger-list" data-obligation></div>
+      </div>
+      <div>
+        <div class="field" style="margin-bottom:var(--sp-4)">
+          <label for="held">Bitcoin actually held (BTC)</label>
+          <input id="held" class="num-input" type="text" inputmode="decimal"
+                 placeholder="0.00000000" autocomplete="off">
+          <span class="hint">
+            Read this off the exchange or wallet the treasury sits in.
+          </span>
+        </div>
+        <div class="ledger-list" data-diff></div>
+        <div class="ledger-list" data-ledger-check style="margin-top:var(--sp-3)"></div>
+      </div>
+    </div>
+
+    <p class="tiny muted" style="margin:var(--sp-4) 0 0">
+      Under half a percent of the requirement is ordinary execution drift. More than
+      that needs correcting before the next redemption, because the shortfall is
+      paid for by whoever exits last — and it compounds quietly.
+    </p>
+  </section>
+
+  <div class="grid g-2" style="gap:var(--sp-4);align-items:start">
+
+    <!-- ========================================================= deposits -->
+    <section class="card card-flush">
+      <div class="card-head" style="padding:var(--sp-4);margin:0">
+        <h3 style="font-size:1rem">Deposits awaiting confirmation</h3>
+      </div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr>
+            <th>Who</th><th class="num">Amount</th><th>UTR</th><th>Waiting</th><th></th>
+          </tr></thead>
+          <tbody data-deposits><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
+        Match the UTR against the bank statement before confirming. Units are issued
+        at the price at the moment of confirmation, not when the QR was shown.
+      </div>
+    </section>
+
+    <!-- ====================================================== withdrawals -->
+    <section class="card card-flush">
+      <div class="card-head" style="padding:var(--sp-4);margin:0">
+        <h3 style="font-size:1rem">Withdrawals to pay</h3>
+      </div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr>
+            <th>Who</th><th class="num">Amount</th><th>UPI ID</th><th>Waiting</th><th></th>
+          </tr></thead>
+          <tbody data-withdrawals><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
+        Amounts are already net of exit fee, GST and TDS. Send the UPI payment, then
+        mark it paid with the UTR so it is traceable.
+      </div>
+    </section>
+
+  </div>
+
+  <!-- =================================================================== KYC -->
+  <section class="card card-flush" style="margin-top:var(--sp-4)">
+    <div class="card-head" style="padding:var(--sp-4);margin:0">
+      <h3 style="font-size:1rem">KYC to review</h3>
+    </div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>Who</th><th>Name</th><th>PAN</th><th>DOB</th>
+          <th>Address</th><th>Waiting</th><th></th>
+        </tr></thead>
+        <tbody data-kyc><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ================================================================= money -->
+  <section class="card" style="margin-top:var(--sp-4)">
+    <div class="card-head">
+      <h3 style="font-size:1rem">Money held on behalf of others</h3>
+      <span class="badge warn">liabilities, not revenue</span>
+    </div>
+    <div class="grid g-4" data-money></div>
+    <div class="note-box warn" style="margin-top:var(--sp-4)">
+      TDS collected under section 194S is not income. It is holders' money that must
+      be deposited with the department and reported so it appears in each holder's
+      Form 26AS. GST on fees is likewise a liability. Only the platform fee line is
+      actual revenue.
+    </div>
+  </section>
+
+  <!-- ============================================================== history -->
+  <section class="card" style="margin-top:var(--sp-4)">
+    <div class="card-head">
+      <h3 style="font-size:1rem">Price history</h3>
+    </div>
+    <div class="table-wrap" style="margin-bottom:var(--sp-4)">
+      <table class="data">
+        <thead><tr><th>Timeframe</th><th class="num">Candles</th><th>From</th><th>To</th></tr></thead>
+        <tbody data-coverage><tr><td colspan="4" class="empty">—</td></tr></tbody>
+      </table>
+    </div>
+    <div class="row row-wrap">
+      <button class="btn btn-sm" data-backfill="1D">Backfill daily (5 years)</button>
+      <button class="btn btn-sm" data-backfill="1h">Backfill hourly (90 days)</button>
+      <button class="btn btn-sm" data-backfill="1m">Backfill minute (7 days)</button>
+    </div>
+    <p class="tiny muted" style="margin:var(--sp-3) 0 0">
+      Run these once after setup. Each paces its own requests to avoid being
+      rate-limited, so the daily one takes a couple of minutes.
+    </p>
+  </section>
+
+  <!-- ============================================================= settings -->
+  <section class="card" style="margin-top:var(--sp-4)">
+    <div class="card-head">
+      <h3 style="font-size:1rem">Settings</h3>
+      <span class="badge">server-side source of truth</span>
+    </div>
+    <div class="grid g-3" data-settings></div>
+    <p class="tiny muted" style="margin:var(--sp-4) 0 0">
+      These decide money — the front-end config is only a copy for quoting. Loss
+      set-off and fee deductibility are deliberately not editable: the law does not
+      permit either, and a toggle for them would produce a wrong tax statement for
+      every user.
+    </p>
+  </section>
+
+</main>
+
+<div data-footer></div>
+<script type="module" src="js/pages/admin.js"></script>
 </body>
 </html>

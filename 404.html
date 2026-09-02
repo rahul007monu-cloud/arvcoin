@@ -1,46 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#05060f" />
-  <title>Page not found — arvcoin</title>
-  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-  <style>
-    .nf{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 24px}
-    .nf-code{font-family:var(--font-alt);font-size:clamp(90px,20vw,180px);font-weight:800;line-height:1;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:-.04em}
-    .nf h1{font-size:26px;font-weight:800;margin-top:10px}
-    .nf p{color:var(--muted);margin:12px 0 28px;max-width:400px}
-    .nf-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
-    .nf-coin{width:120px;height:120px;border-radius:50%;display:grid;place-items:center;margin-bottom:20px;
-      background:radial-gradient(circle at 35% 30%,rgba(0,224,255,.35),rgba(124,92,255,.15) 60%,rgba(5,6,15,.9));
-      border:1px solid var(--stroke-strong);box-shadow:inset 0 0 40px rgba(0,224,255,.25),0 0 60px rgba(124,92,255,.3);animation:spin 12s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Not found — ARV Coin</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#07070a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
 </head>
 <body>
-  <canvas id="bg-canvas"></canvas>
-  <div class="grid-overlay"></div>
-  <div class="noise-overlay"></div>
 
-  <div class="nf">
-    <div class="nf-coin">
-      <svg viewBox="0 0 40 40" width="60" height="60"><path d="M13 27 L20 11 L27 27 M15 21.5 H25" fill="none" stroke="#00ffc2" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </div>
-    <div class="nf-code">404</div>
-    <h1>Yeh page kho gaya 🧭</h1>
-    <p>The page you are looking for does not exist. Let's get you back on track.</p>
-    <div class="nf-actions">
-      <a href="index.html" class="btn btn-primary btn-lg">Back to home</a>
-      <a href="dashboard.html" class="btn btn-ghost btn-lg">Dashboard</a>
-    </div>
+<div data-nav></div>
+
+<main class="page wrap" style="max-width:560px;padding-top:var(--sp-8);padding-bottom:var(--sp-8);text-align:center">
+
+  <div class="num" style="font-size:4.5rem;font-weight:600;color:var(--tx-3);line-height:1;letter-spacing:-.04em">404</div>
+
+  <h1 class="serif" style="font-size:1.6rem;margin-top:var(--sp-4)">That page does not exist</h1>
+
+  <p class="muted" style="max-width:44ch;margin:var(--sp-3) auto 0">
+    The link is probably out of date. Nothing has happened to your money — your
+    balance, your holdings and every ledger entry are exactly where they were.
+  </p>
+
+  <div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px;margin-top:var(--sp-5)">
+    <a href="index.html" class="btn btn-primary">Overview</a>
+    <a href="trade.html" class="btn btn-ghost">Trade</a>
+    <a href="dashboard.html" class="btn btn-ghost">Wallet</a>
+    <a href="transactions.html" class="btn btn-ghost">History</a>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="3d.js" defer></script>
+  <p class="tiny muted" style="margin-top:var(--sp-6)">
+    If you reached this from a link on this site, that is our mistake —
+    <a data-support-link href="#">tell us</a> and we will fix it.
+  </p>
+
+</main>
+
+<div data-footer></div>
+<script type="module">
+  import * as ui from './js/ui.js';
+
+  // No feed on a dead end: it would open a websocket to paint a ticker nobody
+  // came here to read.
+  ui.boot({ feed: false }).then(function () {
+    var email = globalThis.ARV_CONFIG.UI.supportEmail;
+    ui.els('[data-support-link]').forEach(function (a) {
+      a.href = 'mailto:' + email + '?subject=' + encodeURIComponent('Broken link: ' + location.pathname);
+    });
+  });
+</script>
 </body>
 </html>

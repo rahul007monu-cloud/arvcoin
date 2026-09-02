@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trade ARV — ARV Coin</title>
+<meta name="description" content="Buy and sell ARV. Every fill settles at the index price, so there is no spread. Buys are instant; sells go to a real buyer or to the treasury.">
+<meta name="theme-color" content="#07070a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js" defer></script>
+</head>
+<body>
+
+<div data-nav></div>
+
+<main class="page wrap wrap-wide" style="padding-top:var(--sp-4);padding-bottom:var(--sp-7)">
+
+  <!-- ============================================================== ticker -->
+  <div class="card card-tight" style="margin-bottom:var(--sp-4)">
+    <div class="row-between row-wrap">
+      <div class="row" style="gap:var(--sp-4)">
+        <span class="coin arv" style="width:38px;height:38px;font-size:.66rem"><span>ARV</span></span>
+        <div>
+          <div class="row" style="gap:8px">
+            <strong style="font-size:1.02rem">ARV / INR</strong>
+            <span class="badge metal">Bitcoin 1:1</span>
+            <span class="live-dot off" data-dot></span>
+          </div>
+          <div class="price-hero" style="margin-top:2px">
+            <span class="v" style="font-size:2.1rem" data-price>₹—</span>
+            <span class="chip flat" data-change>—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="stat-strip">
+        <div class="stat"><span class="stat-k">24h high</span><span class="num" data-high>—</span></div>
+        <div class="stat"><span class="stat-k">24h low</span><span class="num" data-low>—</span></div>
+        <div class="stat"><span class="stat-k">Since launch</span><span class="num" data-launch>—</span></div>
+        <div class="stat"><span class="stat-k">Bitcoin</span><span class="num" data-btc>—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note-box warn hidden" style="margin-bottom:var(--sp-4)" data-paused>
+    <strong>Trading is paused.</strong> <span data-paused-reason></span>
+    Nothing can be filled at a stale price — that is deliberate. Your balances are
+    unaffected.
+  </div>
+
+  <div class="split">
+
+    <!-- =========================================================== chart -->
+    <div class="stack">
+      <div class="chart-shell">
+        <div class="chart-bar">
+          <div class="row row-wrap" style="gap:var(--sp-3)">
+            <div class="tabs" data-tf-tabs></div>
+            <div class="tabs" data-type-tabs>
+              <button class="tab on" data-ctype="candles">Candles</button>
+              <button class="tab" data-ctype="area">Line</button>
+            </div>
+          </div>
+          <div class="ohlc-readout" data-ohlc>
+            <span>O <b>—</b></span><span>H <b>—</b></span><span>L <b>—</b></span><span>C <b>—</b></span>
+          </div>
+        </div>
+        <div class="chart-canvas tall" data-chart></div>
+        <div class="chart-legend">
+          <div class="legend-item" data-feed-status><span class="live-dot off"></span>connecting…</div>
+          <div class="spacer"></div>
+          <div class="legend-item" data-candle-count></div>
+        </div>
+      </div>
+
+      <!-- ======================================================== the book -->
+      <div class="grid g-2" style="gap:var(--sp-4)">
+
+        <div class="card card-flush">
+          <div class="card-head" style="padding:var(--sp-4);margin:0">
+            <h4 style="font-size:.95rem">Order book</h4>
+            <span class="badge">queue, not an auction</span>
+          </div>
+          <div style="padding:var(--sp-4)">
+            <div class="depth" data-depth>
+              <div class="empty tiny">Loading…</div>
+            </div>
+          </div>
+          <div class="tiny muted" style="padding:0 var(--sp-4) var(--sp-4)">
+            There is no bid/ask spread — every fill settles at the index price. What
+            matters is how much wants in and out, and how long the queue ahead of
+            you is.
+          </div>
+        </div>
+
+        <div class="card card-flush">
+          <div class="card-head" style="padding:var(--sp-4);margin:0">
+            <h4 style="font-size:.95rem">Recent trades</h4>
+            <span class="badge" data-tape-count></span>
+          </div>
+          <div class="tape-head"><span>Price</span><span>Units</span><span>Time</span></div>
+          <div class="tape" data-tape>
+            <div class="empty tiny">No trades yet</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================================ panel -->
+    <div class="stack">
+
+      <div class="card">
+        <div class="side-toggle" data-side-toggle style="margin-bottom:var(--sp-4)">
+          <button data-side="buy" class="on">Buy</button>
+          <button data-side="sell">Sell</button>
+        </div>
+
+        <div class="tabs" data-order-type style="margin-bottom:var(--sp-4);width:100%">
+          <button class="tab on" data-otype="market" style="flex:1">Market</button>
+          <button class="tab" data-otype="limit" style="flex:1">Limit</button>
+        </div>
+
+        <!-- balance -->
+        <div class="row-between small muted" style="margin-bottom:var(--sp-3)">
+          <span data-balance-label>Rupee balance</span>
+          <span class="num strong" data-balance>—</span>
+        </div>
+
+        <!-- amount / units -->
+        <div class="field" style="margin-bottom:var(--sp-3)">
+          <label for="amt" data-amt-label>Amount to invest</label>
+          <div class="amount-input" data-amt-wrap>
+            <span class="cur" data-cur>₹</span>
+            <input id="amt" class="num-input" type="text" inputmode="decimal"
+                   autocomplete="off" placeholder="0">
+          </div>
+          <span class="err hidden" data-amt-err></span>
+        </div>
+
+        <div class="quick" data-quick style="margin-bottom:var(--sp-4)"></div>
+
+        <!-- limit trigger -->
+        <div class="field hidden" data-trigger-field style="margin-bottom:var(--sp-4)">
+          <label for="trigger">Act when ARV reaches</label>
+          <div class="amount-input">
+            <span class="cur">₹</span>
+            <input id="trigger" class="num-input" type="text" inputmode="decimal"
+                   autocomplete="off" placeholder="0.0000">
+          </div>
+          <span class="hint" data-trigger-hint></span>
+        </div>
+
+        <!-- quote -->
+        <div class="ledger-list" data-quote style="margin-bottom:var(--sp-4)">
+          <div class="ledger-row"><span class="l muted">Enter an amount</span></div>
+        </div>
+
+        <button class="btn btn-primary btn-block btn-lg" data-submit disabled>
+          Buy ARV
+        </button>
+
+        <div class="tiny muted" style="margin-top:var(--sp-3)" data-side-note></div>
+      </div>
+
+      <!-- my open orders -->
+      <div class="card card-flush">
+        <div class="card-head" style="padding:var(--sp-4);margin:0">
+          <h4 style="font-size:.95rem">Your open orders</h4>
+        </div>
+        <div data-my-orders>
+          <div class="empty tiny">None</div>
+        </div>
+      </div>
+
+      <!-- how it works -->
+      <div class="card card-tight">
+        <h5 style="margin-bottom:var(--sp-3)">How a fill works here</h5>
+        <ul class="small" style="padding-left:1.1rem;margin:0;color:var(--tx-1)">
+          <li style="margin-bottom:8px">
+            <strong>Buys are instant.</strong> They fill against anyone waiting to
+            sell, and the treasury covers the rest. You never queue.
+          </li>
+          <li style="margin-bottom:8px">
+            <strong>Sells look for a buyer first.</strong> If none is waiting the
+            order rests — and after <span data-fallback>60</span> minutes the
+            treasury buys it, so there is always an exit.
+          </li>
+          <li style="margin-bottom:8px">
+            <strong>A limit order is a trigger</strong>, not an offer. It acts when
+            ARV reaches your level, at the index price.
+          </li>
+          <li>
+            <strong>1% TDS is withheld on every sale.</strong> The 30% plus cess on
+            the gain is not withheld — it is yours to pay at filing.
+          </li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<div data-footer></div>
+<script type="module" src="js/pages/trade.js"></script>
+</body>
+</html>
