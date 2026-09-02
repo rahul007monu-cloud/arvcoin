@@ -41,6 +41,22 @@
           <button type="submit" class="btn btn-primary btn-block btn-lg">Continue</button>
         </form>
 
+        <!--
+          Google, when the operator has configured a client ID.
+
+          Its own wrapper carries data-panel="credentials" so it disappears during
+          the code step along with the form. The inner [data-google] keeps its own
+          hidden state, which is what stops an unconfigured install from showing an
+          empty gap after a trip to the OTP panel and back.
+        -->
+        <div data-panel="credentials">
+          <div class="hidden" data-google>
+            <div class="or-rule"><span>or</span></div>
+            <div class="google-slot" data-google-btn></div>
+          </div>
+          <p class="hint hidden" data-google-note></p>
+        </div>
+
         <!-- ================================================= step 2: OTP -->
         <div data-panel="otp" class="hidden">
           <div class="note-box" style="margin-bottom:var(--sp-4)">
@@ -57,11 +73,20 @@
               <span class="err hidden" data-otp-err></span>
             </div>
 
+            <!--
+              Inverted from "remember me". Not asking again on a device you have
+              already proved is the normal case, so it is the default and this box
+              is the way out of it. Unticked, so nobody has to do anything to get
+              the sensible behaviour.
+            -->
             <label class="check">
-              <input type="checkbox" data-trust checked>
+              <input type="checkbox" data-shared>
               <span>
-                Remember this device for 30 days. We will not ask for a code again
-                on it — untick this on a shared or public computer.
+                This is a shared or public computer — ask for a code every time.
+                <span class="hint" style="display:block;margin-top:2px">
+                  Otherwise we will not ask again on this device for 24 hours.
+                  Signing out ends that straight away.
+                </span>
               </span>
             </label>
 

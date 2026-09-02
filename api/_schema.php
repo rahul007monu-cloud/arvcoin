@@ -28,7 +28,7 @@ declare(strict_types=1);
  * Bumped whenever arv_schema() or arv_migrations() changes, so an operator can see
  * at a glance whether a deployment has caught up with its own database.
  */
-const ARV_SCHEMA_VERSION = 4;
+const ARV_SCHEMA_VERSION = 5;
 
 function arv_schema(): array
 {
@@ -54,8 +54,15 @@ function arv_schema(): array
 
         email_verified  TINYINT(1)   NOT NULL DEFAULT 0,
 
-        -- Referral identity. `referred_by` is set once at signup and never
-        -- changed, so commission can never be re-pointed after the fact.
+        -- Google's account identifier (the `sub` claim), for people who signed in
+        -- with Google. NULL for everyone else, and unique so one Google account
+        -- cannot be attached to two local accounts.
+        --
+        -- Matched on in preference to the email address, because an email address
+        -- is not a stable identity: Google accounts can change theirs, and a
+        -- corporate address can be reassigned to a different person entirely.
+        -- `sub` never changes and is never reused.
+        google_sub      VARCHAR(40)  NULL,
         referral_code   VARCHAR(16)  NOT NULL,
         referred_by     BIGINT UNSIGNED NULL,
 
@@ -74,6 +81,7 @@ function arv_schema(): array
 
         UNIQUE KEY uq_users_email (email),
         UNIQUE KEY uq_users_refcode (referral_code),
+        UNIQUE KEY uq_users_google (google_sub),
         KEY idx_users_referred_by (referred_by),
         CONSTRAINT fk_users_referrer FOREIGN KEY (referred_by)
             REFERENCES users(id) ON DELETE SET NULL
@@ -625,6 +633,24 @@ function arv_default_settings(): array
         'web_tick_min_seconds'  => '45',
         'web_tick_at'           => '0',
 
+        // How long a device that has entered a code is left alone.
+        //
+        // Applied automatically, so the common case — the same phone, several
+        // times a day — is one code and then nothing. Asking every time trains
+        // people to copy six digits out of a notification without reading the
+        // message, which is exactly the reflex an OTP phishing attempt needs.
+        // Short enough that an unattended device does not stay trusted for weeks.
+        // Cleared on sign-out, and there is a shared-computer opt-out on the form.
+        'trust_hours'           => '24',
+
+        // Google sign-in. Empty means the feature is off and the button is not
+        // rendered at all — not shown-and-broken. The client ID is public by
+        // design (it ships to the browser), which is why it lives here rather
+        // than in config.local.php; there is no client *secret* in this flow.
+        'google_client_id'      => '',
+        'google_jwks'           => '',
+        'google_jwks_at'        => '0',
+
         'maintenance_mode'      => '0',
         'schema_version'        => (string)ARV_SCHEMA_VERSION,
     ];
@@ -672,6 +698,15 @@ function arv_migrations(PDO $pdo): array
                       ADD COLUMN delivered TINYINT(1) NOT NULL DEFAULT 1,
                       ADD COLUMN undelivered_code VARCHAR(6) NOT NULL DEFAULT \'\'');
         $done[] = 'otps: added delivered, undelivered_code';
+    }
+
+    // Google sign-in. Nullable and unique: NULL for every password account, and
+    // one Google account can only ever point at one local account.
+    if (!$hasColumn('users', 'google_sub')) {
+        $pdo->exec('ALTER TABLE users
+                      ADD COLUMN google_sub VARCHAR(40) NULL AFTER email_verified,
+                      ADD UNIQUE KEY uq_users_google (google_sub)');
+        $done[] = 'users: added google_sub';
     }
 
     if ($done) {

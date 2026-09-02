@@ -114,7 +114,45 @@ Only if you left it blank in the installer. Operations → **Settings** → `upi
 Until it is set the deposit page shows a placeholder saying so, rather than a QR
 code that scans to nothing.
 
-### 1.7 Check it
+### 1.7 Sign in with Google — optional
+
+Skip this and the site works normally on email, password and a code. There is no
+half-configured state: with no client ID the Google button is not rendered and
+Google's script is never even fetched.
+
+1. [console.cloud.google.com](https://console.cloud.google.com) → create a project
+   (any name)
+2. **APIs & Services → OAuth consent screen** → External → fill in the app name,
+   your support email, and the homepage / privacy / terms links
+   (`https://yourdomain.com/legal.html`)
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID** →
+   *Web application*
+4. Under **Authorised JavaScript origins** add, exactly:
+   - `https://yourdomain.com`
+   - `https://www.yourdomain.com` if you use www
+5. Leave **Authorised redirect URIs** empty. This app never redirects through
+   Google — the browser receives a signed token and posts it to our own endpoint.
+6. Copy the **Client ID**. Operations → **Settings** → `google_client_id` → paste
+   → Save.
+
+Then reload `login.html`; the button appears under the form.
+
+**Only the Client ID.** There is no client secret in this flow, and nothing to
+keep out of the repository — the Client ID is public by design, since it ships to
+every visitor's browser in order to work at all. If you are looking at a secret,
+you are looking at the wrong field.
+
+Two things that will bite:
+
+- **Origins must match exactly**, scheme included. `http://` where the site is
+  `https://`, or a missing `www`, and Google refuses with an error that only
+  appears in the browser console.
+- **Nobody can sign in over plain HTTP.** Turn SSL on first (§5).
+
+The address Google reports is treated as verified, so there is no emailed code on
+that route. KYC is unchanged — Google supplies a name and an email, never a PAN.
+
+### 1.8 Check it
 
 - `https://yourdomain.com/api/market.php?action=snapshot` returns a price with
   `stale: false`
@@ -183,6 +221,9 @@ Settings. No deploy needed.
 | `kyc_required` | 1 | Verification before the first buy |
 | `maintenance_mode` | 0 | Everyone but operators sees a notice |
 | `tds_pct` / `tds_pct_no_pan` | 1 / 20 | s.194S and s.206AA |
+| `trust_hours` | 24 | After one code, that device is not asked again for this long. Cleared on sign-out; there is a shared-computer opt-out on the form |
+| `login_otp_always` | 0 | Set to 1 to demand a code on every single sign-in, ignoring `trust_hours` |
+| `google_client_id` | *empty* | Paste to turn Google sign-in on. Empty means the button does not exist |
 | `web_tick` | 1 | Let a page load refresh a stale price. Set to 0 once the cron is trusted |
 | `web_tick_min_seconds` | 45 | Floor between fallback fetches, so a dead feed cannot be retried on every request |
 | `auto_backfill` | 1 | Let the cron build an empty chart |

@@ -1314,3 +1314,60 @@ table.data tfoot td {
 
 /* Downward, for a scroll cue. */
 .arrow-down::after { transform: rotate(135deg) translateX(-.06em); }
+
+
+/* ============================================================================
+   SIGN IN WITH GOOGLE
+   ============================================================================
+
+   Google renders its own button inside an iframe and will not accept our CSS, by
+   design — it has to look like Google's button or it is not trustworthy. So the
+   work here is confining it: giving it a slot the right width, and a divider
+   above it that belongs to this palette rather than to Google's.
+
+   `filled_black` is the theme chosen in auth.js. It is the only one that does not
+   sit on this page like a white sticker. */
+
+/* A general hint, not only the one inside a .field. The Google block needs a
+   caption that lives outside a form field. */
+.hint {
+  font-size: .76rem;
+  color: var(--tx-3);
+  line-height: 1.45;
+}
+.hint.warn { color: var(--warn); }
+
+/* "or", with a hairline through it. */
+.or-rule {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: var(--sp-5) 0 var(--sp-4);
+  color: var(--tx-3);
+  font-size: .7rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.or-rule::before,
+.or-rule::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  /* Fades out towards the word so the line does not appear to collide with it. */
+  background: linear-gradient(90deg, transparent, var(--line-2), transparent);
+}
+
+/* The slot Google draws into.
+   Centred, and given a minimum height so the card does not jump when the button
+   finally appears — the script is third-party and can take a moment. */
+.google-slot {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+/* Google sets an inline width on its own iframe; this keeps it from overflowing a
+   narrow card on a phone. */
+.google-slot > div,
+.google-slot iframe {
+  max-width: 100% !important;
+}

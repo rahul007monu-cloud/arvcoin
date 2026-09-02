@@ -77,6 +77,166 @@ function applyReferral() {
   }
 }
 
+/* ------------------------------------------------------------------ google -- */
+
+/**
+ * Load Google Identity Services, once.
+ *
+ * Loaded lazily and only when the server says a client ID exists, so an install
+ * that does not use Google never fetches a third-party script — which is both a
+ * page-weight and a privacy consideration, since merely loading it tells Google
+ * somebody opened this page.
+ */
+var gisPromise = null;
+function loadGis() {
+  if (gisPromise) return gisPromise;
+  gisPromise = new Promise(function (resolve, reject) {
+    var s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.defer = true;
+    s.onload = function () {
+      // Present but not ready is a real state on a slow connection.
+      if (globalThis.google && globalThis.google.accounts && globalThis.google.accounts.id) resolve();
+      else reject(new Error('gis-incomplete'));
+    };
+    s.onerror = function () { reject(new Error('gis-blocked')); };
+    document.head.appendChild(s);
+  });
+  return gisPromise;
+}
+
+/**
+ * Google handed us a token. Send it on and go where the server says.
+ */
+async function onGoogleCredential(response) {
+  var box = ui.el('[data-google]');
+  var note = ui.el('[data-google-note]');
+
+  // Consent, and where it can legitimately be given.
+  //
+  // The terms checkbox lives on the signup page, next to the links. The login
+  // page does not have one — so this route never claims consent from there, even
+  // though the same button would otherwise happily open an account. Signing in
+  // with Google on the login page as somebody with no account is answered by the
+  // server with needs:'terms', and handled below by sending them to signup, where
+  // the terms are actually in front of them.
+  var accepted = false;
+  if (isSignup) {
+    var accept = ui.el('[data-accept]');
+    accepted = !!(accept && accept.checked);
+    if (!accepted) {
+      ui.toast('Tick the box to accept the risk disclosure and terms, then use Google again.', 'warn', 7000);
+      return;
+    }
+  }
+
+  if (note) {
+    note.textContent = 'Signing you in\u2026';
+    note.classList.remove('hidden', 'warn');
+  }
+  if (box) box.style.opacity = '0.5';
+
+  try {
+    var r = await api.googleSignIn(response.credential, {
+      referralCode: (ui.el('#ref') || {}).value || '',
+      acceptedTerms: accepted
+    });
+
+    // Shown before navigating, because it is the only warning that the password
+    // on a pre-existing unverified account has just been removed.
+    if (r.notice) {
+      ui.toast(r.notice, 'warn', 12000);
+      setTimeout(function () { location.href = r.isNew ? 'profile.html#kyc' : nextUrl(); }, 2600);
+      return;
+    }
+    // Same rule as the emailed-code path: a new account goes to KYC, a returning
+    // one goes wherever it was headed.
+    location.href = r.isNew ? 'profile.html#kyc' : nextUrl();
+  } catch (err) {
+    if (box) box.style.opacity = '';
+
+    // No account for that Google address, and this page cannot take consent.
+    // Not an error as far as the person is concerned — they are simply new.
+    if (err.needs === 'terms') {
+      ui.toast('That Google account is new here. Accept the terms on the sign-up page '
+             + 'and use Google again \u2014 it takes one tap.', 'warn', 9000);
+      setTimeout(function () {
+        location.href = 'signup.html' + (location.search || '');
+      }, 2200);
+      return;
+    }
+
+    if (note) {
+      note.textContent = err.message || 'That did not work. Try your email and password.';
+      note.classList.remove('hidden');
+      note.classList.add('warn');
+    }
+    ui.toastError(err);
+  }
+}
+
+/**
+ * Draw the Google button, if this install has Google configured.
+ *
+ * Every failure path here ends the same way: the button is simply not there, and
+ * the email form above it is untouched. A sign-in page that breaks because a
+ * third-party script did not load is a sign-in page nobody can use.
+ */
+async function setupGoogle() {
+  var box = ui.el('[data-google]');
+  if (!box) return;
+
+  var cfg;
+  try {
+    cfg = await api.authProviders();
+  } catch (_) {
+    return;                       // Not installed, offline, old deployment.
+  }
+  var g = (cfg.providers || {}).google || {};
+  if (!g.enabled || !g.clientId) return;
+
+  try {
+    await loadGis();
+  } catch (_) {
+    // Blocked by an extension, a network policy, or a region. Say so plainly
+    // rather than leaving an empty gap where a button was promised.
+    var note = ui.el('[data-google-note]');
+    if (note) {
+      note.textContent = 'Google sign-in could not load here. Use your email and password below.';
+      note.classList.remove('hidden');
+      note.classList.add('warn');
+    }
+    return;
+  }
+
+  globalThis.google.accounts.id.initialize({
+    client_id: g.clientId,
+    callback: onGoogleCredential,
+    // Bound to our session and checked inside the signed token, so a credential
+    // captured elsewhere cannot be posted to our endpoint.
+    nonce: g.nonce,
+    auto_select: false,
+    // One Tap is deliberately not enabled. On a page about money an unprompted
+    // account-chooser overlay reads as a phishing attempt, and it would cover
+    // the form somebody is already typing into.
+    cancel_on_tap_outside: true
+  });
+
+  var wrap = ui.el('[data-google-btn]');
+  globalThis.google.accounts.id.renderButton(wrap, {
+    type: 'standard',
+    theme: 'filled_black',       // The only Google theme that sits in this palette.
+    size: 'large',
+    shape: 'rectangular',
+    text: isSignup ? 'signup_with' : 'signin_with',
+    logo_alignment: 'center',
+    width: Math.min(wrap.clientWidth || 380, 400)
+  });
+
+  box.classList.remove('hidden');
+}
+
 /* ------------------------------------------------------------------- submit -- */
 
 async function onCredentials(e) {
@@ -149,7 +309,9 @@ async function onOtp(e) {
       email: st.email,
       code: code,
       purpose: st.purpose,
-      trustDevice: !!(ui.el('[data-trust]') || {}).checked
+      // Inverted from the old trustDevice flag: this device is trusted for the
+      // next day unless the person says it is not theirs.
+      sharedDevice: !!(ui.el('[data-shared]') || {}).checked
     });
     location.href = isSignup ? 'profile.html#kyc' : nextUrl();
   } catch (err) {
@@ -188,6 +350,10 @@ async function onResend(e) {
     location.replace(nextUrl());
     return;
   }
+
+  // Not awaited: it reaches out to Google, and the email form must be usable
+  // immediately whether or not that ever comes back.
+  setupGoogle();
 
   ui.on('[data-form]', 'submit', onCredentials);
   ui.on('[data-otp-form]', 'submit', onOtp);

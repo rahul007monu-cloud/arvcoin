@@ -128,10 +128,10 @@ function tx(callable $fn)
 /**
  * Server-side settings. These decide money; arv-config.js does not.
  */
-function settings(): array
+function settings(bool $reload = false): array
 {
     static $s = null;
-    if ($s !== null) {
+    if ($s !== null && !$reload) {
         return $s;
     }
     $s = [];
@@ -169,6 +169,14 @@ function setting_set(string $key, string $value): void
 {
     q('INSERT INTO settings (skey, svalue) VALUES (?, ?)
        ON DUPLICATE KEY UPDATE svalue = VALUES(svalue)', [$key, $value]);
+
+    // Drop the memoised copy, or the rest of this request keeps reading the old
+    // value. That is not theoretical: saving a setting returns the operator
+    // warnings alongside it, so setting `upi_vpa` used to answer "saved" and
+    // "UPI VPA is not set" in the same response — which reads as a failed save.
+    // One extra SELECT of a forty-row table, only on a write, is a fair price for
+    // a settings write that is actually visible to the code that follows it.
+    settings(true);
 }
 
 /* ========================================================= responses ====== */

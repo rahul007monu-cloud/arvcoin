@@ -673,7 +673,8 @@ function handle_save_setting(): void
         'referral_enabled', 'referral_pct', 'referral_max_paise',
         'kyc_required', 'upi_vpa', 'payee_name',
         'price_max_age_seconds', 'maintenance_mode',
-        'login_otp_always', 'aadhaar_provider',
+        'login_otp_always', 'aadhaar_provider', 'google_client_id',
+        'trust_hours',
         'tds_pct', 'tds_pct_no_pan', 'vda_gain_pct', 'cess_pct',
         'tds_threshold_paise', 'tds_threshold_specified_paise',
     ];
@@ -688,6 +689,9 @@ function handle_save_setting(): void
         'entry_fee_pct' => [0, 5], 'exit_fee_pct' => [0, 5], 'gst_pct' => [0, 28],
         'slippage_pct' => [0, 2], 'referral_pct' => [0, 10],
         'sell_fallback_minutes' => [1, 10080], 'price_max_age_seconds' => [60, 86400],
+        // A month of silent trust is a different product to a day of it. Capped
+        // so that raising it is a decision rather than a typo.
+        'trust_hours' => [1, 720],
         'vda_gain_pct' => [0, 50], 'cess_pct' => [0, 10],
         'tds_pct' => [0, 30], 'tds_pct_no_pan' => [0, 30],
     ];
@@ -701,6 +705,20 @@ function handle_save_setting(): void
 
     if ($key === 'referral_pct' && (float)$value > 10) {
         json_fail(422, 'Above 10% this stops looking like a referral fee. Have counsel sign that off first.');
+    }
+
+    // Checked here because the failure is otherwise silent and confusing: a
+    // mistyped client ID renders a Google button that refuses every sign-in with
+    // a message from Google's own script, in the browser console, where an
+    // operator will never see it. Empty is allowed — that is how the feature is
+    // turned off.
+    if ($key === 'google_client_id') {
+        $value = trim($value);
+        if ($value !== '' && !preg_match('/^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/i', $value)) {
+            json_fail(422, 'That does not look like a Google client ID. It ends in '
+                         . '.apps.googleusercontent.com and comes from Google Cloud Console '
+                         . '→ Credentials → OAuth 2.0 Client IDs. Paste the Client ID, not the secret.');
+        }
     }
 
     $before = setting($key);

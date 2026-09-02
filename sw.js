@@ -69,7 +69,13 @@ var NEVER_CACHE = [
   'api.bybit.com',
   'api.kraken.com', 'ws.kraken.com',
   'api.coingecko.com',
-  'api.frankfurter.dev', 'open.er-api.com'
+  'api.frankfurter.dev', 'open.er-api.com',
+
+  // Google Identity Services. A cached copy of an identity script is a bad
+  // trade at any cache-hit rate: it is the code that mints the token we then
+  // trust, Google updates it without warning, and a stale one fails in ways
+  // that look like our bug rather than a stale asset.
+  'accounts.google.com'
 ];
 
 /** Same-origin paths that carry live or private data. */
