@@ -81,16 +81,23 @@ function handle_submit(): void
 
     $errors = [];
 
-    if (strlen($fullName) < 3) {
+    if ($fullName === '') {
         $errors['fullName'] = 'Enter your full name as it appears on your PAN.';
+    } elseif (strlen($fullName) < 3) {
+        $errors['fullName'] = 'That looks too short — enter your full name as printed on your PAN.';
     }
 
     // Five letters, four digits, one letter. The fourth character encodes the
     // holder type and the fifth is the first letter of the surname, so a
     // mistyped PAN is usually still well-formed — which is why it also has to be
     // verified rather than merely validated.
-    if (!preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
-        $errors['pan'] = 'A PAN is five letters, four digits, then one letter — e.g. ABCDE1234F.';
+    if ($pan === '') {
+        $errors['pan'] = 'Enter your PAN — it decides the TDS rate on every sale.';
+    } elseif (!preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
+        $errors['pan'] = sprintf(
+            'A PAN is five letters, four digits, then one letter — e.g. ABCDE1234F. You entered %d character%s.',
+            strlen($pan), strlen($pan) === 1 ? '' : 's'
+        );
     }
 
     if ($dob === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob)) {
@@ -104,14 +111,32 @@ function handle_submit(): void
         }
     }
 
-    if (strlen($address) < 8) {
+    // City, state and PIN are their own fields, so this line only has to identify
+    // the building and the street. Five characters is enough for "A-12 MG Rd" and
+    // still refuses a single letter.
+    //
+    // The message says what is wrong. It used to read "Enter your address", which
+    // is what you tell someone who left the box empty — so a person who had filled
+    // it in was told to do the thing they had just done, with no hint that the
+    // objection was length. That is the worst kind of validation error: it is
+    // correct, and it is useless.
+    if ($address === '') {
         $errors['addressLine'] = 'Enter your address.';
+    } elseif (strlen($address) < 5) {
+        $errors['addressLine'] = 'That is too short to be an address — add the house or flat '
+                               . 'number and the street or area. City, state and PIN have their '
+                               . 'own boxes below.';
     }
     if ($state === '') {
-        $errors['state'] = 'Select your state.';
+        $errors['state'] = 'Select your state from the list.';
     }
     if (strlen($pincode) !== 6) {
-        $errors['pincode'] = 'A PIN code is six digits.';
+        $errors['pincode'] = $pincode === ''
+            ? 'Enter your 6-digit PIN code.'
+            : sprintf('A PIN code is six digits — that one has %d.', strlen($pincode));
+    }
+    if ($city === '') {
+        $errors['city'] = 'Enter your city.';
     }
     if ($upiVpa !== '' && !preg_match('/^[\w.\-]{2,}@[a-zA-Z]{2,}$/', $upiVpa)) {
         $errors['upiVpa'] = 'A UPI ID looks like yourname@bank.';

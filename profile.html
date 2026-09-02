@@ -52,11 +52,13 @@
           <label for="fullName">Full name</label>
           <input id="fullName" type="text" autocomplete="name" required>
           <span class="hint">Exactly as it appears on your PAN.</span>
+          <span class="err hidden" data-err="fullName"></span>
         </div>
         <div class="field">
           <label for="dob">Date of birth</label>
           <input id="dob" type="date" required>
           <span class="hint">You must be 18 or over.</span>
+          <span class="err hidden" data-err="dob"></span>
         </div>
       </div>
 
@@ -69,26 +71,35 @@
           sale — without it, section 206AA applies
           <strong data-nopan>20%</strong> instead of <strong data-pan-rate>1%</strong>.
         </span>
-        <span class="err hidden" data-pan-err></span>
+        <span class="err hidden" data-err="pan"></span>
       </div>
 
       <div class="field">
         <label for="addr">Address</label>
-        <input id="addr" type="text" autocomplete="street-address" required>
+        <!-- No minlength. The browser's own "please lengthen this text" tooltip
+             blocks submit before any of our code runs, and it does not say what an
+             address is missing. Our check produces a better sentence. -->
+        <input id="addr" type="text" autocomplete="street-address"
+               placeholder="Flat / house number, street, area" required>
+        <span class="hint">House or flat number and the street. City, state and PIN go below.</span>
+        <span class="err hidden" data-err="addressLine"></span>
       </div>
 
       <div class="grid g-3" style="gap:var(--sp-4)">
         <div class="field">
           <label for="city">City</label>
-          <input id="city" type="text" autocomplete="address-level2">
+          <input id="city" type="text" autocomplete="address-level2" required>
+          <span class="err hidden" data-err="city"></span>
         </div>
         <div class="field">
           <label for="state">State</label>
           <select id="state" required><option value="">Select…</option></select>
+          <span class="err hidden" data-err="state"></span>
         </div>
         <div class="field">
           <label for="pin">PIN code</label>
           <input id="pin" type="text" inputmode="numeric" maxlength="6" autocomplete="postal-code" required>
+          <span class="err hidden" data-err="pincode"></span>
         </div>
       </div>
 
@@ -96,12 +107,14 @@
         <label for="vpa">Payout UPI ID</label>
         <input id="vpa" type="text" placeholder="yourname@bank" autocomplete="off">
         <span class="hint">Withdrawals go here. You can change it later.</span>
+        <span class="err hidden" data-err="upiVpa"></span>
       </div>
 
       <!-- Aadhaar: last four only, and the reason is stated -->
       <div class="field">
         <label for="aadhaar4">Aadhaar — last 4 digits <span class="muted">(optional)</span></label>
         <input id="aadhaar4" type="text" inputmode="numeric" maxlength="4" placeholder="1234" autocomplete="off">
+        <span class="err hidden" data-err="aadhaarLast4"></span>
         <span class="hint">
           Only four digits, and only for matching. We do not ask for or store a full
           Aadhaar number — holding one without being a licensed verification agency

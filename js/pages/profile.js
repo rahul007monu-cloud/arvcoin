@@ -154,23 +154,82 @@ function fyLabel() {
 
 /* -------------------------------------------------------------------- submit -- */
 
+/* ------------------------------------------------------------ field errors -- */
+
+function clearFieldErrors() {
+  ui.els('[data-err]').forEach(function (n) {
+    n.classList.add('hidden');
+    n.textContent = '';
+  });
+}
+
+/**
+ * Put each error against the field it belongs to.
+ *
+ * The toast used to carry only the first of them, at the bottom of a long form,
+ * with nothing to say which box was wrong. On a form with eight fields that is
+ * close to no information at all — and when the message was "Enter your address"
+ * for an address that had plainly been entered, it actively misled.
+ *
+ * @return {boolean} whether anything was shown, so the caller knows if a toast is
+ *                   still needed for an error that belongs to no field.
+ */
+function paintFieldErrors(fields) {
+  clearFieldErrors();
+  var first = null;
+
+  Object.keys(fields || {}).forEach(function (key) {
+    var node = ui.el('[data-err="' + key + '"]');
+    if (!node) return;
+    node.textContent = fields[key];
+    node.classList.remove('hidden');
+    if (!first) first = node;
+  });
+
+  if (first) {
+    // Scroll to the first problem. Submitting from the bottom of the form and
+    // being corrected at the top is otherwise invisible.
+    first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var input = first.parentElement && first.parentElement.querySelector('input, select');
+    if (input) setTimeout(function () { input.focus({ preventScroll: true }); }, 400);
+  }
+  return !!first;
+}
+
+/* ------------------------------------------------------------------ submit -- */
+
 async function submitKyc(e) {
   e.preventDefault();
   var btn = ui.el('[data-kyc-submit]');
-  var panErr = ui.el('[data-pan-err]');
-  panErr.classList.add('hidden');
+  clearFieldErrors();
 
   var pan = (ui.el('#pan').value || '').trim().toUpperCase();
   var vpa = (ui.el('#vpa').value || '').trim();
+  var addr = (ui.el('#addr').value || '').trim();
 
+  // Caught here as well as on the server, so the commonest mistakes cost no round
+  // trip — and so the message lands next to the box either way.
+  var local = {};
   if (!PAN_RE.test(pan)) {
-    panErr.textContent = 'A PAN is five letters, four digits, then one letter \u2014 e.g. ABCDE1234F.';
-    panErr.classList.remove('hidden');
-    ui.el('#pan').focus();
-    return;
+    local.pan = 'A PAN is five letters, four digits, then one letter \u2014 e.g. ABCDE1234F.';
+  }
+  if (addr.length < 5) {
+    local.addressLine = addr === ''
+      ? 'Enter your address.'
+      : 'That is too short to be an address \u2014 add the house or flat number and the '
+        + 'street or area. City, state and PIN have their own boxes below.';
+  }
+  if (!ui.el('#state').value) {
+    local.state = 'Select your state from the list.';
+  }
+  if ((ui.el('#pin').value || '').replace(/\D/g, '').length !== 6) {
+    local.pincode = 'A PIN code is six digits.';
   }
   if (vpa && !VPA_RE.test(vpa)) {
-    ui.toast('A UPI ID looks like yourname@bank.', 'warn');
+    local.upiVpa = 'A UPI ID looks like yourname@bank.';
+  }
+  if (Object.keys(local).length) {
+    paintFieldErrors(local);
     return;
   }
 
@@ -180,7 +239,7 @@ async function submitKyc(e) {
       fullName: ui.el('#fullName').value.trim(),
       dob: ui.el('#dob').value,
       pan: pan,
-      addressLine: ui.el('#addr').value.trim(),
+      addressLine: addr,
       city: ui.el('#city').value.trim(),
       state: ui.el('#state').value,
       pincode: ui.el('#pin').value.trim(),
@@ -193,11 +252,14 @@ async function submitKyc(e) {
     ui.toast(r.message || 'Submitted for review.', 'ok', 8000);
     ui.el('#pan').value = '';
   } catch (err) {
-    if (err.fields && err.fields.pan) {
-      panErr.textContent = err.fields.pan;
-      panErr.classList.remove('hidden');
+    // A field-level rejection belongs on the field. Only shout in a toast about
+    // something that has no field to sit next to — a duplicate PAN, a rate limit,
+    // a server that fell over.
+    if (err.fields && paintFieldErrors(err.fields)) {
+      ui.toast('Some details need correcting \u2014 see the highlighted fields.', 'warn', 6000);
+    } else {
+      ui.toastError(err);
     }
-    ui.toastError(err);
   } finally {
     ui.busy(btn, false);
   }
