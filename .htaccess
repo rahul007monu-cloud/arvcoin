@@ -18,22 +18,42 @@ AddType image/svg+xml .svg
   # Never cache HTML: a stale shell can pin users to an old service worker.
   ExpiresByType text/html "access plus 0 seconds"
 
-  # The service worker must always be revalidated, or a deploy never lands.
-  <FilesMatch "sw\.js$">
+  # Scripts and styles are revalidated, not cached for an hour.
+  #
+  # Filenames here are not content-hashed — js/pages/profile.js is the same URL in
+  # every release — so any max-age is a window during which a deployed fix is not
+  # what the browser is actually running. An hour of that is how "I merged it,
+  # deployed it, and nothing changed" happens, and it did happen here.
+  #
+  # A conditional request costs a 304 with no body, and there are about thirty of
+  # these files. That is a far better trade than running an hour behind on the code
+  # that prices somebody's money.
+  #
+  # This block is first on purpose: the two overrides below must win, and for
+  # `Header set` the last matching section is the one that applies.
+  <FilesMatch "\.(js|mjs|css)$">
     ExpiresDefault "access plus 0 seconds"
-    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
 
-  # Config is edited in place, so it must not be cached either.
+  # Config is edited in place on the server, so it must never be held.
   <FilesMatch "arv-config\.js$">
     ExpiresDefault "access plus 0 seconds"
     Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
 
-  ExpiresByType text/javascript "access plus 1 hours"
-  ExpiresByType text/css "access plus 1 hours"
+  # The service worker gets the strongest form. Stored even briefly, it can pin a
+  # browser to the previous release's caching rules — which is the one thing that
+  # can outlive every other fix here.
+  <FilesMatch "sw\.js$">
+    ExpiresDefault "access plus 0 seconds"
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
+
+  # Genuinely static, and not worth revalidating.
   ExpiresByType image/svg+xml "access plus 7 days"
   ExpiresByType image/png "access plus 7 days"
+  ExpiresByType font/woff2 "access plus 30 days"
 </IfModule>
 
 # ---------------------------------------------------------------- compression -
