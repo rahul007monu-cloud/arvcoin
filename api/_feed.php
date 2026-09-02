@@ -736,7 +736,11 @@ function auto_backfill_step(): ?array
 
 function auto_backfill_after(string $tf): string
 {
-    return ['1D' => '1h', '1h' => '1m', '1m' => 'done'][$tf] ?? 'done';
+    // 1W was missing from this chain, so the weekly series — the one the longest
+    // "5 years at a glance" view is drawn from — never got its history and showed a
+    // single candle. It is built right after 1D (and derives from daily data, so it
+    // is cheap), before the shorter recent windows.
+    return ['1D' => '1W', '1W' => '1h', '1h' => '1m', '1m' => 'done'][$tf] ?? 'done';
 }
 
 /**
@@ -753,6 +757,7 @@ function auto_backfill_floor(string $tf): int
 
     switch ($tf) {
         case '1D': return (int)($days * 0.9);
+        case '1W': return (int)(($days / 7) * 0.9);
         case '1h': return 1500;
         case '1m': return 5000;
         default:   return 1;

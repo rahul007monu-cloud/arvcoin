@@ -28,10 +28,10 @@ declare(strict_types=1);
  * Bumped whenever arv_schema() or arv_migrations() changes, so an operator can see
  * at a glance whether a deployment has caught up with its own database.
  */
-// 6 rather than 5 so the repair step below runs on deployments that have already
-// taken the google_sub change. The catch-up is gated on this number, so a repair
-// added after a version has shipped needs its own.
-const ARV_SCHEMA_VERSION = 6;
+// Bumped whenever a migration or one-time repair is added, since the catch-up is
+// gated on it. 7 re-queues the weekly backfill on installs that finished before
+// 1W joined the chain.
+const ARV_SCHEMA_VERSION = 7;
 
 function arv_schema(): array
 {
@@ -744,6 +744,21 @@ function arv_migrations(PDO $pdo): array
                      LEFT JOIN wallets w ON w.user_id = u.id
                      WHERE w.user_id IS NULL');
         $done[] = "wallets: created {$missingWallet} missing row(s)";
+    }
+
+    // Nudge the weekly history into existence on sites that finished backfilling
+    // before 1W was part of the chain. Their auto_backfill_next reads "done", so
+    // the new 1W step would never run on its own — yet 1D is full and 1W has a
+    // single candle, which is the long-range chart showing almost nothing. If that
+    // is the shape, point the backfill back at 1W; the next cron run or page visit
+    // builds it and moves on.
+    $daily  = (int)$pdo->query("SELECT COUNT(*) FROM arv_candles WHERE tf = '1D'")->fetchColumn();
+    $weekly = (int)$pdo->query("SELECT COUNT(*) FROM arv_candles WHERE tf = '1W'")->fetchColumn();
+    $next   = (string)(setting('auto_backfill_next', '1D'));
+    if ($daily > 100 && $weekly < 10 && in_array($next, ['done', 'stalled'], true)) {
+        setting_set('auto_backfill_next', '1W');
+        setting_set('auto_backfill_fails', '0');
+        $done[] = 'backfill: re-queued 1W (weekly history was missing)';
     }
 
     if ($done) {
