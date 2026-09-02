@@ -15,6 +15,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/_boot.php';
 require __DIR__ . '/_money.php';
+require __DIR__ . '/_feed.php';
 
 $action = $_GET['action'] ?? 'snapshot';
 
@@ -32,6 +33,13 @@ switch ($action) {
 function handle_snapshot(): void
 {
     require_method('GET');
+
+    // Every page asks for this on load, which makes it the one place where a stale
+    // price can be noticed and fixed before anybody is affected by it. If a
+    // scheduler is running, this is a single comparison and returns immediately;
+    // if there is none, this is what keeps the platform working. See
+    // tick_if_needed() for the guards.
+    tick_if_needed();
 
     $meta   = arv_nav_meta();
     $launch = strtotime((string)setting('launch_at', '2021-09-01 00:00:00'));

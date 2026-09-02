@@ -195,9 +195,15 @@ sans for everything else.
 
 ## Getting it running
 
-See **[SETUP.md](SETUP.md)**. On a Hostinger plan it is: create a MySQL database,
-push this branch, open `install.php`, add one cron line, backfill the chart, set
-your UPI VPA, delete `install.php`.
+See **[SETUP.md](SETUP.md)**. On a Hostinger plan: create a MySQL database, push
+this branch, open `install.php`, add one cron line. That is the whole list — the
+installer deletes itself and the chart builds itself.
+
+The cron is what makes it reliable, not what makes it work: a page load that finds
+the price behind refreshes it, so the platform runs before a scheduler exists and
+keeps running if one stops. But that only happens while somebody is looking, so an
+idle site has an idle chart and a resting sell waits for a visitor rather than for
+the clock.
 
 ---
 

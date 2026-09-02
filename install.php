@@ -102,6 +102,7 @@ $errors  = [];
 $notices = [];
 $done    = false;
 $step    = 'form';
+$selfDeleted = false;
 
 if (!$alreadyInstalled && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
@@ -254,6 +255,19 @@ if (!$alreadyInstalled && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 @chmod(CONFIG_PATH, 0640);
                 $done = true;
                 $step = 'done';
+
+                // Remove the installer.
+                //
+                // It already refuses to run a second time once the tables exist, so
+                // this is not the only guard — but an installer sitting on a live
+                // host is a standing invitation, and "remember to delete this" is
+                // exactly the step that gets forgotten. PHP has already read and
+                // compiled this file, so unlinking it now does not disturb the page
+                // still being rendered from it.
+                //
+                // If the unlink fails the page says so. Claiming it was deleted
+                // while it is still there would be worse than asking.
+                $selfDeleted = @unlink(__FILE__);
                 if ($triggerWarning) {
                     $notices[] = 'Tables created, but the append-only triggers on the ledger could not be '
                                . 'installed: ' . $triggerWarning . ' — the application still never edits the '
@@ -361,16 +375,47 @@ $allOk  = array_reduce($checks, static fn($c, $x) => $c && $x['ok'], true);
       <div class="msg warn"><?= h($n) ?></div>
     <?php endforeach; ?>
 
-    <h2>Three things left</h2>
+    <?php
+      // What is genuinely left, rather than a fixed list of three. Anything the
+      // form already covered, or that the platform now does for itself, does not
+      // belong on a checklist — a list with done items on it stops being read.
+      $left = [];
+
+      if (!$selfDeleted) {
+          $left[] = '<strong>Delete <code>install.php</code></strong> — it tried to remove itself and '
+                  . 'could not, most likely file permissions. hPanel → File Manager → select → Delete.';
+      }
+
+      $left[] = '<strong>Set up the price cron.</strong> hPanel → Advanced → Cron Jobs → every minute:'
+              . '<br><code>curl -s https://' . h($_SERVER['HTTP_HOST'] ?? 'yourdomain.com')
+              . '/api/cron.php?job=all</code>'
+              . '<br><span class="hint">The site works without it — a page load refreshes the price '
+              . 'when it has gone behind. But that only happens while somebody is looking, so an idle '
+              . 'site has an idle chart and resting orders wait for a visitor. The cron is what makes '
+              . 'it reliable.</span>';
+
+      if ($upiVpa === '') {
+          $left[] = '<strong>Set your UPI ID.</strong> Operations → Settings → <code>upi_vpa</code>. '
+                  . 'Until it is set, the deposit page shows a placeholder that says so rather than a '
+                  . 'QR code that scans to nothing.';
+      }
+    ?>
+
+    <h2><?= count($left) === 1 ? 'One thing left' : ['', 'One', 'Two', 'Three', 'Four'][count($left)] . ' things left' ?></h2>
     <ol>
-      <li><strong>Delete <code>install.php</code></strong> — hPanel → File Manager → select → Delete.</li>
-      <li><strong>Set up the price cron.</strong> hPanel → Advanced → Cron Jobs → every minute:
-          <br><code>curl -s https://<?= h($_SERVER['HTTP_HOST'] ?? 'yourdomain.com') ?>/api/cron.php?job=all</code>
-          <br><span class="hint">Nothing can be bought or sold until this runs — trading refuses to
-          price from a stale feed, which is deliberate.</span></li>
-      <li><strong>Backfill the chart.</strong> Sign in as the operator, open Operations, press
-          “Backfill history”. Takes a couple of minutes.</li>
+      <?php foreach ($left as $item): ?>
+        <li><?= $item ?></li>
+      <?php endforeach; ?>
     </ol>
+
+    <div class="msg ok" style="margin-top:18px">
+      <strong>The chart fills itself.</strong> Five years of daily candles, then hourly, then minute —
+      one timeframe per cron run, so it is complete within about three minutes of the scheduler
+      starting. Nothing to press.
+      <?php if ($selfDeleted): ?>
+        <br><code>install.php</code> has deleted itself, so this page will not load again.
+      <?php endif; ?>
+    </div>
 
     <p style="margin-top:22px"><a href="login.html">Sign in as operator →</a></p>
   </div>

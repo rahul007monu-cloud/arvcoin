@@ -49,12 +49,17 @@ Pressing install creates 18 tables, 8 append-only triggers and the default
 settings, then writes `api/config.local.php` containing the database password and
 a freshly generated app key.
 
+**Then it deletes itself.** It already refuses to run twice once the tables exist,
+but an installer left on a live host is a standing invitation and removing it is the
+step people forget. If the unlink fails — usually file permissions — the success page
+says so and asks you to delete it by hand; it does not pretend.
+
 > **`api/config.local.php` must never be committed.** It is in `.gitignore`
 > already. The app key signs sessions and hashes OTPs, so a leaked one is a way
 > into every account — if it ever reaches the repo, rotate both the key and the
 > database password.
 
-### 1.4 Add the cron job — not optional
+### 1.4 Add the cron job
 
 hPanel → **Advanced → Cron Jobs**. Every minute:
 
@@ -62,39 +67,42 @@ hPanel → **Advanced → Cron Jobs**. Every minute:
 curl -s https://yourdomain.com/api/cron.php?job=all
 ```
 
-This ingests the price, appends candles, runs the matching engine, expires stale
-orders and recalculates reward tiers.
+This ingests the price, appends candles, builds the chart on its first few runs,
+matches resting orders, expires stale ones and recalculates reward tiers.
 
-**Nothing can be bought or sold until it runs.** Trading refuses to price from a
-feed older than `price_max_age_seconds` (600 by default), so with no cron the site
-loads, shows the chart and then declines every order — which is the correct
-failure, not a bug.
+**The site works before you do this**, because a page load that finds the price
+behind refreshes it itself. But that only happens while somebody is looking, so an
+idle site has an idle chart and a resting sell order waits for a visitor rather than
+for the clock. Add the cron.
 
-If your plan's minimum interval is five minutes, raise
-`price_max_age_seconds` in Operations → Settings to match, or the feed will read as
-stale between runs.
+If your plan's minimum interval is five minutes, raise `price_max_age_seconds` in
+Operations → Settings to match, or the price will read as stale between runs and
+trading will keep pausing.
 
-### 1.5 Backfill the chart
+To turn the fallback off once the scheduler is known good — so no visitor ever pays
+for a price fetch — set `web_tick` to `0` in Operations → Settings.
 
-Sign in as the operator → **Operations** → **Backfill history**. Two or three
-minutes. It pulls daily, hourly and minute candles from whichever exchange answers
-and computes the ARV series from them: roughly 1,827 daily, 2,160 hourly and
-10,080 minute candles.
+### 1.5 The chart builds itself
 
-Backfill is the one cron job that requires a signed-in operator, because it is
-heavy and should never be triggerable by a stranger with a URL.
+Nothing to do. The cron notices an empty chart and fills it, one timeframe per run:
+daily since launch, then hourly, then minute — roughly 1,827 / 2,160 / 10,080
+candles, complete about three minutes after the scheduler starts.
+
+One timeframe per run rather than all three, because all three take about
+thirty-five seconds and a scheduled job should finish inside its own minute. Progress
+is kept in `auto_backfill_next`, which walks `1D → 1h → 1m → done`.
+
+If an exchange refuses to page history it retries on the next run, and after twenty
+refusals it stops and records `stalled` rather than hammering a free endpoint all
+day. **Operations → Backfill history** is still there to run it by hand.
 
 ### 1.6 Set the UPI VPA
 
-Operations → **Settings** → `upi_vpa`. Until it is set, the deposit QR renders a
-placeholder that says so rather than a code that scans to nothing.
+Only if you left it blank in the installer. Operations → **Settings** → `upi_vpa`.
+Until it is set the deposit page shows a placeholder saying so, rather than a QR
+code that scans to nothing.
 
-### 1.7 Delete `install.php`
-
-hPanel → File Manager → select → Delete. It refuses to run a second time once the
-tables exist, but leaving an installer on a live host is not a risk worth carrying.
-
-### 1.8 Check it
+### 1.7 Check it
 
 - `https://yourdomain.com/api/market.php?action=snapshot` returns a price with
   `stale: false`
@@ -115,11 +123,14 @@ php -S localhost:8080
 Open `http://localhost:8080/install.php` and fill in the same form, with
 `localhost` as the host and your local credentials.
 
-Then run the cron by hand whenever you want fresh data:
+There is nothing else to run. Loading any page refreshes the price when it has gone
+behind, and the chart builds itself. To force it along:
 
 ```bash
 curl -s "http://localhost:8080/api/cron.php?job=all"
 ```
+
+Four of those calls take an install from empty to a full five-year chart.
 
 `php -S` is single-threaded, so a request that fires several API calls will feel
 slower than the real thing. Use `php -S localhost:8080 -t . &` plus a second
@@ -160,6 +171,10 @@ Settings. No deploy needed.
 | `kyc_required` | 1 | Verification before the first buy |
 | `maintenance_mode` | 0 | Everyone but operators sees a notice |
 | `tds_pct` / `tds_pct_no_pan` | 1 / 20 | s.194S and s.206AA |
+| `web_tick` | 1 | Let a page load refresh a stale price. Set to 0 once the cron is trusted |
+| `web_tick_min_seconds` | 45 | Floor between fallback fetches, so a dead feed cannot be retried on every request |
+| `auto_backfill` | 1 | Let the cron build an empty chart |
+| `auto_backfill_next` | 1D | Progress: `1D → 1h → 1m → done`. Set back to `1D` to rebuild |
 
 The launch reference — `launch_at`, `base_btc_usd`, `base_fx_usd_inr` — is also in
 `settings`, but **changing it after anyone has traded rewrites the entire price
@@ -202,9 +217,15 @@ node tools/build-icons.mjs
 ## 6. When something is wrong
 
 **Every page says the price feed is not running.**
-The cron is not firing, or `curl` is disabled. Run
+Both the cron and the page-load fallback are failing, which almost always means
+`curl` is disabled or the host blocks outbound HTTPS. Run
 `curl -s https://yourdomain.com/api/cron.php?job=all` by hand and read the JSON it
-returns.
+returns — it names every exchange it tried.
+
+**The chart is empty and stays empty.**
+Check `auto_backfill_next` in Operations → Settings. If it says `stalled`, twenty
+consecutive attempts were refused by every exchange; `cron_runs` will have the
+reason. Set it back to `1D` to retry.
 
 **"The server returned something unexpected."**
 PHP died and printed a warning before the JSON. Check the error log; it is almost

@@ -585,6 +585,23 @@ function arv_default_settings(): array
         // visible pause than a fill at yesterday's number.
         'price_max_age_seconds' => '600',
 
+        // The chart builds itself over the first few cron runs after an install,
+        // one timeframe at a time: daily, then hourly, then minute, then 'done'.
+        // Nobody should have to press a button to get history the launch date
+        // already determines.
+        'auto_backfill'         => '1',
+        'auto_backfill_next'    => '1D',
+        'auto_backfill_fails'   => '0',
+
+        // Fallback scheduling. A page request that finds the price behind refreshes
+        // it, so the platform works before a cron exists and keeps working if one
+        // stops. The cron is still the reliable path — this only runs when somebody
+        // visits, so an idle site has an idle chart. Set to 0 once the scheduler is
+        // known good and you would rather no visitor ever pays for a fetch.
+        'web_tick'              => '1',
+        'web_tick_min_seconds'  => '45',
+        'web_tick_at'           => '0',
+
         'maintenance_mode'      => '0',
         'schema_version'        => '3',
     ];
