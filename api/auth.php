@@ -194,7 +194,16 @@ function handle_verify(): void
             : 'That code is not correct. Request a new one.');
     }
 
+    // Used, so the recovery copy must not outlive it. Tolerated because a database
+    // that has not had the migration applied has no such column, and consuming a
+    // valid code must never fail over housekeeping.
     q('UPDATE otps SET used_at = UTC_TIMESTAMP() WHERE id = ?', [$otp['id']]);
+    try {
+        q('UPDATE otps SET undelivered_code = \'\' WHERE id = ?', [$otp['id']]);
+    } catch (Throwable $e) {
+        // Column not present yet. The migration will add it; nothing is lost.
+    }
+
     if (!$user['email_verified']) {
         q('UPDATE users SET email_verified = 1 WHERE id = ?', [$user['id']]);
     }
@@ -381,8 +390,15 @@ function issue_otp(int $userId, string $purpose, string $email): bool
     $code = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
     $otpId = tx(static function (PDO $pdo) use ($userId, $purpose, $code) {
+        // Only `used_at`. This statement is on the path of every signup and every
+        // login, so it must reference nothing that a database might not have yet —
+        // adding `undelivered_code` here took down signup and login together on any
+        // install whose migration had not run, which is every install between a
+        // deploy and the next cron minute. Superseding a code by marking it used is
+        // sufficient; clearing the column is what the migration and the delete
+        // below are for.
         $pdo->prepare(
-            'UPDATE otps SET used_at = UTC_TIMESTAMP(), undelivered_code = \'\'
+            'UPDATE otps SET used_at = UTC_TIMESTAMP()
              WHERE user_id = ? AND purpose = ? AND used_at IS NULL'
         )->execute([$userId, $purpose]);
 

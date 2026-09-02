@@ -25,6 +25,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/_boot.php';
 require_once __DIR__ . '/_money.php';
 require_once __DIR__ . '/_match.php';
+require_once __DIR__ . '/_schema.php';
 
 
 function ingest_prices(): array
@@ -781,10 +782,47 @@ function auto_backfill_floor(string $tf): int
  * keeping in mind: it only runs when somebody visits, so an idle site has an idle
  * chart, and the visitor who triggers it is the one who waits for it.
  */
+/**
+ * Apply any pending schema change.
+ *
+ * Deliberately not only on the cron. A deployment that needs a migration is
+ * *broken* until it runs, and tying the repair to a scheduler that the operator may
+ * not have configured yet means the site stays broken indefinitely — which is
+ * exactly what happened: adding a column to `otps` took signup and login down on
+ * every install whose cron had not yet had its turn.
+ *
+ * Gated on the version number, which is a memoised settings read and therefore
+ * free, so the information_schema queries only happen when there is genuinely
+ * something behind. Locked, so several workers arriving at once do not all try to
+ * ALTER the same table.
+ */
+function schema_catch_up(): array
+{
+    if (setting_i('schema_version', 0) >= ARV_SCHEMA_VERSION) {
+        return [];
+    }
+    if (!feed_lock('migrate')) {
+        return [];
+    }
+    try {
+        return arv_migrations(db());
+    } catch (Throwable $e) {
+        error_log('[arv] migration failed: ' . $e->getMessage());
+        return [];
+    } finally {
+        feed_unlock('migrate');
+    }
+}
+
 function tick_if_needed(): ?array
 {
+    // Before the freshness check, and before the `web_tick` switch: a database
+    // behind its code needs fixing whether or not the price needs refreshing, and
+    // whether or not an operator has turned the fallback off.
+    $migrated = schema_catch_up();
+
     if (!setting_b('web_tick', true)) {
-        return null;
+        return $migrated ? ['migrated' => $migrated] : null;
     }
 
     // The series is per-minute, so refreshing more often than that buys nothing —
