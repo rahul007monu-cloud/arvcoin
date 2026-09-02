@@ -642,9 +642,12 @@ function arv_default_settings(): array
         // times a day — is one code and then nothing. Asking every time trains
         // people to copy six digits out of a notification without reading the
         // message, which is exactly the reflex an OTP phishing attempt needs.
-        // Short enough that an unattended device does not stay trusted for weeks.
-        // Cleared on sign-out, and there is a shared-computer opt-out on the form.
-        'trust_hours'           => '24',
+        // 30 days. Long enough that a personal phone is genuinely not nagged, which
+        // was the whole complaint. Not cleared on sign-out — device trust waives
+        // only the emailed code, never the password — so signing out and back in
+        // does not re-trigger it. The shared-computer opt-out on the form is how
+        // someone declines it, and login_otp_always forces a code regardless.
+        'trust_hours'           => '720',
 
         // Google sign-in. Empty means the feature is off and the button is not
         // rendered at all — not shown-and-broken. The client ID is public by

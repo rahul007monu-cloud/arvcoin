@@ -324,9 +324,20 @@ function handle_logout(): void
         audit('logout', ['actor' => (int)$u['id']]);
     }
     logout_user();
-    // Clearing the trust cookie is deliberate: "sign out" on a shared machine
-    // should not leave a token behind that skips the second factor.
-    setcookie(TRUST_COOKIE, '', ['expires' => time() - 42000, 'path' => '/']);
+
+    // The device stays trusted across a sign-out. It used to be cleared here, on
+    // the reasoning that signing out on a shared machine should not leave a token
+    // that skips the second factor. In practice the person hitting this is on
+    // their own phone, signs out, signs back in, and is asked for a code every
+    // single time — which is the exact "why does it keep emailing me" complaint,
+    // and it trains people to treat the code as a formality.
+    //
+    // Dropping it is safe: device trust only ever waives the emailed *code*, never
+    // the password. Whoever signs in next still needs the password, and the cookie
+    // is bound by signature to one account so it cannot help with any other. The
+    // shared-machine case is served by the opt-out on the form (which never sets
+    // the cookie) and by login_otp_always for an operator who wants a code every
+    // time regardless.
     json_ok(['message' => 'Signed out.']);
 }
 
