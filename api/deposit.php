@@ -301,7 +301,15 @@ function handle_get(): void
     if (!$d) {
         json_fail(404, 'Deposit not found.');
     }
-    json_ok(['deposit' => deposit_row_public($d)]);
+
+    // The payee is returned here as well as on create, because resuming an
+    // unfinished request has to show the same UPI ID as starting one. Reading it
+    // from arv-config.js instead would mean the operator had to change the VPA in
+    // two places and would silently show nothing if they changed only the setting.
+    json_ok([
+        'deposit' => deposit_row_public($d),
+        'upi'     => deposit_payee(),
+    ]);
 }
 
 /* ============================================================= cancel ===== */
@@ -337,6 +345,23 @@ function deposit_public(int $id, int $userId): array
         json_fail(404, 'Deposit not found.');
     }
     return deposit_row_public($d);
+}
+
+/**
+ * Who is being paid, from the settings table.
+ *
+ * The single source of truth for the VPA is `settings.upi_vpa`, which an operator
+ * changes in Operations → Settings and which takes effect immediately. Nothing on
+ * the client should ever carry a payment address of its own.
+ */
+function deposit_payee(): array
+{
+    $vpa = (string)setting('upi_vpa', '');
+    return [
+        'vpa'        => $vpa,
+        'payee'      => (string)setting('payee_name', 'ARV Coin'),
+        'configured' => $vpa !== '',
+    ];
 }
 
 function deposit_row_public(array $d): array

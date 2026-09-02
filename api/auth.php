@@ -367,13 +367,22 @@ function otp_hash(string $code, int $userId, string $purpose): string
  * Any earlier unused code for the same purpose is invalidated first, so exactly
  * one code is live at a time and an old email cannot be replayed.
  */
-function issue_otp(int $userId, string $purpose, string $email): void
+/**
+ * Create a one-time code and email it.
+ *
+ * @return bool Whether the email actually went. Callers must not tell the user to
+ *              check their inbox when this is false — the commonest way a signup
+ *              becomes a dead end is a page that says "we sent you a code" when
+ *              nothing was sent, leaving the person to retry until they are rate
+ *              limited and still no closer.
+ */
+function issue_otp(int $userId, string $purpose, string $email): bool
 {
     $code = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
-    tx(static function (PDO $pdo) use ($userId, $purpose, $code) {
+    $otpId = tx(static function (PDO $pdo) use ($userId, $purpose, $code) {
         $pdo->prepare(
-            'UPDATE otps SET used_at = UTC_TIMESTAMP()
+            'UPDATE otps SET used_at = UTC_TIMESTAMP(), undelivered_code = \'\'
              WHERE user_id = ? AND purpose = ? AND used_at IS NULL'
         )->execute([$userId, $purpose]);
 
@@ -381,6 +390,8 @@ function issue_otp(int $userId, string $purpose, string $email): void
             'INSERT INTO otps (user_id, purpose, code_hash, expires_at)
              VALUES (?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? SECOND))'
         )->execute([$userId, $purpose, otp_hash($code, $userId, $purpose), OTP_TTL_SECONDS]);
+
+        return (int)$pdo->lastInsertId();
     });
 
     $minutes = (int)(OTP_TTL_SECONDS / 60);
@@ -395,11 +406,32 @@ function issue_otp(int $userId, string $purpose, string $email): void
 
     $sent = send_mail($email, 'ARV Coin — your code is ' . $code, $body);
 
-    // In development there is no MTA, so the code goes to the error log rather
-    // than leaving the flow untestable. It is never returned to the browser.
     if (!$sent) {
+        // The code goes to the error log, so a developer with no MTA can still test
+        // the flow — and to the row itself, so an operator on a host where mail is
+        // broken can read it out of the database and get in. Without one of those,
+        // a failed send is an account nobody can ever enter.
         error_log(sprintf('[arv] OTP for %s (%s): %s', $email, $purpose, $code));
+
+        // Tolerated rather than required: on a database that has not yet had the
+        // migration applied these columns do not exist, and a failed *send* must
+        // never turn into a failed *request*. The error log above is the fallback
+        // to the fallback.
+        try {
+            q('UPDATE otps SET delivered = 0, undelivered_code = ? WHERE id = ?', [$code, $otpId]);
+        } catch (Throwable $e) {
+            error_log('[arv] could not record the undelivered code: ' . $e->getMessage());
+        }
+
+        audit('otp_undelivered', [
+            'actor'  => $userId,
+            'entity' => 'otps',
+            'entity_id' => (string)$otpId,
+            'detail' => ['purpose' => $purpose, 'email' => $email],
+        ]);
     }
+
+    return $sent;
 }
 
 /* ------------------------------------------------------- trusted device --- */

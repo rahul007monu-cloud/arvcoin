@@ -49,6 +49,11 @@ function loadLib() {
  * Amount is rendered with exactly two decimals: UPI rejects malformed amounts,
  * and "100" versus "100.00" is the kind of difference that fails silently on
  * one app and works on another.
+ *
+ * The VPA should always be passed in, from the server. `CFG.PAYMENTS.vpa` is a
+ * last resort that is empty by design — the payment address lives in
+ * `settings.upi_vpa`, and a copy of it in the browser bundle would be a second
+ * place to forget and a stale address to send money to.
  */
 export function upiUri(opts) {
   var o = opts || {};
@@ -94,8 +99,8 @@ export async function render(el, opts) {
     el.innerHTML =
       '<div class="qr-unconfigured">' +
         '<div><strong>UPI not configured</strong><br>' +
-        'Set <code>PAYMENTS.vpa</code> in <code>arv-config.js</code> ' +
-        'and a scannable code appears here.</div>' +
+        'An operator needs to set <code>upi_vpa</code> in Operations &rarr; Settings. ' +
+        'A scannable code appears here as soon as they do \u2014 nothing else is needed.</div>' +
       '</div>';
     return { ok: false, reason: 'no vpa configured' };
   }
@@ -143,9 +148,4 @@ export function intentLink(opts) {
 
 export function isMobile() {
   return /android|iphone|ipad|ipod/i.test(navigator.userAgent || '');
-}
-
-/** Whether payments are configured at all — drives UI copy. */
-export function configured() {
-  return !!CFG.PAYMENTS.vpa;
 }

@@ -12,7 +12,7 @@ import * as api from '../api.js';
 import * as qr from '../qr.js';
 
 var CFG = globalThis.ARV_CONFIG;
-var st = { user: null, deposit: null, timer: null };
+var st = { user: null, deposit: null, timer: null, upi: null };
 
 function goto(n) {
   ui.els('[data-panel]').forEach(function (p) {
@@ -78,15 +78,25 @@ async function showPayment(dep, upi) {
   ui.setText('[data-pay-amount]', ui.fmtPaise(dep.amountPaise));
   ui.setText('[data-ref]', dep.ref);
 
+  // Remembered so the copy button and a resumed request use the same address the
+  // server just gave us. The payment address lives in settings.upi_vpa and nowhere
+  // else — a copy of it in arv-config.js would be a second place to change and a
+  // silent blank when only one of them was updated.
+  if (upi && upi.vpa) {
+    st.upi = upi;
+  }
+
   var r = await qr.render(ui.el('[data-qr]'), {
     uri: dep.qrPayload || null,
     amountPaise: dep.amountPaise,
     ref: dep.ref
   });
 
-  if (r.ok && upi && upi.vpa) {
-    ui.el('[data-vpa-row]').hidden = false;
-    ui.setText('[data-vpa]', upi.vpa);
+  var vpa = (st.upi && st.upi.vpa) || '';
+  ui.el('[data-vpa-row]').hidden = !(r.ok && vpa);
+
+  if (r.ok && vpa) {
+    ui.setText('[data-vpa]', vpa);
     if (qr.isMobile()) {
       var link = ui.el('[data-intent]');
       link.href = r.uri;
@@ -199,7 +209,7 @@ async function resumeExisting(ref) {
         goto(3);
         startWatching();
       } else {
-        await showPayment(st.deposit, { vpa: CFG.PAYMENTS.vpa });
+        await showPayment(st.deposit, r.upi);
         goto(2);
       }
     });
@@ -275,7 +285,17 @@ async function loadHistory() {
   });
 
   ui.on('[data-copy-vpa]', 'click', function () {
-    navigator.clipboard.writeText(CFG.PAYMENTS.vpa)
+    // Whatever is on screen is what gets copied. Reading it from the config would
+    // copy an empty string and then claim success, which is the worst outcome on a
+    // payment screen — the user pastes nothing and believes they pasted the address.
+    var vpa = (st.upi && st.upi.vpa) || (ui.el('[data-vpa]') || {}).textContent || '';
+    vpa = vpa.trim();
+
+    if (!vpa) {
+      ui.toast('No UPI ID is configured yet, so there is nothing to copy.', 'warn');
+      return;
+    }
+    navigator.clipboard.writeText(vpa)
       .then(function () { ui.toast('UPI ID copied.', 'ok', 2000); })
       .catch(function () { ui.toast('Could not copy \u2014 select it manually.', 'warn'); });
   });

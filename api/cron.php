@@ -35,6 +35,7 @@ require __DIR__ . '/_boot.php';
 require __DIR__ . '/_money.php';
 require __DIR__ . '/_match.php';
 require __DIR__ . '/_feed.php';
+require __DIR__ . '/_schema.php';
 
 @set_time_limit(300);
 ignore_user_abort(true);
@@ -63,6 +64,14 @@ try {
             // one query a minute for ever after. Nobody should have to press a
             // button to get a chart that the launch date already determines.
             $out['backfill'] = auto_backfill_step();
+            // Schema catch-up. arv_schema() is all CREATE TABLE IF NOT EXISTS, which
+            // does nothing for a column added to a table that already exists — so a
+            // deployed update would otherwise reference a column its own database
+            // has never had. Costs one information_schema query when current.
+            $migrated = arv_migrations(db());
+            if ($migrated) {
+                $out['migrated'] = $migrated;
+            }
             break;
 
         case 'ingest':   $out['ingest'] = job_ingest(); break;

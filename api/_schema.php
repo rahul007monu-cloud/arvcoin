@@ -24,6 +24,12 @@
 
 declare(strict_types=1);
 
+/**
+ * Bumped whenever arv_schema() or arv_migrations() changes, so an operator can see
+ * at a glance whether a deployment has caught up with its own database.
+ */
+const ARV_SCHEMA_VERSION = 4;
+
 function arv_schema(): array
 {
     return [
@@ -85,6 +91,23 @@ function arv_schema(): array
         expires_at      DATETIME     NOT NULL,
         used_at         DATETIME     NULL,
         created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+        -- Delivery, and the escape hatch when it fails.
+        --
+        -- A code that cannot be emailed locks the account out of its own signin,
+        -- and because the first login always needs one, a server with broken mail
+        -- locks out *everybody* — including the operator, who is then unable to
+        -- reach the settings page that would tell them why. That is a dead end with
+        -- no way back in.
+        --
+        -- So when delivery fails the code is written here in plain text, where the
+        -- person holding the database can read it and get in. That is not a
+        -- weakening: anyone with write access to this table could already replace a
+        -- password hash. It is only ever populated when the email did not go, it is
+        -- cleared the moment the code is used or expires, and admin.php reports it
+        -- loudly so it cannot sit unnoticed.
+        delivered       TINYINT(1)   NOT NULL DEFAULT 1,
+        undelivered_code VARCHAR(6)  NOT NULL DEFAULT '',
 
         KEY idx_otps_lookup (user_id, purpose, used_at),
         KEY idx_otps_expiry (expires_at),
@@ -603,6 +626,56 @@ function arv_default_settings(): array
         'web_tick_at'           => '0',
 
         'maintenance_mode'      => '0',
-        'schema_version'        => '3',
+        'schema_version'        => (string)ARV_SCHEMA_VERSION,
     ];
+}
+
+
+/* ========================================================== migrations ===== */
+
+/**
+ * Bring an existing database up to the current schema.
+ *
+ * `arv_schema()` is all `CREATE TABLE IF NOT EXISTS`, which is exactly right for a
+ * fresh install and useless for an existing one: a new column on a table that
+ * already exists is silently skipped, and the code that expects it then fails at
+ * runtime on the live site.
+ *
+ * Every step here is written to be safe to run repeatedly and safe to run out of
+ * order, because that is the only kind of migration that survives contact with a
+ * shared host — there is no reliable place to record "step 4 ran" that cannot
+ * itself be lost, so each step asks the database what it actually looks like
+ * instead of trusting a version number.
+ *
+ * Called once per cron run. The cost when there is nothing to do is one query
+ * against information_schema.
+ *
+ * @return string[] Descriptions of what was changed, empty when already current.
+ */
+function arv_migrations(PDO $pdo): array
+{
+    $done = [];
+
+    $hasColumn = static function (string $table, string $column) use ($pdo): bool {
+        $st = $pdo->prepare(
+            'SELECT 1 FROM information_schema.columns
+              WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?'
+        );
+        $st->execute([$table, $column]);
+        return (bool)$st->fetchColumn();
+    };
+
+    // Added when it became clear that a host with broken mail locks every account,
+    // operator included, out of a login it can never complete.
+    if (!$hasColumn('otps', 'delivered')) {
+        $pdo->exec('ALTER TABLE otps
+                      ADD COLUMN delivered TINYINT(1) NOT NULL DEFAULT 1,
+                      ADD COLUMN undelivered_code VARCHAR(6) NOT NULL DEFAULT \'\'');
+        $done[] = 'otps: added delivered, undelivered_code';
+    }
+
+    if ($done) {
+        setting_set('schema_version', (string)ARV_SCHEMA_VERSION);
+    }
+    return $done;
 }
