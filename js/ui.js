@@ -549,6 +549,17 @@ export async function boot(opts) {
       toast('No market data source is reachable right now. Prices will retry automatically.',
             'warn', 9000);
     }
+  } else {
+    // A page that does not open a socket still has the status indicator in its
+    // footer, and leaving it on "connecting…" for ever is a worse lie than saying
+    // nothing. One cheap GET tells it the truth — and populates the nav ticker,
+    // so the price is visible on every page rather than only the market ones.
+    api.snapshot().then(function (snap) {
+      paintServerFeed(snap);
+      paintNavTicker(snap);
+    }).catch(function () {
+      paintServerFeed(null);
+    });
   }
 
   var warnings = CFG.configWarnings().filter(function (w) { return !/UPI VPA/.test(w); });

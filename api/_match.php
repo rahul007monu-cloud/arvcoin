@@ -94,18 +94,84 @@ function ready_orders(PDO $pdo, string $side, bool $lock = true): array
     return $st->fetchAll();
 }
 
-function order_remaining_units8(array $o, float $nav): int
+/**
+ * How much of a buy order's escrow can actually reach the market.
+ *
+ * The escrow holds the gross amount *plus* the entry fee and its GST, because all
+ * three are debited on a fill. So the rupees available to buy units with are less
+ * than the rupees held — and dividing the whole escrow by the price would size the
+ * order as though the fees were free, then try to debit them on top. That is what
+ * makes a fill exceed its own escrow.
+ *
+ * Inverting the charge stack gives the gross G that fits in escrow L:
+ *
+ *     G × (1 + e/100 × (1 + g/100))  =  L
+ *
+ * The floor can still leave the recomputed fee a paise over L because pct_of
+ * rounds, so the result is stepped down until it genuinely fits. That loop runs
+ * once or twice, never more.
+ */
+function buy_spendable_paise(int $lockedPaise, float $entryPct, float $gstPct): int
+{
+    if ($lockedPaise <= 0) {
+        return 0;
+    }
+    $gross = (int)floor($lockedPaise / (1 + ($entryPct / 100) * (1 + $gstPct / 100)));
+
+    while ($gross > 0) {
+        $fee = pct_of($gross, $entryPct);
+        $gst = pct_of($fee, $gstPct);
+        if ($gross + $fee + $gst <= $lockedPaise) {
+            break;
+        }
+        $gross--;
+    }
+    return max(0, $gross);
+}
+
+/**
+ * Units still to fill on an order.
+ *
+ * `$fees` is the order owner's own fee schedule, which differs by reward tier. It
+ * is passed in rather than looked up because the matching loop already holds the
+ * user row, and a query per iteration would be a query per candidate order. The
+ * aggregate views pass nothing and fall back to the platform default, which is an
+ * approximation — acceptable for a depth bar, not for a fill.
+ */
+function order_remaining_units8(array $o, float $nav, ?array $fees = null): int
 {
     if ($o['side'] === 'sell') {
         return max(0, u8((string)$o['units']) - u8((string)$o['filled_units']));
     }
-    // A buy is expressed in rupees, so what remains is whatever the unspent
-    // escrow can still buy at the current price.
-    $remainingPaise = max(0, (int)$o['locked_paise']);
-    return paise_to_u8($remainingPaise, exec_nav($nav, 'buy'));
+
+    $locked = max(0, (int)$o['locked_paise']);
+    if ($locked <= 0) {
+        return 0;
+    }
+
+    $entryPct = $fees['entryPct'] ?? setting_f('entry_fee_pct', 0.5);
+    $gstPct   = $fees['gstPct']   ?? setting_f('gst_pct', 18);
+
+    return paise_to_u8(buy_spendable_paise($locked, (float)$entryPct, (float)$gstPct),
+                       exec_nav($nav, 'buy'));
 }
 
 /* ============================================================== fills ==== */
+
+/**
+ * Total rupees a buyer is debited for a given number of units.
+ *
+ * Gross plus entry fee plus GST on that fee — the same three components the
+ * escrow was sized to cover, computed the same way in every caller so the debit
+ * and the escrow cannot disagree by a rounding step.
+ */
+function buy_debit_paise(int $unitsU8, float $nav, array $fees): int
+{
+    $gross = u8_to_paise($unitsU8, exec_nav($nav, 'buy'));
+    $fee   = pct_of($gross, (float)$fees['entryPct']);
+    $gst   = pct_of($fee, (float)$fees['gstPct']);
+    return $gross + $fee + $gst;
+}
 
 /**
  * Record one fill between a buyer and a seller.
@@ -191,16 +257,19 @@ function execute_fill(
         ]);
         if ($sellerFee > 0) {
             ledger_add($pdo, (int)$seller['id'], 'fee', 0, 0,
-                ['ref' => $tradeRef, 'note' => 'Exit fee ' . $sf['exitPct'] . '%', 'fy' => $fy]);
+                ['ref' => $tradeRef, 'fy' => $fy,
+                 'note' => sprintf('Exit fee %s%% — %s', $sf['exitPct'], money_note($sellerFee))]);
         }
         if ($sellerGst > 0) {
             ledger_add($pdo, (int)$seller['id'], 'gst', 0, 0,
-                ['ref' => $tradeRef, 'note' => 'GST on exit fee', 'fy' => $fy]);
+                ['ref' => $tradeRef, 'fy' => $fy,
+                 'note' => sprintf('GST on exit fee — %s', money_note($sellerGst))]);
         }
         if ($sellerTds > 0) {
             ledger_add($pdo, (int)$seller['id'], 'tds', 0, 0, [
                 'ref' => $tradeRef, 'fy' => $fy,
-                'note' => sprintf('TDS %s%% withheld under s.194S', $tds['ratePct']),
+                'note' => sprintf('TDS %s%% withheld under s.194S — %s',
+                                  $tds['ratePct'], money_note($sellerTds)),
             ]);
         }
     }
@@ -234,11 +303,13 @@ function execute_fill(
         ]);
         if ($buyerFee > 0) {
             ledger_add($pdo, (int)$buyer['id'], 'fee', 0, 0,
-                ['ref' => $tradeRef, 'note' => 'Entry fee ' . $bf['entryPct'] . '%', 'fy' => $fy]);
+                ['ref' => $tradeRef, 'fy' => $fy,
+                 'note' => sprintf('Entry fee %s%% — %s', $bf['entryPct'], money_note($buyerFee))]);
         }
         if ($buyerGst > 0) {
             ledger_add($pdo, (int)$buyer['id'], 'gst', 0, 0,
-                ['ref' => $tradeRef, 'note' => 'GST on entry fee', 'fy' => $fy]);
+                ['ref' => $tradeRef, 'fy' => $fy,
+                 'note' => sprintf('GST on entry fee — %s', money_note($buyerGst))]);
         }
     }
 
@@ -353,6 +424,21 @@ function run_matching(float $nav): array
         $buys  = ready_orders($pdo, 'buy');
         $sells = ready_orders($pdo, 'sell');
 
+        // Cache the user rows and their fee schedules. Sizing a buy needs the
+        // owner's own entry fee, and looking that up inside the inner loop would
+        // be a query per candidate pairing.
+        $users = [];
+        $fees  = [];
+        $load = static function (int $id) use ($pdo, &$users, &$fees): array {
+            if (!isset($users[$id])) {
+                $st = $pdo->prepare('SELECT * FROM users WHERE id = ?');
+                $st->execute([$id]);
+                $users[$id] = $st->fetch();
+                $fees[$id]  = user_fees($users[$id]);
+            }
+            return [$users[$id], $fees[$id]];
+        };
+
         $bi = 0;
         foreach ($sells as &$sell) {
             $sellLeft = order_remaining_units8($sell, $nav);
@@ -361,8 +447,9 @@ function run_matching(float $nav): array
             }
 
             while ($sellLeft > 0 && $bi < count($buys)) {
-                $buy     = &$buys[$bi];
-                $buyLeft = order_remaining_units8($buy, $nav);
+                $buy = &$buys[$bi];
+                [$buyer, $bFees] = $load((int)$buy['user_id']);
+                $buyLeft = order_remaining_units8($buy, $nav, $bFees);
 
                 if ($buyLeft <= 0) {
                     $bi++;
@@ -375,18 +462,14 @@ function run_matching(float $nav): array
                     continue;
                 }
 
-                $buyer  = $pdo->query('SELECT * FROM users WHERE id = ' . (int)$buy['user_id'])->fetch();
-                $seller = $pdo->query('SELECT * FROM users WHERE id = ' . (int)$sell['user_id'])->fetch();
+                [$seller] = $load((int)$sell['user_id']);
 
                 $fill = execute_fill(
                     $pdo, $buyer, $seller, $take, $nav,
                     (int)$buy['id'], (int)$sell['id']
                 );
 
-                $buyGross = u8_to_paise($take, exec_nav($nav, 'buy'));
-                $bFees    = user_fees($buyer);
-                $buyDebit = $buyGross + pct_of($buyGross, $bFees['entryPct'])
-                          + pct_of(pct_of($buyGross, $bFees['entryPct']), $bFees['gstPct']);
+                $buyDebit = buy_debit_paise($take, $nav, $bFees);
 
                 order_progress($pdo, $buy,  $take, $buyDebit, $nav);
                 order_progress($pdo, $sell, $take, $fill['grossPaise'], $nav);
@@ -469,7 +552,10 @@ function fill_buy_now(int $orderId, float $nav): array
             return [];
         }
 
-        $buyer = $pdo->query('SELECT * FROM users WHERE id = ' . (int)$buy['user_id'])->fetch();
+        $uSt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
+        $uSt->execute([(int)$buy['user_id']]);
+        $buyer = $uSt->fetch();
+        $bFees = user_fees($buyer);
         $fills = [];
 
         // Resting sellers first — a real counterparty is always preferable to the
@@ -485,7 +571,7 @@ function fill_buy_now(int $orderId, float $nav): array
         $sellSt->execute([(int)$buy['user_id']]);
 
         foreach ($sellSt->fetchAll() as $sell) {
-            $need = order_remaining_units8($buy, $nav);
+            $need = order_remaining_units8($buy, $nav, $bFees);
             if ($need <= 0) {
                 break;
             }
@@ -493,15 +579,13 @@ function fill_buy_now(int $orderId, float $nav): array
             if ($have <= 0) {
                 continue;
             }
-            $take   = min($need, $have);
-            $seller = $pdo->query('SELECT * FROM users WHERE id = ' . (int)$sell['user_id'])->fetch();
+            $take = min($need, $have);
+
+            $uSt->execute([(int)$sell['user_id']]);
+            $seller = $uSt->fetch();
 
             $fill = execute_fill($pdo, $buyer, $seller, $take, $nav, (int)$buy['id'], (int)$sell['id']);
-
-            $buyGross = u8_to_paise($take, exec_nav($nav, 'buy'));
-            $bf       = user_fees($buyer);
-            $debit    = $buyGross + pct_of($buyGross, $bf['entryPct'])
-                      + pct_of(pct_of($buyGross, $bf['entryPct']), $bf['gstPct']);
+            $debit = buy_debit_paise($take, $nav, $bFees);
 
             order_progress($pdo, $buy,  $take, $debit, $nav);
             order_progress($pdo, $sell, $take, $fill['grossPaise'], $nav);
@@ -514,15 +598,10 @@ function fill_buy_now(int $orderId, float $nav): array
 
         // Whatever is left comes from the treasury, so the buy completes now.
         if (setting_b('buy_fills_from_treasury', true)) {
-            $need = order_remaining_units8($buy, $nav);
+            $need = order_remaining_units8($buy, $nav, $bFees);
             if ($need > 0) {
-                $fill = execute_fill($pdo, $buyer, null, $need, $nav, (int)$buy['id'], null);
-
-                $buyGross = u8_to_paise($need, exec_nav($nav, 'buy'));
-                $bf       = user_fees($buyer);
-                $debit    = $buyGross + pct_of($buyGross, $bf['entryPct'])
-                          + pct_of(pct_of($buyGross, $bf['entryPct']), $bf['gstPct']);
-
+                $fill  = execute_fill($pdo, $buyer, null, $need, $nav, (int)$buy['id'], null);
+                $debit = buy_debit_paise($need, $nav, $bFees);
                 order_progress($pdo, $buy, $need, $debit, $nav);
                 $fills[] = $fill;
             }
@@ -548,7 +627,9 @@ function fill_sell_now(int $orderId, float $nav): array
             return [];
         }
 
-        $seller = $pdo->query('SELECT * FROM users WHERE id = ' . (int)$sell['user_id'])->fetch();
+        $uSt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
+        $uSt->execute([(int)$sell['user_id']]);
+        $seller = $uSt->fetch();
         $fills  = [];
 
         $buySt = $pdo->prepare(
@@ -566,19 +647,19 @@ function fill_sell_now(int $orderId, float $nav): array
             if ($have <= 0) {
                 break;
             }
-            $need = order_remaining_units8($buy, $nav);
+
+            $uSt->execute([(int)$buy['user_id']]);
+            $buyer = $uSt->fetch();
+            $bFees = user_fees($buyer);
+
+            $need = order_remaining_units8($buy, $nav, $bFees);
             if ($need <= 0) {
                 continue;
             }
-            $take  = min($have, $need);
-            $buyer = $pdo->query('SELECT * FROM users WHERE id = ' . (int)$buy['user_id'])->fetch();
+            $take = min($have, $need);
 
-            $fill = execute_fill($pdo, $buyer, $seller, $take, $nav, (int)$buy['id'], (int)$sell['id']);
-
-            $buyGross = u8_to_paise($take, exec_nav($nav, 'buy'));
-            $bf       = user_fees($buyer);
-            $debit    = $buyGross + pct_of($buyGross, $bf['entryPct'])
-                      + pct_of(pct_of($buyGross, $bf['entryPct']), $bf['gstPct']);
+            $fill  = execute_fill($pdo, $buyer, $seller, $take, $nav, (int)$buy['id'], (int)$sell['id']);
+            $debit = buy_debit_paise($take, $nav, $bFees);
 
             order_progress($pdo, $buy,  $take, $debit, $nav);
             order_progress($pdo, $sell, $take, $fill['grossPaise'], $nav);

@@ -1,291 +1,460 @@
 /**
- * Portfolio dashboard.
+ * Wallet.
  *
- * The "if you redeemed everything now" panel is the reason this page exists in
- * this shape. A dashboard that shows a large green unrealised gain and nothing
- * else trains the wrong expectation: on virtual digital assets, 31.2% of that
- * gain is owed the moment it is realised, fees come off the top, and losses
- * elsewhere cannot be used to reduce it. So the tax consequence sits beside the
- * gain rather than being discovered later.
+ * The panel that shapes this page is "if you sold everything now". A dashboard
+ * that shows a large green unrealised gain and nothing else teaches the wrong
+ * expectation: on virtual digital assets 31.2% of that gain is owed the moment it
+ * is realised, fees come off the top, and losses elsewhere cannot reduce it. So
+ * the tax consequence sits beside the gain rather than being discovered in July.
  */
 
 import * as ui from '../ui.js';
-import * as feed from '../feed.js';
-import * as engine from '../index-engine.js';
-import * as chart from '../chart.js';
-import * as db from '../db.js';
-import * as ledger from '../ledger.js';
-import { fmtPrice, fmtPaise, fmtPct, fmtUnits, fmtBig, direction } from '../money.js';
+import * as api from '../api.js';
+import { reveal } from '../ui.js';
 
 var CFG = globalThis.ARV_CONFIG;
 
 var st = {
-  tf: '1D', api: null, candles: [], live: null, lastPrice: null,
-  holdings: null, lots: [], txns: []
+  user: null,
+  snap: null,
+  range: null,
+  chart: null,
+  series: null,
+  costLine: null,
+  candles: []
 };
 
-/* ---------------------------------------------------------------- headline -- */
+/* ------------------------------------------------------------------- wallet -- */
 
-function paint() {
-  var nav = engine.currentArv();
-  if (nav == null || !st.holdings) return;
+function paintWallet() {
+  var u = st.user;
+  if (!u) return;
+  var w = u.wallet;
+  var nav = st.snap && st.snap.price ? st.snap.price.nav : null;
 
-  var p = ledger.position(st.holdings, nav);
+  ui.setText('[data-greeting]',
+    (u.fullName ? u.fullName.split(' ')[0] : 'Welcome') + (u.fullName ? '\u2019s wallet' : ''));
 
-  ui.setText('[data-value]', fmtPaise(p.valuePaise));
-  ui.setText('[data-units]', fmtUnits(p.units));
-  ui.setText('[data-invested]', fmtPaise(p.investedPaise));
-  ui.setText('[data-avg-cost]', p.avgCostNav > 0 ? fmtPrice(p.avgCostNav) : '\u2014');
+  if (!w) return;
 
-  var pnlEl = document.querySelector('[data-pnl]');
-  if (pnlEl) {
-    pnlEl.textContent = (p.unrealisedPnlPaise >= 0 ? '+' : '\u2212') +
-      fmtPaise(Math.abs(p.unrealisedPnlPaise));
-    pnlEl.className = 'stat-v ' + direction(p.unrealisedPnlPaise);
-  }
-  ui.paintChange(document.querySelector('[data-pnl-pct]'), p.unrealisedPnlPct);
-
-  ui.paintPrice(document.querySelector('[data-price]'), nav, st.lastPrice);
-  st.lastPrice = nav;
-
-  var lp = engine.changeSinceLaunch(nav);
-  var lEl = document.querySelector('[data-launch]');
-  if (lEl && lp != null) {
-    lEl.textContent = fmtPct(lp);
-    lEl.className = direction(lp);
+  ui.setText('[data-inr]', ui.fmtPaise(w.inrPaise));
+  if (w.inrLockedPaise > 0) {
+    var l = ui.el('[data-inr-locked]');
+    l.classList.remove('hidden');
+    l.textContent = ui.fmtPaise(w.inrLockedPaise) + ' held in open orders';
   }
 
-  paintWhatIf(nav, p);
-  paintAllocation(nav, p);
+  ui.setText('[data-units]', ui.fmtUnits(w.arvUnits, 4));
+  ui.setText('[data-value]', ui.fmtPaise(w.valuePaise));
+  if (parseFloat(w.arvLockedUnits) > 0) {
+    var lu = ui.el('[data-units-locked]');
+    lu.classList.remove('hidden');
+    lu.textContent = '\u00b7 ' + ui.fmtUnits(w.arvLockedUnits, 4) + ' in open orders';
+  }
+
+  ui.setText('[data-invested]', ui.fmtPaise(w.investedPaise));
+  ui.setText('[data-avg-cost]', w.avgCostNav > 0 ? ui.fmtPrice(w.avgCostNav) : '\u2014');
+
+  ui.paintSigned('[data-unrealised]', w.unrealisedPaise, { base: 'stat-v' });
+  ui.paintChange('[data-unrealised-pct]', w.unrealisedPct);
+  ui.paintSigned('[data-realised]', w.realisedPaise, { base: 'stat-v' });
+
+  if (nav != null) {
+    ui.paintPrice('[data-price]', nav, 'dash');
+    if (st.snap.stats) ui.paintChange('[data-change]', st.snap.stats.change24hPct);
+  }
+
+  // Referral
+  ui.setText('[data-ref-code]', u.referralCode || '\u2014');
+  ui.setText('[data-ref-pct]', CFG.REFERRAL.commissionPct + '%');
+  if (u.tier) {
+    var t = ui.el('[data-tier]');
+    t.hidden = false;
+    t.textContent = u.tier;
+  }
+
+  // Gates
+  if (u.kyc && u.kyc.status !== 'verified') {
+    ui.el('[data-kyc-notice]').classList.remove('hidden');
+  }
 }
 
-/* ------------------------------------------------------------- what-if ----- */
+function paintPaused() {
+  var p = st.snap && st.snap.price;
+  var f = st.snap && st.snap.feed;
+  var box = ui.el('[data-paused-notice]');
+  if (!box) return;
 
-function paintWhatIf(nav, pos) {
-  var host = document.querySelector('[data-what-if]');
-  if (!host) return;
-
-  if (!pos.units) {
-    host.innerHTML = '<div class="ledger-row"><span class="l muted">' +
-      'You hold no units yet.</span></div>';
-    return;
+  var paused = !p || p.nav == null || p.stale;
+  box.classList.toggle('hidden', !paused);
+  if (paused) {
+    ui.setText('[data-paused-reason]', (f && f.note) || 'The price feed is not current.');
   }
-
-  var q = ledger.quoteSell(pos.units, nav, st.lots, {
-    hasPan: st.profileHasPan,
-    isSpecifiedPerson: st.profileSpecified,
-    fyGrossProceedsPaise: st.fyGross || 0,
-    availableUnits: pos.units
-  });
-
-  var rows = [
-    { l: 'Gross value', a: q.grossPaise, k: 'gross' },
-    { l: 'Exit fee + GST', a: -(q.feePaise + q.gstPaise), k: 'charge' },
-    { l: 'TDS withheld' + (q.tds.applies ? ' (' + q.tds.ratePct + '%)' : ''), a: -q.tdsPaise, k: 'tds' },
-    { l: 'Credited to UPI', a: q.netPayoutPaise, k: 'net' },
-    { div: true },
-    { l: 'Cost of acquisition', a: q.costBasisPaise, k: 'info' },
-    { l: q.pnlPaise >= 0 ? 'Realised gain' : 'Realised loss', a: q.pnlPaise, k: 'pnl' },
-    { l: 'Tax at ' + q.effectiveTaxRatePct.toFixed(1) + '%', a: q.totalTaxLiabilityPaise, k: 'liability' },
-    { l: 'Balance payable at filing', a: q.balanceTaxPayablePaise, k: 'liability-total' },
-    { l: 'Net after tax', a: q.netAfterTaxPaise, k: 'net' }
-  ];
-
-  host.innerHTML = rows.map(function (r) {
-    if (r.div) return '<div class="ledger-divider"></div>';
-    var neg = r.a < 0;
-    return '<div class="ledger-row k-' + r.k + '">' +
-      '<span class="l">' + ui.esc(r.l) + '</span>' +
-      '<span class="a">' + (neg ? '\u2212' : '') + fmtPaise(Math.abs(r.a)) + '</span>' +
-    '</div>';
-  }).join('') +
-  (q.lossNotSetOff
-    ? '<div class="ledger-row k-warning"><span class="note">This loss could not be ' +
-      'set off against other gains or carried forward \u2014 section 115BBH permits ' +
-      'neither.</span></div>'
-    : '');
 }
 
-/* ----------------------------------------------------------- allocation ---- */
+/* ------------------------------------------------------------------ what-if -- */
 
 /**
- * What actually backs the units. With a single-asset basket this is one bar, but
- * it states plainly what the treasury holds against the units outstanding —
- * which is the honest version of an "allocation" panel.
+ * The full cost of exiting, computed from the live price.
+ *
+ * Uses the same percentages the server charges. It is an estimate only because
+ * the price moves between here and a fill — which the note says rather than
+ * implying a guarantee.
  */
-function paintAllocation(nav, pos) {
-  var host = document.querySelector('[data-allocation]');
-  if (!host) return;
+async function paintWhatIf() {
+  var host = ui.el('[data-whatif]');
+  if (!host || !st.user) return;
 
-  host.innerHTML = CFG.BASKET.map(function (a) {
-    var pct = a.weight * 100;
-    var quote = engine.currentQuotePrice(a.key);
-    return '<div style="margin-bottom:var(--sp-4)">' +
-      '<div class="row-between" style="margin-bottom:6px">' +
-        '<span class="row" style="gap:7px">' +
-          '<span style="width:9px;height:9px;border-radius:2px;background:' + a.colour + '"></span>' +
-          '<strong>' + ui.esc(a.name) + '</strong>' +
-        '</span>' +
-        '<span class="num strong">' + pct.toFixed(0) + '%</span>' +
-      '</div>' +
-      '<div style="height:6px;border-radius:3px;background:var(--bg-3);overflow:hidden">' +
-        '<div style="height:100%;width:' + pct + '%;background:' + a.colour + '"></div>' +
-      '</div>' +
-      '<div class="tiny muted" style="margin-top:6px">' +
-        (quote != null ? fmtBig(quote) + ' \u00b7 ' : '') +
-        'your share ' + fmtPaise(Math.round(pos.valuePaise * a.weight)) +
-      '</div>' +
-    '</div>';
-  }).join('') +
-  (CFG.WATCHLIST.length
-    ? '<div class="tiny muted" style="padding-top:var(--sp-2);border-top:1px solid var(--glass-brd)">' +
-      CFG.WATCHLIST.map(function (w) { return w.name; }).join(' and ') +
-      ' carry zero weight and back none of your units.</div>'
-    : '');
-}
+  var w = st.user.wallet;
+  var units = w ? parseFloat(w.arvTotalUnits) : 0;
 
-/* ---------------------------------------------------------------- tables --- */
-
-function paintTxns() {
-  var host = document.querySelector('[data-txns]');
-  if (!host) return;
-
-  if (!st.txns.length) {
-    host.innerHTML = '<tr><td colspan="6"><div class="empty">' +
-      '<div class="icon">\u25ca</div>No transactions yet.<br>' +
-      '<a href="buy.html">Make your first deposit</a></div></td></tr>';
+  if (!units) {
+    host.innerHTML = '<div class="ledger-row"><span class="l muted">'
+      + 'You hold no units yet. <a href="trade.html">Buy ARV</a></span></div>';
     return;
   }
-
-  host.innerHTML = st.txns.slice(0, 8).map(function (t) {
-    var isBuy = t.type === 'deposit';
-    var amount = isBuy ? t.grossPaise : t.netPaise;
-    return '<tr>' +
-      '<td class="tiny">' + ui.fmtTime(t.createdAt, true) + '</td>' +
-      '<td><span class="badge ' + (isBuy ? 'info' : 'warn') + '">' +
-        (isBuy ? 'Buy' : 'Redeem') + '</span></td>' +
-      '<td class="num">' + fmtUnits(t.units) + '</td>' +
-      '<td class="num">' + (t.nav ? fmtPrice(t.nav) : '\u2014') + '</td>' +
-      '<td class="num">' + fmtPaise(amount) + '</td>' +
-      '<td>' + statusBadge(t.status) + '</td>' +
-    '</tr>';
-  }).join('');
-}
-
-function statusBadge(s) {
-  var map = {
-    settled: 'ok', confirmed: 'ok', pending: 'warn',
-    awaiting_payment: 'warn', failed: 'bad', cancelled: 'bad'
-  };
-  var label = s === 'awaiting_payment' ? 'awaiting payment' : s;
-  return '<span class="badge ' + (map[s] || '') + '">' + ui.esc(label) + '</span>';
-}
-
-function paintLots() {
-  var host = document.querySelector('[data-lots]');
-  if (!host) return;
-
-  if (!st.lots.length) {
-    host.innerHTML = '<tr><td colspan="3" class="empty">No open lots.</td></tr>';
-    return;
-  }
-
-  host.innerHTML = st.lots.map(function (l, i) {
-    return '<tr>' +
-      '<td class="tiny">' + ui.fmtDate(l.acquiredAt) +
-        (i === 0 ? ' <span class="badge warn">next</span>' : '') + '</td>' +
-      '<td class="num">' + fmtUnits(l.unitsRemaining) + '</td>' +
-      '<td class="num">' + fmtPrice(l.nav) + '</td>' +
-    '</tr>';
-  }).join('');
-}
-
-/* ----------------------------------------------------------------- chart --- */
-
-async function loadChart() {
-  var el = document.querySelector('[data-chart]');
-  if (!el) return;
-  chart.overlay(el, '<span class="spinner"></span>');
 
   try {
-    var res = await engine.arvSeries(st.tf === '1W' ? '4h' : (st.tf === '1h' ? '5m' : '1h'), {
-      days: st.tf === '1h' ? 1 : (st.tf === '1D' ? 7 : 60)
-    });
-    st.candles = res.candles;
-    if (!st.candles.length) { chart.overlay(el, 'No price history.'); return; }
+    // Ask the server: it applies the user's own tier fees, their PAN status and
+    // their financial-year TDS position, none of which the browser should guess.
+    var r = await api.quoteSell(parseFloat(w.arvUnits) || units);
+    var q = r.quote;
 
-    if (st.api) chart.destroy(st.api);
-    st.api = chart.create(el, { priceKind: 'arv' });
-    chart.addArea(st.api, {});
-    chart.setArea(st.api, st.candles);
+    host.innerHTML = rows([
+      ['Gross value', q.grossPaise, 'gross'],
+      ['Exit fee + GST', -(q.feePaise + q.gstPaise), 'charge'],
+      ['TDS withheld' + (q.tds && q.tds.applies ? ' (' + q.tds.ratePct + '%)' : ''),
+       -q.tdsPaise, 'tds', q.tds ? q.tds.reason : null],
+      ['Credited to rupees', q.netPayoutPaise, 'net'],
+      [null],
+      ['Cost of acquisition', q.costBasisPaise, 'info'],
+      [q.pnlPaise >= 0 ? 'Realised gain' : 'Realised loss', q.pnlPaise, 'pnl'],
+      ['Tax at ' + q.effectiveTaxPct.toFixed(1) + '%', q.totalTaxPaise, 'liability',
+       'Not withheld \u2014 payable by you when you file'],
+      ['Balance at filing', q.balanceTaxPaise, 'liability-total']
+    ]);
 
-    if (st.holdings && st.holdings.units > 0 && st.holdings.investedPaise > 0) {
-      chart.addPriceLine(st.api, {
-        price: (st.holdings.investedPaise / 100) / st.holdings.units,
-        colour: 'rgba(245,165,36,0.8)',
-        title: 'your cost'
-      });
+    if (q.lossNotSetOff) {
+      host.insertAdjacentHTML('beforeend',
+        '<div class="ledger-row k-warning"><span class="note">This loss could not be set '
+        + 'off against other gains or carried forward \u2014 section 115BBH permits neither.'
+        + '</span></div>');
     }
-    chart.addPriceLine(st.api, {
-      price: CFG.INDEX.arvBaseInr, colour: 'rgba(185,195,214,0.3)', title: '\u20b91'
-    });
-
-    chart.fit(st.api);
-    chart.overlay(el, null);
-    st.live = engine.createLiveCandle(st.tf === '1h' ? '5m' : '1h', st.candles[st.candles.length - 1]);
   } catch (e) {
-    chart.overlay(el, 'Price history unavailable.');
+    host.innerHTML = '<div class="ledger-row"><span class="l muted">'
+      + ui.esc(e.message || 'Cannot price a sale right now.') + '</span></div>';
+  }
+
+  function rows(list) {
+    return list.map(function (r) {
+      if (!r[0]) return '<div class="ledger-divider"></div>';
+      var neg = r[1] < 0;
+      return '<div class="ledger-row k-' + (r[2] || 'info') + '">'
+        + '<span class="l">' + ui.esc(r[0]) + '</span>'
+        + '<span class="a">' + (neg ? '\u2212' : '') + ui.fmtPaise(Math.abs(r[1] || 0)) + '</span>'
+        + (r[3] ? '<span class="note">' + ui.esc(r[3]) + '</span>' : '')
+        + '</div>';
+    }).join('');
   }
 }
 
-/* ------------------------------------------------------------------- boot -- */
+/* -------------------------------------------------------------------- chart -- */
 
-(async function () {
-  var res = await ui.boot();
-  var user = await db.requireUser();
-  if (!user) return;
+function buildRangeTabs() {
+  var host = ui.el('[data-range-tabs]');
+  if (!host) return;
+  var ranges = CFG.CHARTS.ranges || [];
+  st.range = ranges.find(function (r) { return r.label === CFG.CHARTS.defaultRange; }) || ranges[0];
 
-  ui.setText('[data-mode-note]',
-    db.mode() === 'local'
-      ? 'Stored in this browser \u2014 configure Supabase in arv-config.js to persist across devices'
-      : 'Signed in as ' + (user.email || ''));
+  host.innerHTML = ranges.map(function (r) {
+    return '<button class="tab' + (r === st.range ? ' on' : '') + '" data-range="' + r.label + '">'
+      + r.label + '</button>';
+  }).join('');
 
-  ui.els('[data-tf-tabs] .tab').forEach(function (b) {
+  ui.els('[data-range-tabs] .tab').forEach(function (b) {
     b.addEventListener('click', function () {
-      ui.els('[data-tf-tabs] .tab').forEach(function (x) { x.classList.remove('on'); });
+      ui.els('[data-range-tabs] .tab').forEach(function (x) { x.classList.remove('on'); });
       b.classList.add('on');
-      st.tf = b.dataset.tf;
+      st.range = ranges.find(function (r) { return r.label === b.dataset.range; });
       loadChart();
     });
   });
+}
+
+async function loadChart() {
+  var host = ui.el('[data-chart]');
+  if (!host || !globalThis.LightweightCharts || !st.range) return;
 
   try {
-    var profile = await db.getProfile();
-    st.profileHasPan = !!(profile && profile.pan);
-    st.profileSpecified = !!(profile && profile.isSpecifiedPerson);
-  } catch (_) {}
+    var r = await api.candles(st.range.tf, st.range.days, CFG.CHARTS.maxCandles);
+    st.candles = r.candles || [];
 
-  try {
-    st.holdings = await db.getHoldings();
-    st.lots = await db.getLots();
-    st.txns = await db.getTransactions({ limit: 20 });
-    st.fyGross = await db.fyGrossProceeds();
-  } catch (e) {
-    ui.toastError(e);
-    st.holdings = { units: 0, investedPaise: 0, realisedGainPaise: 0 };
-  }
+    ui.setText('[data-candle-count]', st.candles.length
+      ? st.candles.length + ' candles \u00b7 ' + st.range.tf
+      : 'no candles for this range');
 
-  paintTxns();
-  paintLots();
-  await loadChart();
-  paint();
+    if (!st.candles.length) return;
 
-  feed.onTick(function () {
-    paint();
-    var nav = engine.currentArv();
-    if (st.live && st.api && nav != null) {
-      var r = st.live.push(nav);
-      if (r.candle) chart.updateArea(st.api, r.candle);
+    var L = globalThis.LightweightCharts;
+
+    if (!st.chart) {
+      st.chart = L.createChart(host, {
+        width: host.clientWidth,
+        height: host.clientHeight || 430,
+        layout: { background: { type: 'solid', color: 'transparent' },
+                  textColor: '#5d636f', fontSize: 10,
+                  fontFamily: "'JetBrains Mono',ui-monospace,monospace" },
+        grid: { vertLines: { color: 'rgba(255,255,255,.025)' },
+                horzLines: { color: 'rgba(255,255,255,.03)' } },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,.07)',
+                           scaleMargins: { top: .12, bottom: .1 } },
+        timeScale: { borderColor: 'rgba(255,255,255,.07)', timeVisible: true, rightOffset: 4 },
+        crosshair: { mode: L.CrosshairMode.Normal,
+                     vertLine: { color: 'rgba(185,190,201,.35)', style: L.LineStyle.Dashed,
+                                 labelBackgroundColor: '#24242e' },
+                     horzLine: { color: 'rgba(185,190,201,.35)', style: L.LineStyle.Dashed,
+                                 labelBackgroundColor: '#24242e' } },
+        localization: {
+          locale: CFG.UI.locale,
+          priceFormatter: function (p) { return p.toFixed(CFG.INDEX.priceDecimals); }
+        }
+      });
+
+      st.series = st.chart.addAreaSeries({
+        lineColor: '#dfe2e9',
+        topColor: 'rgba(223,226,233,.18)',
+        bottomColor: 'rgba(223,226,233,.01)',
+        lineWidth: 2,
+        priceFormat: { type: 'price', precision: CFG.INDEX.priceDecimals, minMove: 0.0001 }
+      });
+
+      if (typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(function (e) {
+          var w = e[0] && e[0].contentRect.width;
+          if (w > 0) st.chart.applyOptions({ width: w });
+        }).observe(host);
+      }
     }
+
+    st.series.setData(st.candles.map(function (k) {
+      return { time: Math.floor(k.t / 1000), value: k.c };
+    }));
+
+    // The user's own average cost. Seeing your entry against the current price is
+    // the single most useful annotation on a portfolio chart.
+    var w = st.user && st.user.wallet;
+    if (st.costLine) { try { st.series.removePriceLine(st.costLine); } catch (_) {} st.costLine = null; }
+    if (w && w.avgCostNav > 0) {
+      st.costLine = st.series.createPriceLine({
+        price: w.avgCostNav,
+        color: 'rgba(224,176,85,.75)',
+        lineWidth: 1,
+        lineStyle: L.LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: 'your cost'
+      });
+    } else {
+      ui.setText('[data-cost-line-note]', 'Buy ARV and your average cost appears here');
+    }
+
+    st.chart.timeScale().fitContent();
+  } catch (e) {
+    ui.setText('[data-candle-count]', 'chart unavailable');
+  }
+}
+
+/* ------------------------------------------------------------------- orders -- */
+
+function statusBadge(s) {
+  var map = { filled: 'ok', partial: 'info', open: 'warn', triggered: 'warn',
+              cancelled: '', expired: '', paid: 'ok', confirmed: 'ok',
+              requested: 'warn', submitted: 'warn', rejected: 'bad' };
+  return '<span class="badge ' + (map[s] || '') + '">' + ui.esc(s.replace(/_/g, ' ')) + '</span>';
+}
+
+async function loadOrders() {
+  var host = ui.el('[data-orders]');
+  if (!host) return;
+
+  try {
+    var r = await api.myOrders('open');
+    var rows = r.orders || [];
+
+    if (!rows.length) {
+      host.innerHTML = '<tr><td colspan="7"><div class="empty">'
+        + 'No open orders. <a href="trade.html">Place one</a></div></td></tr>';
+      return;
+    }
+
+    host.innerHTML = rows.map(function (o) {
+      var fb = o.fallbackInMinutes != null && o.side === 'sell'
+        ? '<div class="tiny muted">treasury buys in ' + o.fallbackInMinutes + 'm</div>'
+        : '';
+      return '<tr>'
+        + '<td class="mono tiny">' + ui.esc(o.ref) + '</td>'
+        + '<td><span class="badge ' + (o.side === 'buy' ? 'ok' : 'warn') + '">'
+          + o.side + '</span></td>'
+        + '<td class="tiny">' + o.type + (o.triggerNav ? '' : '') + '</td>'
+        + '<td class="num">' + ui.fmtUnits(o.remainingUnits, 4) + fb + '</td>'
+        + '<td class="num">' + (o.triggerNav ? ui.fmtPrice(o.triggerNav) : 'index') + '</td>'
+        + '<td>' + statusBadge(o.status) + '</td>'
+        + '<td class="right"><button class="btn btn-sm btn-ghost" data-cancel="'
+          + o.id + '">Cancel</button></td>'
+        + '</tr>';
+    }).join('');
+
+    ui.els('[data-cancel]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        ui.busy(b, true, '\u2026');
+        try {
+          var res = await api.cancelOrder(Number(b.dataset.cancel));
+          ui.toast(res.message || 'Cancelled.', 'ok');
+          await refresh();
+        } catch (e) {
+          ui.toastError(e);
+          ui.busy(b, false);
+        }
+      });
+    });
+  } catch (e) {
+    host.innerHTML = '<tr><td colspan="7" class="empty">Could not load orders.</td></tr>';
+  }
+}
+
+/* ----------------------------------------------------------------- activity -- */
+
+async function loadActivity() {
+  var host = ui.el('[data-activity]');
+  if (!host) return;
+
+  try {
+    // Deposits, withdrawals and fills, merged into one readable list.
+    var results = await Promise.all([
+      api.myDeposits().catch(function () { return { deposits: [] }; }),
+      api.myWithdrawals().catch(function () { return { withdrawals: [] }; }),
+      api.myOrders('all').catch(function () { return { orders: [] }; })
+    ]);
+
+    var items = [];
+    (results[0].deposits || []).forEach(function (d) {
+      items.push({ at: d.createdAt, what: 'Deposit', badge: 'info',
+                   units: null, price: null, amount: d.amountPaise, status: d.status });
+    });
+    (results[1].withdrawals || []).forEach(function (w) {
+      items.push({ at: w.createdAt, what: 'Withdrawal', badge: 'warn',
+                   units: null, price: null, amount: -w.amountPaise, status: w.status });
+    });
+    (results[2].orders || []).filter(function (o) {
+      return parseFloat(o.filledUnits) > 0;
+    }).forEach(function (o) {
+      items.push({ at: o.createdAt, what: o.side === 'buy' ? 'Bought ARV' : 'Sold ARV',
+                   badge: o.side === 'buy' ? 'ok' : 'warn',
+                   units: o.filledUnits, price: null,
+                   amount: o.side === 'buy' ? -o.filledPaise : o.filledPaise,
+                   status: o.status });
+    });
+
+    items.sort(function (a, b) {
+      return Date.parse(String(b.at).replace(' ', 'T')) - Date.parse(String(a.at).replace(' ', 'T'));
+    });
+
+    if (!items.length) {
+      host.innerHTML = '<tr><td colspan="5"><div class="empty">'
+        + '<div class="icon">\u25c7</div>Nothing yet.<br>'
+        + '<a href="deposit.html">Add funds</a> to get started.</div></td></tr>';
+      return;
+    }
+
+    host.innerHTML = items.slice(0, 10).map(function (i) {
+      return '<tr>'
+        + '<td class="tiny nowrap">' + ui.ago(i.at) + '</td>'
+        + '<td><span class="badge ' + i.badge + '">' + i.what + '</span> '
+          + statusBadge(i.status) + '</td>'
+        + '<td class="num">' + (i.units ? ui.fmtUnits(i.units, 4) : '\u2014') + '</td>'
+        + '<td class="num">' + (i.price ? ui.fmtPrice(i.price) : '\u2014') + '</td>'
+        + '<td class="num ' + (i.amount >= 0 ? 'up' : '') + '">'
+          + (i.amount >= 0 ? '+' : '\u2212') + ui.fmtPaise(Math.abs(i.amount)) + '</td>'
+        + '</tr>';
+    }).join('');
+  } catch (e) {
+    host.innerHTML = '<tr><td colspan="5" class="empty">Could not load activity.</td></tr>';
+  }
+}
+
+/* ---------------------------------------------------------------- watchlist -- */
+
+async function loadWatchlist() {
+  var host = ui.el('[data-watchlist]');
+  if (!host) return;
+  try {
+    var w = await api.watchlist();
+    host.innerHTML = (w.assets || []).map(function (a, i) {
+      var d = ui.direction(a.change24h);
+      return '<div class="asset-row railed ' + a.key.toLowerCase() + '" data-reveal="soft" style="--i:' + i + '">'
+        + '<span class="coin ' + a.key.toLowerCase() + '"><span>' + a.key + '</span></span>'
+        + '<div class="asset-name"><div class="t">' + ui.esc(a.name) + '</div>'
+          + '<div class="s">' + (a.inIndex ? 'in the index' : '0% weight') + '</div></div>'
+        + '<div class="right"><div class="num strong">'
+          + (a.priceUsd != null
+              ? '$' + a.priceUsd.toLocaleString('en-US', { maximumFractionDigits: a.priceUsd < 10 ? 2 : 0 })
+              : '\u2014')
+          + '</div><div class="chip ' + d + '" style="margin-top:3px">'
+          + ui.fmtPct(a.change24h) + '</div></div>'
+        + '</div>';
+    }).join('');
+    host.setAttribute('data-reveal-group', 'tight');
+    reveal.observe(host);
+  } catch (_) {
+    host.innerHTML = '<div class="empty tiny">Market data unavailable.</div>';
+  }
+}
+
+/* -------------------------------------------------------------------- boot -- */
+
+async function refresh() {
+  st.user = await api.me(true);
+  st.snap = await api.snapshot().catch(function () { return null; });
+  paintWallet();
+  paintPaused();
+  ui.paintNavTicker(st.snap);
+  ui.paintServerFeed(st.snap);
+  await Promise.all([loadOrders(), paintWhatIf()]);
+}
+
+(async function () {
+  buildRangeTabs();
+
+  await ui.boot({ feed: false });
+  var user = await api.requireUser();
+  if (!user) return;
+  st.user = user;
+
+  st.snap = await api.snapshot().catch(function () { return null; });
+  paintWallet();
+  paintPaused();
+  ui.paintNavTicker(st.snap);
+  ui.paintServerFeed(st.snap);
+
+  await loadChart();
+  loadOrders();
+  loadActivity();
+  loadWatchlist();
+  paintWhatIf();
+
+  ui.on('[data-copy-ref]', 'click', function (e) {
+    var link = location.origin + '/signup.html?ref=' + (st.user.referralCode || '');
+    navigator.clipboard.writeText(link)
+      .then(function () { ui.toast('Referral link copied.', 'ok', 2500); })
+      .catch(function () { ui.toast('Could not copy \u2014 select it manually.', 'warn'); });
   });
+
+  // The index is recomputed once a minute, so polling matches that.
+  api.poll(async function () {
+    st.snap = await api.snapshot();
+    st.user = await api.me(true);
+    paintWallet();
+    paintPaused();
+    ui.paintNavTicker(st.snap);
+    ui.paintServerFeed(st.snap);
+  }, 30000);
 })();

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Refer &amp; earn — ARV Coin</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#07070a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
+</head>
+<body>
+
+<div data-nav></div>
+
+<main class="page wrap" style="max-width:1040px;padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
+
+  <div class="row-between row-wrap" style="margin-bottom:var(--sp-5)">
+    <div>
+      <h1 class="serif" style="font-size:1.8rem;margin-bottom:2px">Refer &amp; earn</h1>
+      <div class="small muted">
+        <span data-pct>5</span>% of what each person you invite first puts in, paid once.
+      </div>
+    </div>
+    <span class="badge metal hidden" data-tier-badge></span>
+  </div>
+
+  <div class="note-box warn hidden" data-off style="margin-bottom:var(--sp-4)">
+    Referrals are switched off at the moment. Your code still works for sign-ups —
+    nothing is being paid out until they are switched back on.
+  </div>
+
+  <!-- ============================================================== invite -->
+  <section class="card" data-reveal style="margin-bottom:var(--sp-4)">
+    <div class="grid g-2" style="gap:var(--sp-5);align-items:start">
+
+      <div class="stack">
+        <div class="field">
+          <label for="code">Your code</label>
+          <div class="row" style="gap:8px">
+            <input id="code" type="text" readonly class="num"
+                   style="font-size:1.15rem;letter-spacing:.12em;text-transform:uppercase" value="—">
+            <button class="btn btn-sm" data-copy="code" style="flex-shrink:0">Copy</button>
+          </div>
+          <span class="hint">Anyone who enters this at sign-up is linked to you permanently.</span>
+        </div>
+
+        <div class="field">
+          <label for="link">Your link</label>
+          <div class="row" style="gap:8px">
+            <input id="link" type="text" readonly value="—">
+            <button class="btn btn-sm" data-copy="link" style="flex-shrink:0">Copy</button>
+          </div>
+          <span class="hint">The code is filled in for them, so there is nothing to type.</span>
+        </div>
+
+        <div class="row row-wrap" style="gap:8px">
+          <button class="btn btn-primary btn-sm hidden" data-share>Share</button>
+          <a class="btn btn-ghost btn-sm" data-wa target="_blank" rel="noopener">WhatsApp</a>
+          <a class="btn btn-ghost btn-sm" data-tg target="_blank" rel="noopener">Telegram</a>
+          <a class="btn btn-ghost btn-sm" data-mail>Email</a>
+        </div>
+      </div>
+
+      <div>
+        <div class="qr-panel">
+          <div class="qr-frame" data-qr></div>
+          <div class="tiny muted" style="text-align:center;margin-top:var(--sp-3)">
+            Scan to open your invite link.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- =============================================================== stats -->
+  <section class="card card-tight" data-reveal style="margin-bottom:var(--sp-4)">
+    <div class="grid g-4" style="gap:var(--sp-5)">
+      <div class="stat">
+        <span class="stat-k">Earned</span>
+        <span class="stat-v" data-earned>—</span>
+        <span class="stat-sub">already in your rupee balance</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Pending</span>
+        <span class="stat-v" data-pending>—</span>
+        <span class="stat-sub">awaiting deposit confirmation</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Funded</span>
+        <span class="stat-v" data-funded>—</span>
+        <span class="stat-sub" data-joined>—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Referred volume</span>
+        <span class="stat-v" data-volume>—</span>
+        <span class="stat-sub">first deposits, counted once each</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid g-2" style="align-items:start;gap:var(--sp-4)">
+
+    <!-- ============================================================= tiers -->
+    <section class="card" data-reveal>
+      <div class="card-head">
+        <h3 style="font-size:1rem">Fee tiers</h3>
+        <span class="badge" data-tier-now>—</span>
+      </div>
+
+      <div class="stack" data-tier-progress style="margin-bottom:var(--sp-4)"></div>
+      <div class="stack" data-tiers style="gap:8px"></div>
+
+      <p class="tiny muted" style="margin:var(--sp-4) 0 0">
+        Tiers pay in lower fees, not in cash. A cash reward that grows with how much
+        money other people deposit is a return funded by deposits, which is the
+        shape of a scheme rather than a business — and it is a deposit-taking
+        offence under the BUDS Act, 2019. A fee discount comes out of our own
+        margin, so it is ours to give.
+      </p>
+    </section>
+
+    <!-- ============================================================= terms -->
+    <section class="stack" data-reveal>
+      <div class="card card-tight">
+        <h4 style="font-size:.95rem;margin-bottom:var(--sp-3)">How it pays</h4>
+        <div class="ledger-list" data-terms></div>
+        <p class="tiny muted" style="margin:var(--sp-3) 0 0" data-terms-note></p>
+      </div>
+
+      <div class="card card-tight">
+        <h4 style="font-size:.95rem;margin-bottom:var(--sp-3)">What it does not do</h4>
+        <ul class="small muted" style="margin:0;padding-left:1.1rem;line-height:1.75">
+          <li>No second level. You are not paid on the people they invite.</li>
+          <li>No cut of their trading, ever — only that one first deposit.</li>
+          <li>Nothing is taken from them. The commission is ours, not theirs.</li>
+          <li>Self-referral is void, and a duplicate PAN or device voids both sides.</li>
+        </ul>
+      </div>
+
+      <div class="card card-tight">
+        <h4 style="font-size:.95rem;margin-bottom:var(--sp-3)">Tax on this</h4>
+        <p class="small muted" style="margin:0">
+          Referral commission is ordinary income at your slab rate, not a capital
+          gain. It is kept apart from your ARV holdings and does not change their
+          cost basis, so selling ARV later is unaffected by it. It shows in your
+          <a href="tax.html">tax statement</a> under other income.
+        </p>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============================================================== people -->
+  <section class="card card-flush" data-reveal style="margin-top:var(--sp-4)">
+    <div class="card-head" style="padding:var(--sp-4) var(--sp-5)">
+      <h3 style="font-size:1rem">People you invited</h3>
+      <button class="btn btn-ghost btn-sm hidden" data-csv>Export CSV</button>
+    </div>
+    <div class="table-wrap" data-people></div>
+  </section>
+
+</main>
+
+<div data-footer></div>
+<script type="module" src="js/pages/referral.js"></script>
+</body>
+</html>

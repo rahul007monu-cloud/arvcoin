@@ -1,246 +1,207 @@
 /**
- * Redeem flow.
+ * Withdraw — rupees out, to UPI.
  *
- * The design goal of this screen is that nobody is surprised in July. Indian VDA
- * tax has three properties that catch people out, and all three are stated on
- * screen before the confirm button becomes active:
- *
- *   the 30% + cess is NOT withheld — it is owed later
- *   platform fees are not deductible against the gain
- *   losses cannot be set off or carried forward
- *
- * The quote comes from the same `ledger.quoteSell` that executes the redemption,
- * so the itemisation shown is arithmetically the record that gets written.
+ * Only the rupee balance leaves. Selling ARV is a separate action with its own tax
+ * position, and keeping the two apart is what stops a withdrawal screen having to
+ * explain capital gains.
  */
 
 import * as ui from '../ui.js';
-import * as feed from '../feed.js';
-import * as engine from '../index-engine.js';
-import * as ledger from '../ledger.js';
-import * as db from '../db.js';
-import * as qr from '../qr.js';
-import { fmtPaise, fmtPrice, fmtUnits, roundUnits, direction } from '../money.js';
+import * as api from '../api.js';
 
 var CFG = globalThis.ARV_CONFIG;
+var st = { user: null };
 
-var st = {
-  step: 1, holdings: null, lots: [], profile: null,
-  fyGross: 0, quote: null, units: 0
-};
+/* ------------------------------------------------------------------ painting -- */
 
-function goto(n) {
-  st.step = n;
-  ui.els('[data-panel]').forEach(function (p) {
-    p.classList.toggle('hidden', Number(p.dataset.panel) !== n);
-  });
-  ui.els('[data-step]').forEach(function (s) {
-    var i = Number(s.dataset.step);
-    s.classList.toggle('on', i === n);
-    s.classList.toggle('done', i < n);
-  });
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
+function paint() {
+  var u = st.user;
+  var w = u && u.wallet;
 
-/* -------------------------------------------------------------------- quote -- */
+  ui.setText('[data-min]', ui.fmtPaise(CFG.FEES.minWithdrawPaise));
 
-function ctx() {
-  return {
-    hasPan: !!(st.profile && st.profile.pan),
-    isSpecifiedPerson: !!(st.profile && st.profile.isSpecifiedPerson),
-    fyGrossProceedsPaise: st.fyGross,
-    availableUnits: st.holdings ? st.holdings.units : 0
-  };
-}
+  if (w) {
+    ui.setText('[data-balance]', ui.fmtPaise(w.inrPaise) + ' available');
+    ui.setText('[data-units]', ui.fmtUnits(w.arvUnits, 4) + ' ARV');
+    ui.setText('[data-worth]', ui.fmtPaise(w.valuePaise));
 
-function paintQuote() {
-  var nav = engine.currentArv();
-  var host = ui.el('[data-quote]');
-  var btn = ui.el('[data-continue]');
-  var err = ui.el('[data-units-err]');
+    // Portions of what is actually available, so "All" can never overdraw.
+    ui.setHtml('[data-quick]', [25, 50, 75, 100].map(function (pc) {
+      return '<button class="btn btn-sm" data-qpct="' + pc + '">' + pc + '%</button>';
+    }).join(''));
 
-  ui.setText('[data-price-badge]', nav != null ? fmtPrice(nav) + ' / unit' : 'waiting for price');
-
-  if (nav == null || !st.holdings) {
-    host.innerHTML = '<div class="ledger-row"><span class="l muted">' +
-      '<span class="spinner"></span> Waiting for a live price\u2026</span></div>';
-    btn.disabled = true;
-    return;
-  }
-
-  ui.setText('[data-held]', fmtUnits(st.holdings.units));
-  ui.setText('[data-worth]', fmtPaise(Math.floor(st.holdings.units * nav * 100)));
-
-  var raw = (ui.el('#units').value || '').replace(/[^\d.]/g, '');
-  st.units = roundUnits(parseFloat(raw) || 0);
-
-  if (!st.units) {
-    host.innerHTML = '<div class="ledger-row"><span class="l muted">Enter units to redeem</span></div>';
-    err.classList.add('hidden');
-    btn.disabled = true;
-    return;
-  }
-
-  var q = ledger.quoteSell(st.units, nav, st.lots, ctx());
-  st.quote = q;
-
-  if (q.errors.length) {
-    err.textContent = q.errors[0];
-    err.classList.remove('hidden');
-  } else {
-    err.classList.add('hidden');
-  }
-
-  host.innerHTML = renderLedger(ledger.explainSell(q));
-  btn.disabled = !q.valid;
-}
-
-function renderLedger(rows) {
-  return rows.map(function (r) {
-    if (r.divider) return '<div class="ledger-divider"></div>';
-    var amt = r.paise != null
-      ? '<span class="a">' + (r.paise < 0 ? '\u2212' : '') +
-        fmtPaise(Math.abs(r.paise)) + '</span>'
-      : '';
-    return '<div class="ledger-row k-' + (r.kind || 'info') + '">' +
-      '<span class="l">' + ui.esc(r.label) + '</span>' + amt +
-      (r.note ? '<span class="note">' + ui.esc(r.note) + '</span>' : '') +
-    '</div>';
-  }).join('');
-}
-
-/* -------------------------------------------------------------------- final -- */
-
-function paintFinal() {
-  var q = st.quote;
-  if (!q) return;
-
-  ui.setHtml('[data-final]', renderLedger(ledger.explainSell(q)));
-
-  var lots = ui.el('[data-lots]');
-  if (lots) {
-    lots.innerHTML = q.lotsConsumed.length
-      ? q.lotsConsumed.map(function (c) {
-          return '<tr>' +
-            '<td class="tiny">' + (c.acquiredAt ? ui.fmtDate(c.acquiredAt) : '\u2014') + '</td>' +
-            '<td class="num">' + fmtUnits(c.units) + '</td>' +
-            '<td class="num">' + fmtPaise(c.costPaise) + '</td>' +
-          '</tr>';
-        }).join('')
-      : '<tr><td colspan="3" class="empty">No lot data</td></tr>';
-  }
-
-  var ack = ui.el('[data-ack2]');
-  var exec = ui.el('[data-execute]');
-  ack.checked = false;
-  exec.disabled = true;
-}
-
-/* ------------------------------------------------------------------ execute -- */
-
-async function execute() {
-  var btn = ui.el('[data-execute]');
-  ui.busy(btn, true, 'Redeeming\u2026');
-
-  try {
-    var vpa = (ui.el('#vpa').value || '').trim();
-    if (vpa && (!st.profile || st.profile.upiVpa !== vpa)) {
-      await db.updateProfile({ upiVpa: vpa });
-      st.profile = Object.assign({}, st.profile, { upiVpa: vpa });
-    }
-
-    var nav = engine.currentArv();
-    var res = await db.redeem(st.units, nav, ctx());
-    var q = res.quote || st.quote;
-
-    ui.setText('[data-payout]', fmtPaise(q.netPayoutPaise));
-    ui.setText('[data-payout-ref]', res.ref);
-    ui.setText('[data-payout-vpa]', vpa || '\u2014');
-    ui.setText('[data-fy]', q.fy);
-    ui.setText('[data-settle]', CFG.PAYMENTS.settlementHours + ' hours');
-
-    // A QR for the payout direction too, so the operator can scan and pay out
-    // without retyping the amount.
-    await qr.render(ui.el('[data-payout-qr]'), {
-      vpa: vpa,
-      payeeName: (st.profile && st.profile.fullName) || 'Redemption',
-      amountPaise: q.netPayoutPaise,
-      ref: res.ref
+    ui.els('[data-qpct]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var paise = Math.floor(w.inrPaise * (Number(b.dataset.qpct) / 100));
+        ui.el('#amt').value = String(paise / 100);
+        validate();
+      });
     });
+  }
 
-    var receipt = ui.el('[data-receipt]');
-    if (receipt) {
-      receipt.innerHTML =
-        rec('Units redeemed', fmtUnits(q.units)) +
-        rec('Price', fmtPrice(q.execNav)) +
-        rec('Gross', fmtPaise(q.grossPaise)) +
-        rec('TDS withheld', fmtPaise(q.tdsPaise)) +
-        rec('Paid to you', fmtPaise(q.netPayoutPaise)) +
-        rec('Tax due at filing', fmtPaise(q.balanceTaxPayablePaise));
+  if (u && u.kyc) {
+    if (u.kyc.status !== 'verified') {
+      ui.el('[data-kyc-gate]').classList.remove('hidden');
     }
+    if (u.kyc.upiVpa) ui.el('#vpa').value = u.kyc.upiVpa;
+  }
 
-    ui.toast('Redeemed ' + fmtUnits(q.units) + ' units', 'ok');
-    goto(3);
+  ui.paintTimer(ui.el('[data-window]'), {
+    elapsedSeconds: 0,
+    minMinutes: CFG.PAYMENTS.withdrawMinMinutes,
+    maxMinutes: CFG.PAYMENTS.withdrawMaxMinutes,
+    note: 'Payouts are sent within this window once requested.'
+  });
+}
+
+/* ----------------------------------------------------------------- validate -- */
+
+function validate() {
+  var w = st.user && st.user.wallet;
+  var btn = ui.el('[data-submit]');
+  var amtErr = ui.el('[data-amt-err]');
+  var vpaErr = ui.el('[data-vpa-err]');
+
+  amtErr.classList.add('hidden');
+  vpaErr.classList.add('hidden');
+
+  var paise = ui.toPaise(parseFloat((ui.el('#amt').value || '').replace(/[^\d.]/g, '')) || 0);
+  var vpa = (ui.el('#vpa').value || '').trim();
+  var okAmount = true;
+  var okVpa = true;
+
+  if (paise < CFG.FEES.minWithdrawPaise) {
+    okAmount = false;
+    if (paise > 0) {
+      amtErr.textContent = 'The minimum withdrawal is ' + ui.fmtPaise(CFG.FEES.minWithdrawPaise) + '.';
+      amtErr.classList.remove('hidden');
+    }
+  } else if (w && paise > w.inrPaise) {
+    okAmount = false;
+    amtErr.textContent = 'You have ' + ui.fmtPaise(w.inrPaise)
+      + ' available. Sell ARV first to withdraw more.';
+    amtErr.classList.remove('hidden');
+  }
+
+  if (vpa && !/^[\w.\-]{2,}@[a-zA-Z]{2,}$/.test(vpa)) {
+    okVpa = false;
+    vpaErr.textContent = 'A UPI ID looks like yourname@bank.';
+    vpaErr.classList.remove('hidden');
+  }
+
+  btn.disabled = !(okAmount && okVpa && vpa);
+}
+
+/* ------------------------------------------------------------------- submit -- */
+
+async function submit() {
+  var btn = ui.el('[data-submit]');
+  var paise = ui.toPaise(parseFloat((ui.el('#amt').value || '').replace(/[^\d.]/g, '')) || 0);
+  var vpa = (ui.el('#vpa').value || '').trim();
+
+  // A wrong UPI ID is the most common cause of a failed payout, and it is far
+  // cheaper to confirm here than to chase a bounced transfer.
+  if (!confirm('Send ' + ui.fmtPaise(paise) + ' to ' + vpa + '?\n\n'
+             + 'Check the UPI ID — a payout to the wrong ID has to be traced and resent.')) {
+    return;
+  }
+
+  ui.busy(btn, true, 'Requesting\u2026');
+  try {
+    var r = await api.createWithdrawal(paise, vpa);
+    ui.toast(r.message || 'Requested.', 'ok', 9000);
+    ui.el('#amt').value = '';
+    st.user = await api.me(true);
+    paint();
+    validate();
+    loadHistory();
   } catch (e) {
     ui.toastError(e);
   } finally {
     ui.busy(btn, false);
   }
+}
 
-  function rec(l, v) {
-    return '<div class="ledger-row"><span class="l">' + l +
-           '</span><span class="a">' + v + '</span></div>';
+/* ------------------------------------------------------------------ history -- */
+
+function statusBadge(s) {
+  var map = { paid: 'ok', approved: 'info', requested: 'warn', rejected: 'bad' };
+  return '<span class="badge ' + (map[s] || '') + '">' + ui.esc(s) + '</span>';
+}
+
+async function loadHistory() {
+  var host = ui.el('[data-history]');
+  if (!host) return;
+
+  try {
+    var r = await api.myWithdrawals();
+    var rows = r.withdrawals || [];
+
+    if (!rows.length) {
+      host.innerHTML = '<tr><td colspan="6" class="empty">No withdrawals yet.</td></tr>';
+      return;
+    }
+
+    host.innerHTML = rows.map(function (w) {
+      var wait = w.minutesLeft != null && !w.overdue
+        ? '<div class="tiny muted">' + w.minutesLeft + 'm left</div>'
+        : (w.overdue ? '<div class="tiny warn">past the window</div>' : '');
+      var cancel = w.status === 'requested'
+        ? '<button class="btn btn-sm btn-ghost" data-cancel="' + ui.esc(w.ref) + '">Cancel</button>'
+        : '';
+      return '<tr>'
+        + '<td class="mono tiny">' + ui.esc(w.ref) + '</td>'
+        + '<td class="tiny">' + ui.fmtTime(w.createdAt, true) + '</td>'
+        + '<td class="num">' + ui.fmtPaise(w.amountPaise) + '</td>'
+        + '<td class="mono tiny">' + ui.esc(w.upiVpa) + '</td>'
+        + '<td>' + statusBadge(w.status) + wait
+          + (w.rejectReason ? '<div class="tiny muted">' + ui.esc(w.rejectReason) + '</div>' : '')
+          + '</td>'
+        + '<td class="right">' + cancel + '</td>'
+        + '</tr>';
+    }).join('');
+
+    ui.els('[data-cancel]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        ui.busy(b, true, '\u2026');
+        try {
+          var res = await api.cancelWithdrawal(b.dataset.cancel);
+          ui.toast(res.message || 'Cancelled.', 'ok');
+          st.user = await api.me(true);
+          paint();
+          loadHistory();
+        } catch (e) {
+          ui.toastError(e);
+          ui.busy(b, false);
+        }
+      });
+    });
+  } catch (_) {
+    host.innerHTML = '<tr><td colspan="6" class="empty">Could not load.</td></tr>';
   }
 }
 
 /* --------------------------------------------------------------------- boot -- */
 
 (async function () {
-  ui.setText('[data-pan-rate]', CFG.TAX.tdsPct + '%');
-  ui.setText('[data-nopan-rate]', CFG.TAX.tdsPctNoPan + '%');
+  await ui.boot({ feed: false });
 
-  await ui.boot();
-  var user = await db.requireUser();
+  var user = await api.requireUser();
   if (!user) return;
+  st.user = user;
 
-  try {
-    st.holdings = await db.getHoldings();
-    st.lots = await db.getLots();
-    st.profile = await db.getProfile();
-    st.fyGross = await db.fyGrossProceeds();
-  } catch (e) {
-    ui.toastError(e);
-    return;
-  }
+  paint();
+  validate();
+  loadHistory();
 
-  if (st.profile && st.profile.upiVpa) ui.el('#vpa').value = st.profile.upiVpa;
-  if (!st.profile || !st.profile.pan) ui.el('[data-pan-warn]').hidden = false;
+  ui.el('#amt').addEventListener('input', validate);
+  ui.el('#vpa').addEventListener('input', validate);
+  ui.on('[data-submit]', 'click', submit);
 
-  if (!st.holdings || st.holdings.units <= 0) {
-    ui.el('[data-quote]').innerHTML =
-      '<div class="ledger-row"><span class="l muted">You hold no units to redeem. ' +
-      '<a href="buy.html">Buy ARV</a> first.</span></div>';
-  }
-
-  ui.el('#units').addEventListener('input', paintQuote);
-
-  ui.els('[data-pct]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      if (!st.holdings) return;
-      var pct = Number(b.dataset.pct) / 100;
-      // Floor at 8dp so 100% never asks for more than is held.
-      var u = Math.floor(st.holdings.units * pct * 1e8) / 1e8;
-      ui.el('#units').value = String(u);
-      paintQuote();
-    });
-  });
-
-  ui.on('[data-continue]', 'click', function () { paintFinal(); goto(2); });
-  ui.on('[data-back]', 'click', function () { goto(1); });
-  ui.on('[data-ack2]', 'change', function (e) {
-    ui.el('[data-execute]').disabled = !e.target.checked;
-  });
-  ui.on('[data-execute]', 'click', execute);
-
-  paintQuote();
-  feed.onTick(function () { if (st.step === 1) paintQuote(); });
+  // A payout is approved by a person, so this refreshes at a human pace.
+  api.poll(async function () {
+    st.user = await api.me(true);
+    paint();
+    loadHistory();
+  }, 30000);
 })();

@@ -418,7 +418,13 @@
     },
 
     refreshMs: 1000,
-    toastMs: 4000
+    toastMs: 4000,
+
+    // Where complaints go, and the date the terms last changed. Both are printed
+    // on legal.html, so they live here rather than being hard-coded into a page
+    // nobody remembers to edit.
+    supportEmail: 'support@arvcoin.com',
+    legalUpdated: '2026-09-01'
   };
 
   // ---------------------------------------------------------------------------

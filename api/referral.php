@@ -190,7 +190,7 @@ function mask_email(string $email): string
 {
     $parts = explode('@', $email);
     if (count($parts) !== 2) {
-        return '\u2014';
+        return '—';
     }
     $name = $parts[0];
     $shown = strlen($name) <= 2 ? substr($name, 0, 1) : substr($name, 0, 2);

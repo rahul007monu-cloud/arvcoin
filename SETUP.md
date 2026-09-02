@@ -1,282 +1,224 @@
 # Setup
 
-Two modes. Local needs nothing; hosted needs a Supabase project.
+PHP 8 and MySQL. Nothing to build, nothing to compile, no node_modules on the
+server — the files in this repo are the deployment.
+
+Two ways to run it: on a Hostinger plan (or any cPanel-style host), or locally
+against a MySQL you already have.
 
 ---
 
-## 1. Local, no backend
+## 1. On Hostinger — about fifteen minutes
 
-```bash
-python3 -m http.server 8080
-```
+### 1.1 Create the database
 
-Open `http://localhost:8080`. With `SUPABASE.url` blank in `arv-config.js` the app
-runs entirely in the browser:
+hPanel → **Databases → MySQL Databases**. Create a database and a user, and give
+the user all privileges on it. Note down four things:
 
-- ✅ live prices from real exchanges, real candles, the full 3D scene
-- ✅ the complete fee, FIFO and tax engine — every number is genuinely computed
-- ✅ working buy and redeem flows against `localStorage`
-- ❌ nothing persists past a cleared cache, and it is one browser only
+- database name (Hostinger prefixes it, e.g. `u123456789_arv`)
+- username (also prefixed)
+- password
+- host — `localhost` on shared plans
 
-Good for evaluating the product. Not a deployment.
+### 1.2 Get the files onto the server
 
-> Local mode necessarily runs the ledger client-side, which is exactly what row
-> level security exists to prevent in the hosted setup. Do not treat it as a
-> production path.
+If the domain is already connected to this repo through hPanel →
+**Advanced → Git**, merging into `main` deploys it. Otherwise upload the contents
+of the repo into `public_html`.
 
----
+Either way, `public_html` should contain `index.html`, `install.php`, `api/`,
+`css/`, `js/`, `icons/`, `manifest.json`, `sw.js` and `.htaccess` at the top level.
 
-## 2. Hosted, with Supabase
+### 1.3 Run the installer
 
-### 2.1 Create the project
+Open `https://yourdomain.com/install.php`.
 
-[supabase.com](https://supabase.com) → new project. From **Settings → API** take:
+It checks the server first — PHP version, `pdo_mysql`, `curl`, whether `api/` and
+`uploads/` are writable — and refuses to go on if something is missing, saying
+which. Then it asks for:
 
-- Project URL — `https://xxxxx.supabase.co`
-- `anon` **public** key
-- `service_role` key — **secret**
-
-### 2.2 Configure the front end
-
-In `arv-config.js`:
-
-```js
-var SUPABASE = {
-  url:     'https://xxxxx.supabase.co',
-  anonKey: 'eyJhbGciOi...',      // the anon key, public by design
-  functionsBase: ''              // leave blank
-};
-```
-
-> The `anon` key belongs in the browser — it is safe there because every table is
-> guarded by RLS. The **`service_role` key must never appear in this repo, in
-> `arv-config.js`, or anywhere a browser can reach.** It bypasses RLS entirely. It
-> goes only into function secrets, below.
-
-### 2.3 Apply the schema
-
-Supabase dashboard → **SQL Editor** → paste all of
-`supabase/migrations/0001_init.sql` → Run.
-
-Or with the CLI:
-
-```bash
-npm install -g supabase
-supabase link --project-ref xxxxx
-supabase db push
-```
-
-This creates the tables, row level security policies, the append-only trigger on
-`transactions`, the privilege-escalation guards on `profiles`, the signup hook and
-the reporting views. It is idempotent — safe to re-run.
-
-**Verify it took effect.** In the SQL editor:
-
-```sql
-select tablename, rowsecurity from pg_tables
-where schemaname = 'public' order by tablename;
-```
-
-Every table must show `rowsecurity = true`. If any does not, stop and fix it — that
-table is world-writable.
-
-### 2.4 Deploy the functions
-
-```bash
-supabase secrets set SUPABASE_URL=https://xxxxx.supabase.co
-supabase secrets set SUPABASE_ANON_KEY=eyJhbGciOi...
-supabase secrets set SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...   # secret
-
-supabase functions deploy trade
-supabase functions deploy ingest --no-verify-jwt
-supabase functions deploy backfill
-```
-
-`ingest` is deployed with `--no-verify-jwt` because a scheduler calls it, not a
-signed-in user. `trade` and `backfill` verify the caller's JWT and re-check
-operator authority against the database.
-
-> **If the bundler cannot resolve `../../../js/ledger.js`:** the functions import
-> the ledger maths from the front-end tree on purpose, so the quote a user sees and
-> the arithmetic that writes the ledger are one implementation. If your CLI version
-> refuses to bundle outside `supabase/functions/`, copy the two files in and adjust
-> the import:
->
-> ```bash
-> mkdir -p supabase/functions/_shared/lib
-> cp js/ledger.js js/money.js supabase/functions/_shared/lib/
-> # then in _shared/context.ts change the two import paths to './lib/…'
-> ```
->
-> If you do this, re-copy them whenever `js/ledger.js` changes. Divergence between
-> the two copies means users agree to numbers the ledger disagrees with.
-
-### 2.5 Grant yourself operator access
-
-Sign up through the app first, then in the SQL editor:
-
-```sql
-update public.profiles set is_admin = true where email = 'you@example.com';
-```
-
-There is no UI for this by design — a user cannot grant themselves `is_admin`, and
-the trigger blocks the attempt.
-
-### 2.6 Start the price feed
-
-**Backfill history once.** From the app, signed in as an operator, or by curl with
-your access token:
-
-```bash
-TOKEN='<your access_token from the browser session>'
-BASE='https://xxxxx.supabase.co/functions/v1'
-
-curl -s -X POST "$BASE/backfill" -H "authorization: Bearer $TOKEN" \
-     -H 'content-type: application/json' -d '{"tf":"1D"}'
-curl -s -X POST "$BASE/backfill" -H "authorization: Bearer $TOKEN" \
-     -H 'content-type: application/json' -d '{"tf":"1h","days":90}'
-curl -s -X POST "$BASE/backfill" -H "authorization: Bearer $TOKEN" \
-     -H 'content-type: application/json' -d '{"tf":"1m","days":7}'
-```
-
-Run them one at a time — each paces its own requests to avoid being rate-limited,
-so the daily one takes a couple of minutes.
-
-**Then schedule `ingest` every minute.** In the SQL editor:
-
-```sql
-create extension if not exists pg_cron;
-create extension if not exists pg_net;
-
-select cron.schedule(
-  'arv-ingest',
-  '* * * * *',
-  $$
-  select net.http_post(
-    url     := 'https://xxxxx.supabase.co/functions/v1/ingest',
-    headers := '{"content-type":"application/json"}'::jsonb
-  );
-  $$
-);
-```
-
-Any external scheduler works too — GitHub Actions on a cron, cron-job.org,
-Cloudflare Workers. It just needs to POST to `/functions/v1/ingest` once a minute.
-
-**Confirm it is running:**
-
-```sql
-select tf, count(*), max(ts) as latest
-from public.arv_candles group by tf order by tf;
-```
-
-`latest` for `1m` should be within the last minute or two. **Trading is paused
-while the newest price is more than 10 minutes old** — deliberately, so nothing
-executes at a stale number. If `ingest` stops, buys and redemptions stop.
-
----
-
-## 3. Payments
-
-### 3.1 Configure UPI
-
-```js
-var PAYMENTS = {
-  vpa:        'yourname@okhdfcbank',   // your real UPI ID
-  payeeName:  'ARV Coin',
-  merchantCode: '',
-  settlementHours: 24
-};
-```
-
-With `vpa` set, the buy screen generates a real scannable UPI intent QR with the
-amount pre-filled, plus a deep link that opens the UPI app directly on mobile.
-Leave it blank and a clearly-marked placeholder is shown instead.
-
-### 3.2 How confirmation works, and why
-
-**A UPI QR cannot tell the app that money arrived.** It carries a request one way
-and returns nothing — no callback, no signature, nothing to verify. So:
-
-1. `create_deposit` records the intent and issues **nothing**
-2. money lands in your bank account
-3. an operator confirms it in `admin.html`
-4. units are issued at the price **at that moment**, not when the QR was shown
-
-Step 3 is manual because with a bare UPI QR there is nothing to automate against.
-To automate it, use a PSP that signs webhooks (Razorpay, Cashfree, PhonePe
-business), verify the signature server-side inside the `trade` function, and call
-the same `confirm_deposit` path.
-
-> **Never wire a client-side "payment succeeded" callback to issue units.** It is
-> the single most reliable way to have a treasury emptied by someone who never paid.
-
-### 3.3 Payouts
-
-Redemptions queue in `payouts` with the amount already net of exit fee, GST and
-TDS. `admin.html` lists them with the holder's UPI ID and a scannable QR so the
-payout can be sent without retyping the amount. Mark them paid once sent.
-
----
-
-## 4. Operating it
-
-### Daily: reconcile
-
-Open `admin.html`. It computes the Bitcoin the treasury must hold — units
-outstanding × NAV ÷ Bitcoin's rupee price — and you enter what is actually held.
-
-Any gap is tracking error, and it is funded by whoever redeems last. Under 0.5% is
-normal execution drift. Anything larger needs correcting before the next
-redemption. This compounds silently if left alone.
-
-### Monthly and quarterly
-
-- **TDS deposited.** `admin.html` shows TDS withheld under s.194S. It is not
-  revenue — it is holders' money that must be deposited with the department and
-  reported so it appears in each holder's Form 26AS.
-- **GST on fees.** Also a liability, not income.
-- **Ledger check.** `select * from public.treasury_summary;`
-
-### When assets change
-
-Bump `CACHE` in `sw.js` and add any new file to its `ASSETS` list, or returning
-users keep the old shell from cache.
-
----
-
-## 5. Deploying the front end
-
-Static files — any host works.
-
-**Hostinger** (what this repo was previously wired to): merging to `main` deploys.
-Check that first if the repo has a GitHub integration attached.
-
-**Netlify / Vercel / Cloudflare Pages:** no build command, publish directory `.`.
-
-**Supabase Storage / S3 / GitHub Pages:** upload as-is.
-
-Requirements: serve over **HTTPS** (the service worker and WebSockets need it), and
-serve `.js` as `text/javascript` — some hosts default `.mjs` or ES modules wrongly
-and the browser then refuses the module.
-
----
-
-## 6. Troubleshooting
-
-| Symptom | Cause |
+| Field | Notes |
 |---|---|
-| Price shows `—` forever | Every exchange blocked from that network. Check the feed indicator in the footer — it names the source it settled on. Reorder `FEED.sources`. |
-| "No market data source reachable" | Same, with all sources exhausted. Binance and Bybit block many regions. |
-| Chart empty on 1m but fine on 1D | `ingest` is not running, or backfill for `1m` was never done. |
-| "Trading is paused… price is N minutes old" | `ingest` has stopped. Working as intended — check the cron job. |
-| "No price available yet" on a trade | Backfill and ingest have not run. Do §2.6. |
-| QR shows "UPI not configured" | `PAYMENTS.vpa` is empty. |
-| Confirm button missing on buy | Account is not an operator. Do §2.5. |
-| `admin.html` says "Not authorised" | Same. |
-| Units issued at a different price than quoted | Correct behaviour. Issuance uses the confirmation-time price. |
-| `permission denied for table holdings` | Correct behaviour — browsers cannot write holdings. The write must go through the `trade` function. |
-| Signup succeeds but sign-in fails | Email confirmation is on in Supabase Auth. Confirm the address or turn it off for testing. |
-| Google sign-in fails | Configure the Google provider in Supabase Auth and add your redirect URL. |
-| Helix not rendering | No WebGL, or `prefers-reduced-motion` is set. The CSS gradient fallback is expected. |
-| Old version after deploy | `CACHE` in `sw.js` was not bumped. |
+| Database host / port / name / user / password | from step 1.1 |
+| Operator name, email, password | this becomes the admin account; minimum 10 characters |
+| Site URL | used in emails and referral links; changeable later |
+| From address for mail | OTPs are sent from here |
+| UPI VPA | where deposits are paid; leave blank and the QR shows a clearly-marked placeholder |
+
+Pressing install creates 18 tables, 8 append-only triggers and the default
+settings, then writes `api/config.local.php` containing the database password and
+a freshly generated app key.
+
+> **`api/config.local.php` must never be committed.** It is in `.gitignore`
+> already. The app key signs sessions and hashes OTPs, so a leaked one is a way
+> into every account — if it ever reaches the repo, rotate both the key and the
+> database password.
+
+### 1.4 Add the cron job — not optional
+
+hPanel → **Advanced → Cron Jobs**. Every minute:
+
+```
+curl -s https://yourdomain.com/api/cron.php?job=all
+```
+
+This ingests the price, appends candles, runs the matching engine, expires stale
+orders and recalculates reward tiers.
+
+**Nothing can be bought or sold until it runs.** Trading refuses to price from a
+feed older than `price_max_age_seconds` (600 by default), so with no cron the site
+loads, shows the chart and then declines every order — which is the correct
+failure, not a bug.
+
+If your plan's minimum interval is five minutes, raise
+`price_max_age_seconds` in Operations → Settings to match, or the feed will read as
+stale between runs.
+
+### 1.5 Backfill the chart
+
+Sign in as the operator → **Operations** → **Backfill history**. Two or three
+minutes. It pulls daily, hourly and minute candles from whichever exchange answers
+and computes the ARV series from them: roughly 1,827 daily, 2,160 hourly and
+10,080 minute candles.
+
+Backfill is the one cron job that requires a signed-in operator, because it is
+heavy and should never be triggerable by a stranger with a URL.
+
+### 1.6 Set the UPI VPA
+
+Operations → **Settings** → `upi_vpa`. Until it is set, the deposit QR renders a
+placeholder that says so rather than a code that scans to nothing.
+
+### 1.7 Delete `install.php`
+
+hPanel → File Manager → select → Delete. It refuses to run a second time once the
+tables exist, but leaving an installer on a live host is not a risk worth carrying.
+
+### 1.8 Check it
+
+- `https://yourdomain.com/api/market.php?action=snapshot` returns a price with
+  `stale: false`
+- Operations → **Reconcile** reports the ledger and the wallets agreeing exactly
+- Sign up as a normal user, deposit ₹100, confirm it as the operator, buy, sell
+
+---
+
+## 2. Locally
+
+Needs PHP 8 with `pdo_mysql`, and a MySQL or MariaDB you can create a database in.
+
+```bash
+mysql -u root -e "CREATE DATABASE arv CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+php -S localhost:8080
+```
+
+Open `http://localhost:8080/install.php` and fill in the same form, with
+`localhost` as the host and your local credentials.
+
+Then run the cron by hand whenever you want fresh data:
+
+```bash
+curl -s "http://localhost:8080/api/cron.php?job=all"
+```
+
+`php -S` is single-threaded, so a request that fires several API calls will feel
+slower than the real thing. Use `php -S localhost:8080 -t . &` plus a second
+worker, or just accept it — it is a development server.
+
+### Mail locally
+
+Without a working `mail()`, OTPs cannot be delivered. `send_mail()` logs the whole
+message when delivery fails, so the code is in your PHP error log:
+
+```bash
+tail -f /path/to/php-error.log | grep -i otp
+```
+
+That is a development convenience and nothing more — on the server, mail must
+actually work, because the OTP is the only thing standing between an email address
+and an account.
+
+---
+
+## 3. Settings worth knowing
+
+All of these live in the `settings` table and are editable in Operations →
+Settings. No deploy needed.
+
+| Key | Default | What it does |
+|---|---|---|
+| `price_max_age_seconds` | 600 | Refuse to trade on a feed older than this |
+| `entry_fee_pct` / `exit_fee_pct` | 0.5 / 0.5 | Platform fee |
+| `gst_pct` | 18 | GST on the fee, not on the trade |
+| `slippage_pct` | 0.05 | Spread applied to the execution price |
+| `sell_fallback_minutes` | 60 | When the treasury takes an unmatched sell |
+| `order_expiry_hours` | 168 | Resting orders expire after a week |
+| `min_order_paise` | 10000 | ₹100 |
+| `deposit_max_minutes` | 15 | The window quoted to the user |
+| `withdraw_max_minutes` | 60 | Same, for withdrawals |
+| `referral_pct` | 5 | Commission on a referee's first deposit |
+| `kyc_required` | 1 | Verification before the first buy |
+| `maintenance_mode` | 0 | Everyone but operators sees a notice |
+| `tds_pct` / `tds_pct_no_pan` | 1 / 20 | s.194S and s.206AA |
+
+The launch reference — `launch_at`, `base_btc_usd`, `base_fx_usd_inr` — is also in
+`settings`, but **changing it after anyone has traded rewrites the entire price
+history**, and every holder's chart with it. It is set once, at install.
+
+---
+
+## 4. Regenerating the icons
+
+Only needed after editing `favicon.svg`. The PNGs are committed, so a deploy needs
+no build step.
+
+```bash
+npm i -D playwright && npx playwright install chromium
+node tools/build-icons.mjs
+```
+
+---
+
+## 5. Going live properly
+
+- **HTTPS.** hPanel → SSL, then force it. `.htaccess` already redirects, but the
+  certificate has to exist first. A session cookie over plain HTTP is a session
+  anyone on the network can take.
+- **Back up the database.** hPanel → Backups, and take one manually before any
+  schema change. The ledger is the record; losing it loses everything.
+- **Watch the cron.** `cron_runs` records every execution with its status. If
+  ingest starts failing, trading pauses — you want to know before a user tells you.
+- **Reconcile regularly.** Operations → Reconcile compares the ledger against every
+  wallet. It should always be exact. If it is not, do not adjust a wallet — find
+  the missing entry.
+- **Mail deliverability.** Set SPF and DKIM for the domain, or OTP emails land in
+  spam and nobody can finish signing up.
+- **`uploads/` is data, never code.** `deposit.php` writes an `.htaccess` there
+  that switches the PHP engine off. Confirm it exists after the first upload — a
+  file called `shot.png` that is really PHP is otherwise a shell.
+
+---
+
+## 6. When something is wrong
+
+**Every page says the price feed is not running.**
+The cron is not firing, or `curl` is disabled. Run
+`curl -s https://yourdomain.com/api/cron.php?job=all` by hand and read the JSON it
+returns.
+
+**"The server returned something unexpected."**
+PHP died and printed a warning before the JSON. Check the error log; it is almost
+always a missing `api/config.local.php` or a database that refused the connection.
+
+**Orders are refused with a 503.**
+Working as intended: the feed is stale. Check `cron_runs` and the `arv_candles`
+timestamp.
+
+**Reconciliation is off by a few paise.**
+Look for a fill that wrote a ledger entry but not its fee, or the reverse. Correct
+it with an `adjustment` entry — never by editing a wallet, and never by editing the
+original row. The triggers will refuse the edit anyway.
+
+**A deposit was credited twice.**
+The same UTR reached two deposits. `deposits.utr` is indexed for exactly this;
+find both rows, and reverse one with a compensating ledger entry.

@@ -4,136 +4,178 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tax statement — ARV Coin</title>
-<meta name="theme-color" content="#05070d">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#07070a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/core.css">
 <script src="arv-config.js"></script>
 </head>
 <body>
 
-<canvas id="helix-canvas" aria-hidden="true"></canvas>
 <div data-nav></div>
 
-<main class="page wrap" style="padding-top:var(--sp-5);padding-bottom:var(--sp-7);max-width:1120px">
+<main class="page wrap" style="max-width:1080px;padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
 
   <div class="row-between row-wrap" style="margin-bottom:var(--sp-4)">
     <div>
-      <h1 style="font-size:1.7rem;margin-bottom:4px">Tax statement</h1>
+      <h1 class="serif" style="font-size:1.8rem;margin-bottom:2px">Tax statement</h1>
       <div class="small muted">
-        Virtual digital assets, section 115BBH · TDS under section 194S
+        What we executed and what we withheld, for one financial year.
       </div>
     </div>
-    <div class="row">
-      <select data-fy style="max-width:190px"></select>
-      <button class="btn btn-ghost" data-csv>Export CSV</button>
+    <div class="row row-wrap" style="gap:8px">
+      <select data-fy style="width:auto;min-width:140px"></select>
+      <button class="btn btn-ghost btn-sm" data-csv>Export CSV</button>
+      <button class="btn btn-ghost btn-sm" data-print>Print</button>
     </div>
   </div>
+
+  <div class="note-box" style="margin-bottom:var(--sp-4)" data-disclaimer>—</div>
 
   <!-- ============================================================= headline -->
-  <div class="grid g-4" style="margin-bottom:var(--sp-4)">
-    <div class="card card-tight"><div class="stat">
-      <span class="stat-k">Taxable gains</span>
-      <span class="stat-v" data-gains>—</span>
-      <span class="stat-sub">gains only, losses excluded</span>
-    </div></div>
-    <div class="card card-tight"><div class="stat">
-      <span class="stat-k">Tax + cess</span>
-      <span class="stat-v" data-tax>—</span>
-      <span class="stat-sub"><span data-rate>31.2%</span> effective</span>
-    </div></div>
-    <div class="card card-tight"><div class="stat">
-      <span class="stat-k">TDS already withheld</span>
-      <span class="stat-v" data-tds>—</span>
-      <span class="stat-sub">credited against the above</span>
-    </div></div>
-    <div class="card card-tight"><div class="stat">
-      <span class="stat-k" data-balance-label>Balance payable</span>
-      <span class="stat-v" data-balance>—</span>
-      <span class="stat-sub">at the time of filing</span>
-    </div></div>
-  </div>
-
-  <div class="grid" style="grid-template-columns:1fr 1fr;gap:var(--sp-4);align-items:start">
-
-    <!-- computation -->
-    <div class="card card-flush">
-      <div class="card-head" style="padding:var(--sp-4);margin:0">
-        <h3 style="font-size:1rem">Computation</h3>
-        <span class="badge" data-fy-badge>—</span>
-      </div>
-      <div class="ledger-list" data-computation></div>
+  <section class="card" style="margin-bottom:var(--sp-4)">
+    <div class="card-head">
+      <h3 style="font-size:1rem">Realised position <span class="muted" data-fy-label></span></h3>
+      <span class="badge" data-live-badge></span>
     </div>
 
-    <div class="stack">
-      <!-- the no-set-off cost -->
-      <div class="card card-tight" data-setoff-card hidden>
-        <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
-          <h4 style="font-size:0.95rem">What the no-set-off rule cost you</h4>
-          <span class="badge bad">s.115BBH</span>
+    <div class="grid g-4" style="gap:var(--sp-5);margin-bottom:var(--sp-5)">
+      <div class="stat">
+        <span class="stat-k">Sale proceeds</span>
+        <span class="stat-v" data-gross>—</span>
+        <span class="stat-sub"><span data-disposals>0</span> disposals</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Taxable gains</span>
+        <span class="stat-v up" data-gains>—</span>
+        <span class="stat-sub">gains only — losses cannot offset them</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Tax on gains</span>
+        <span class="stat-v" data-due>—</span>
+        <span class="stat-sub"><span data-rate>30</span>% + <span data-cess>4</span>% cess</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Still to pay at filing</span>
+        <span class="stat-v" data-balance>—</span>
+        <span class="stat-sub" data-balance-note>after the TDS credit</span>
+      </div>
+    </div>
+
+    <div class="ledger-list" data-computation></div>
+  </section>
+
+  <div class="grid g-2" style="align-items:start;gap:var(--sp-4);margin-bottom:var(--sp-4)">
+
+    <!-- ================================================================ TDS -->
+    <section class="card">
+      <div class="card-head">
+        <h3 style="font-size:1rem">TDS under section 194S</h3>
+        <span class="badge" data-tds-badge>—</span>
+      </div>
+      <div class="ledger-list" data-tds></div>
+      <div class="small" style="margin-top:var(--sp-4)">
+        <div class="row-between tiny muted" style="margin-bottom:6px">
+          <span>Annual threshold used</span>
+          <span class="num" data-threshold-txt>—</span>
         </div>
-        <div class="ledger-list" data-setoff></div>
+        <div class="progress"><span data-threshold-bar style="width:0%"></span></div>
       </div>
+      <p class="tiny muted" style="margin:var(--sp-4) 0 0" data-tds-note></p>
+    </section>
 
-      <div class="card card-tight">
-        <h4 style="font-size:0.95rem">How this is computed</h4>
-        <ul class="small" style="padding-left:1.1rem;margin:0;color:var(--tx-1)">
-          <li style="margin-bottom:8px">
-            <strong>Cost of acquisition only.</strong> Entry and exit fees, GST and
-            any other expense are <em>not</em> deductible. Only what you paid for
-            the units reduces the gain.
-          </li>
-          <li style="margin-bottom:8px">
-            <strong>FIFO.</strong> The oldest units you hold are treated as sold
-            first, which fixes the cost against each redemption.
-          </li>
-          <li style="margin-bottom:8px">
-            <strong>Gains are not netted against losses.</strong> Each redemption
-            stands alone. A loss cannot reduce another gain and cannot be carried
-            into a later year.
-          </li>
-          <li style="margin-bottom:8px">
-            <strong>30% plus 4% cess</strong> on the gain — 31.2% effective. Flat,
-            regardless of your slab or holding period.
-          </li>
-          <li>
-            <strong>1% TDS</strong> is withheld on gross proceeds once your
-            transfers for the year pass <span data-threshold>₹10,000</span>. It is
-            a credit, not an extra tax.
-          </li>
-        </ul>
+    <!-- ========================================================== holdings -->
+    <section class="card">
+      <div class="card-head">
+        <h3 style="font-size:1rem">Still held</h3>
+        <span class="badge info">not taxable yet</span>
       </div>
+      <div class="ledger-list" data-unrealised></div>
+      <h5 class="small" style="margin:var(--sp-4) 0 var(--sp-3)">Open lots, oldest first</h5>
+      <div class="table-wrap" data-lots></div>
+      <p class="tiny muted" style="margin:var(--sp-3) 0 0" data-unrealised-note></p>
+    </section>
 
-      <div class="note-box warn">
-        This is a computation from your recorded transactions, not a filing and not
-        tax advice. Verify the rates and the treatment with a chartered accountant
-        before you file — and give them the CSV rather than a screenshot.
-      </div>
-    </div>
   </div>
 
-  <!-- ============================================================ per-txn -->
-  <div class="card card-flush" style="margin-top:var(--sp-4)">
-    <div class="card-head" style="padding:var(--sp-4);margin:0">
-      <h3 style="font-size:1rem">Redemptions in this year</h3>
-      <span class="badge">Schedule VDA detail</span>
-    </div>
-    <div class="table-wrap">
-      <table class="data">
-        <thead><tr>
-          <th>Date</th><th>Reference</th><th class="num">Units</th>
-          <th class="num">Consideration</th><th class="num">Cost of acquisition</th>
-          <th class="num">Gain / loss</th><th class="num">Tax 30%</th>
-          <th class="num">Cess 4%</th><th class="num">TDS 1%</th>
-        </tr></thead>
-        <tbody data-detail>
-          <tr><td colspan="9" class="empty">Loading…</td></tr>
-        </tbody>
-        <tfoot data-detail-foot></tfoot>
-      </table>
-    </div>
+  <!-- ========================================================== other rows -->
+  <div class="grid g-2" style="align-items:start;gap:var(--sp-4);margin-bottom:var(--sp-4)">
+    <section class="card card-tight">
+      <h4 style="font-size:.95rem;margin-bottom:var(--sp-3)">Purchases this year</h4>
+      <div class="ledger-list" data-acquisitions></div>
+      <p class="tiny muted" style="margin:var(--sp-3) 0 0">
+        Buying is not a taxable event. These figures matter only as the cost basis of
+        what you sell later.
+      </p>
+    </section>
+
+    <section class="card card-tight">
+      <h4 style="font-size:.95rem;margin-bottom:var(--sp-3)">Other income &amp; charges</h4>
+      <div class="ledger-list" data-other></div>
+      <div class="ledger-list" data-charges></div>
+      <p class="tiny muted" style="margin:var(--sp-3) 0 0" data-other-note></p>
+    </section>
   </div>
+
+  <!-- ========================================================== disposals -->
+  <section class="card card-flush" style="margin-bottom:var(--sp-4)">
+    <div class="card-head" style="padding:var(--sp-4) var(--sp-5)">
+      <h3 style="font-size:1rem">Every disposal</h3>
+      <span class="tiny muted">FIFO cost basis, applied at the moment of each sale</span>
+    </div>
+    <div class="table-wrap" data-disposal-rows></div>
+  </section>
+
+  <!-- =============================================================== rules -->
+  <section class="card">
+    <h3 style="font-size:1rem;margin-bottom:var(--sp-4)">How these numbers are worked out</h3>
+    <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
+      <div>
+        <strong>Gains are taxed at a flat rate.</strong>
+        Section 115BBH taxes income from transferring a virtual digital asset at
+        <span data-rate2>30</span>% plus <span data-cess2>4</span>% health and education
+        cess, whatever your slab. There is no long-term rate and no indexation.
+      </div>
+      <div>
+        <strong>Only cost of acquisition is deductible.</strong>
+        Not our fee, not the GST on it, not anything else. So the fees shown on this
+        page are real money you paid but they do not reduce the taxable gain.
+      </div>
+      <div>
+        <strong>Losses cannot be set off, or carried forward.</strong>
+        Section 115BBH(2) blocks both — against other VDA gains, against any other
+        income, and into the next year. That is why the figure above is the sum of
+        your gains rather than gains minus losses.
+      </div>
+      <div>
+        <strong>Cost basis is first-in, first-out.</strong>
+        A sale consumes your oldest units first, and the cost recorded against it is
+        the cost of exactly those units. It is fixed at the moment of the sale, so a
+        later purchase never changes an earlier disposal.
+      </div>
+      <div>
+        <strong>TDS is a credit, not an extra tax.</strong>
+        Section 194S makes us withhold <span data-tds-rate>1</span>% of the gross
+        consideration on your sales and pay it to the government against your PAN. It
+        reduces what you owe at filing, and it appears in Form 26AS. Without a PAN on
+        record, section 206AA raises the rate to
+        <span data-nopan-rate>20</span>% — which is why the
+        <a href="profile.html#kyc">PAN field</a> is worth filling in.
+      </div>
+      <div>
+        <strong>The threshold is an aggregate, not an allowance.</strong>
+        Once your total sale proceeds for the year pass the threshold, the whole of a
+        transfer is liable — not merely the part above the line.
+      </div>
+      <div>
+        <strong>Referral commission is not a capital gain.</strong>
+        It is ordinary income at your slab rate, kept apart from your ARV holdings so
+        it never contaminates their cost basis.
+      </div>
+    </div>
+  </section>
 
 </main>
 

@@ -326,6 +326,34 @@ export function rewardTiers() {
   return request('referral', 'tiers', { method: 'GET' });
 }
 
+/* ---------------------------------------------------------------- account -- */
+
+/**
+ * Ledger page.
+ *
+ * `before` is an id cursor, not an offset — the ledger grows while it is being
+ * read, and an offset would skip or repeat rows as new entries land on top.
+ */
+export function ledger(opts) {
+  var o = opts || {};
+  return request('account', 'ledger', {
+    method: 'GET',
+    query: { limit: o.limit, before: o.before, fy: o.fy, group: o.group }
+  });
+}
+
+export function myTrades(limit) {
+  return request('account', 'trades', { method: 'GET', query: { limit: limit } });
+}
+
+export function taxStatement(fy) {
+  return request('account', 'tax', { method: 'GET', query: { fy: fy } });
+}
+
+export function financialYears() {
+  return request('account', 'years', { method: 'GET' });
+}
+
 /* ------------------------------------------------------------------ admin -- */
 
 export var admin = {

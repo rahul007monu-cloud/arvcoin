@@ -3,419 +3,443 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Risk, terms and disclosures — ARV Coin</title>
-<meta name="description" content="Risk disclosure, terms of service, privacy policy, tax treatment, fee schedule, refund policy and grievance redressal for ARV Coin.">
-<meta name="theme-color" content="#05070d">
+<title>Terms, risk &amp; privacy — ARV Coin</title>
+<meta name="description" content="Risk disclosure, terms of use, tax treatment, privacy policy, AML and KYC policy, and regulatory status for ARV Coin.">
+<meta name="theme-color" content="#07070a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/core.css">
 <script src="arv-config.js"></script>
-<style>
-  .legal h2 { margin-top:var(--sp-7); padding-top:var(--sp-5); border-top:1px solid var(--glass-brd); scroll-margin-top:80px; }
-  .legal h3 { margin-top:var(--sp-5); font-size:1.05rem; }
-  .legal ul, .legal ol { color:var(--tx-1); padding-left:1.3rem; }
-  .legal li { margin-bottom:8px; }
-  .toc { position:sticky; top:80px; }
-  .toc ul { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:4px; }
-  .toc a { display:block; padding:6px 11px; border-radius:var(--r-sm); color:var(--tx-2); font-size:0.86rem; }
-  .toc a:hover { background:var(--bg-2); color:var(--tx-0); }
-</style>
 </head>
 <body>
 
-<canvas id="helix-canvas" aria-hidden="true"></canvas>
 <div data-nav></div>
 
-<main class="page wrap" style="padding-top:var(--sp-5);padding-bottom:var(--sp-8);max-width:1100px">
+<main class="page wrap" style="max-width:1080px;padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
 
-  <h1 style="font-size:1.9rem">Risk, terms and disclosures</h1>
-  <p class="muted">Last updated <span data-updated>—</span></p>
+  <header style="margin-bottom:var(--sp-5)">
+    <h1 class="serif" style="font-size:2rem;margin-bottom:6px">Terms, risk &amp; privacy</h1>
+    <p class="small muted" style="max-width:70ch">
+      Written to be read, not to be survived. Where something works against you it
+      says so in the same size type as everything else.
+      Last updated <span data-updated>—</span>.
+    </p>
+  </header>
 
-  <div class="grid" style="grid-template-columns:230px 1fr;gap:var(--sp-6);align-items:start">
+  <div class="legal-layout">
 
-    <aside class="toc">
-      <ul>
-        <li><a href="#risk">Risk disclosure</a></li>
-        <li><a href="#nature">What ARV is</a></li>
-        <li><a href="#terms">Terms of service</a></li>
-        <li><a href="#fees">Fee schedule</a></li>
-        <li><a href="#tax">Tax treatment</a></li>
-        <li><a href="#privacy">Privacy</a></li>
-        <li><a href="#refund">Redemption &amp; refunds</a></li>
-        <li><a href="#grievance">Grievance redressal</a></li>
-        <li><a href="#regulatory">Regulatory status</a></li>
+    <!-- ================================================================ toc -->
+    <nav class="card card-tight toc" data-toc>
+      <h5 class="small" style="margin:0 0 var(--sp-3)">On this page</h5>
+      <ul class="small">
+        <li><a href="#risk">1. Risk disclosure</a></li>
+        <li><a href="#what">2. What ARV is</a></li>
+        <li><a href="#regulatory">3. Regulatory status</a></li>
+        <li><a href="#terms">4. Terms of use</a></li>
+        <li><a href="#money">5. Money, orders &amp; settlement</a></li>
+        <li><a href="#tax">6. Tax treatment</a></li>
+        <li><a href="#kyc">7. KYC &amp; AML</a></li>
+        <li><a href="#privacy">8. Privacy</a></li>
+        <li><a href="#referral">9. Referrals</a></li>
+        <li><a href="#complaints">10. Complaints</a></li>
       </ul>
-    </aside>
+    </nav>
 
-    <div class="legal">
+    <div class="stack-lg">
 
-      <!-- ============================================================ risk -->
-      <h2 id="risk">Risk disclosure</h2>
-
-      <div class="note-box bad">
-        <strong>You can lose money.</strong> ARV tracks Bitcoin. Bitcoin has
-        repeatedly fallen by more than half from a peak and taken years to recover.
-        A holding worth ₹1,00,000 today can be worth ₹40,000 with no warning, no
-        floor and no recourse. Only commit money you can afford to lose entirely.
-      </div>
-
-      <h3>Specific risks</h3>
-      <ul>
-        <li>
-          <strong>Market risk.</strong> ARV's price is Bitcoin's percentage move
-          applied to ₹1. There is no cap on the downside short of zero, and no
-          mechanism that arrests a fall.
-        </li>
-        <li>
-          <strong>Currency risk.</strong> ARV is quoted in rupees while Bitcoin
-          trades in dollars, so the USD/INR rate is part of your return. A
-          strengthening rupee reduces your rupee gain even when Bitcoin rises.
-        </li>
-        <li>
-          <strong>No guaranteed return.</strong> Nothing on this platform is a
-          promise, projection or assurance of any return. Past performance —
-          including any chart shown here — says nothing about future movement.
-        </li>
-        <li>
-          <strong>Liquidity and settlement risk.</strong> Redemption is against the
-          index price, not a market maker. Payouts are processed within the stated
-          window but are not instantaneous, and the price can move between your
-          request and settlement.
-        </li>
-        <li>
-          <strong>Tracking risk.</strong> The treasury holds the underlying asset.
-          Any divergence between what is held and what is owed — from execution
-          slippage, timing or operational error — is borne by holders.
-        </li>
-        <li>
-          <strong>Counterparty and custody risk.</strong> The underlying asset is
-          held with third-party exchanges or custodians. Their failure, freeze or
-          compromise affects your holding.
-        </li>
-        <li>
-          <strong>Tax risk.</strong> Gains are taxed at a flat rate with no
-          deduction for costs and no set-off of losses. Two redemptions that
-          cancel out economically can still leave tax owing. See
-          <a href="#tax">tax treatment</a>.
-        </li>
-        <li>
-          <strong>Regulatory risk.</strong> Virtual digital assets are not
-          regulated as securities in India and are not covered by any investor
-          protection or compensation scheme. The legal and tax framework can change
-          with a budget.
-        </li>
-        <li>
-          <strong>Technology and data risk.</strong> Prices come from third-party
-          exchange feeds. An outage, a regional block or bad data can interrupt
-          pricing, charts or the ability to transact.
-        </li>
-      </ul>
-
-      <!-- ========================================================== nature -->
-      <h2 id="nature">What ARV is, precisely</h2>
-      <p>
-        ARV is an <strong>index unit</strong>. It was priced at
-        <strong data-base>₹1.0000</strong> on <strong data-launch>—</strong> and
-        from then on its price is:
-      </p>
-      <div class="card card-solid mono" style="overflow-x:auto">
-        <span class="muted">ARV(t)</span> = <span data-formula>—</span>
-      </div>
-      <p>
-        The launch reference is <strong data-base-btc>—</strong>, locked and never
-        revised. Every ARV price ever displayed is that formula applied to a live
-        market price.
-      </p>
-
-      <h3>What it is not</h3>
-      <ul>
-        <li>
-          <strong>Not a deposit.</strong> There is no interest, no assured return
-          and no capital protection.
-        </li>
-        <li>
-          <strong>Not a security.</strong> It confers no ownership of the operating
-          entity, no dividend and no voting right.
-        </li>
-        <li>
-          <strong>Not backed by a promise.</strong> Its value derives from the
-          underlying asset held against it, not from an undertaking by the operator.
-        </li>
-        <li>
-          <strong>Not traded on a secondary market.</strong> Units are issued and
-          redeemed against the index price. There is no order book, no bid/ask
-          spread and no counterparty, and units are not transferable between users.
-        </li>
-        <li>
-          <strong>Not affected by other holders.</strong> Deposits and redemptions
-          do not move the price. Nobody's entry improves or damages anybody else's
-          position.
-        </li>
-      </ul>
-
-      <!-- =========================================================== terms -->
-      <h2 id="terms">Terms of service</h2>
-
-      <h3>Eligibility</h3>
-      <ul>
-        <li>You must be at least 18 and legally able to enter a contract.</li>
-        <li>You must be a resident Indian taxpayer with a valid PAN. Without a PAN,
-            TDS is withheld at the higher section 206AA rate.</li>
-        <li>Accounts are personal. You may not operate one on behalf of another
-            person or hold more than one.</li>
-        <li>Funds must be your own and lawfully sourced. Third-party deposits are
-            not accepted and will be returned.</li>
-      </ul>
-
-      <h3>Issuance and redemption</h3>
-      <ul>
-        <li>Units are issued at the index price prevailing when your payment is
-            <em>confirmed</em> — not when you requested it or when a QR was
-            displayed. The market moves in between.</li>
-        <li>Units are redeemed at the index price when the redemption is executed.</li>
-        <li>Minimum deposit <strong data-min-buy>—</strong>, minimum redemption
-            <strong data-min-sell>—</strong>.</li>
-        <li>Quoted prices include an assumed execution slippage of
-            <strong data-slip>—</strong>, because a real order does not fill at the
-            mid price.</li>
-        <li>Fractional units are issued to eight decimal places, rounded down.</li>
-      </ul>
-
-      <h3>Records</h3>
-      <ul>
-        <li>The transaction ledger is append-only. Entries are never edited or
-            deleted; a correction is posted as a new entry with its own reference
-            and an audit trail.</li>
-        <li>You can export your full history and tax computation as CSV at any
-            time.</li>
-      </ul>
-
-      <h3>Suspension</h3>
-      <p>
-        Issuance or redemption may be suspended where market data is unavailable or
-        unreliable, where required by law, or where an account shows signs of fraud
-        or unlawful use. Suspension does not extinguish your units.
-      </p>
-
-      <h3>No advice</h3>
-      <p>
-        Nothing on this platform is investment, tax or legal advice, or a
-        recommendation to buy, hold or redeem. No employee or representative is
-        authorised to give you a view on whether this is suitable for you. Take
-        independent advice.
-      </p>
-
-      <!-- ============================================================ fees -->
-      <h2 id="fees">Fee schedule</h2>
-      <p class="small muted">
-        Rendered directly from the platform's configuration, so this table cannot
-        drift out of step with what is actually charged.
-      </p>
-      <div class="table-wrap">
-        <table class="data" data-fee-table></table>
-      </div>
-      <p>
-        GST applies to the <strong>fee only</strong>, never to the amount you
-        invest or redeem. Charges are deducted at the time of the transaction and
-        itemised on screen before you confirm.
-      </p>
-
-      <!-- ============================================================= tax -->
-      <h2 id="tax">Tax treatment</h2>
-
-      <div class="note-box warn">
-        <strong>Two different things, and they are not interchangeable.</strong>
-        TDS is withheld by this platform at redemption. The 30% plus cess is
-        <em>not</em> withheld — it is your own liability at filing time.
-      </div>
-
-      <div class="table-wrap">
-        <table class="data" data-tax-table></table>
-      </div>
-
-      <h3>What this means in practice</h3>
-      <ul>
-        <li>
-          <strong>Only cost of acquisition is deductible.</strong> Entry fees, exit
-          fees, GST and any other expense do not reduce your taxable gain.
-        </li>
-        <li>
-          <strong>Losses cannot be set off.</strong> Not against other virtual
-          digital asset gains, not against other income, and not carried forward to
-          a later year. Gaining ₹1,00,000 on one redemption and losing ₹1,00,000 on
-          another leaves you flat but still owing tax on ₹1,00,000.
-        </li>
-        <li>
-          <strong>The rate is flat.</strong> 30% regardless of your slab, and
-          regardless of how long you held.
-        </li>
-        <li>
-          <strong>Holding is not a taxable event.</strong> Tax arises on transfer.
-          An unrealised gain, however large, is not taxed until you redeem.
-        </li>
-        <li>
-          <strong>Cost basis is FIFO.</strong> The oldest units you hold are
-          treated as redeemed first.
-        </li>
-        <li>
-          <strong>TDS is a credit, not an extra tax.</strong> It is set against your
-          liability and appears in Form 26AS and AIS. Where it exceeds the
-          liability, the excess is refundable when you file.
-        </li>
-      </ul>
-
-      <p class="small muted">
-        Your <a href="tax.html">tax statement</a> computes all of this from your
-        recorded transactions and exports it as CSV. It is a computation, not a
-        filing, and not tax advice — have a chartered accountant review it.
-      </p>
-
-      <!-- ========================================================= privacy -->
-      <h2 id="privacy">Privacy</h2>
-
-      <h3>What is collected</h3>
-      <ul>
-        <li>Email address and password (stored hashed, never in plain text).</li>
-        <li>Name and PAN — required to apply the correct TDS rate and to report it.</li>
-        <li>Your payout UPI ID.</li>
-        <li>Transaction records: amounts, units, prices, timestamps, references.</li>
-      </ul>
-
-      <h3>What is not collected</h3>
-      <ul>
-        <li>No advertising or cross-site tracking, and no third-party analytics.</li>
-        <li>Card details are never handled — payment is by UPI, directly between
-            your bank app and the platform's account.</li>
-      </ul>
-
-      <h3>Where it lives</h3>
-      <p>
-        Account and transaction data sit in a Postgres database with row-level
-        security: a signed-in browser can read only its own rows, and cannot write
-        holdings, transactions or tax records at all. Those are written solely by
-        server-side functions.
-      </p>
-
-      <h3>Retention and deletion</h3>
-      <p>
-        Transaction and tax records are retained as long as required for tax and
-        anti-money-laundering purposes, which is generally several years beyond the
-        relevant financial year, and cannot be deleted on request during that
-        period. Profile data can be corrected at any time and deleted once no
-        holdings and no retention obligation remain. Write to the address under
-        <a href="#grievance">grievance redressal</a>.
-      </p>
-
-      <h3>Third parties</h3>
-      <p>
-        Market prices are fetched from public exchange APIs. Those requests carry
-        no account information — only which instrument and timeframe is being
-        requested.
-      </p>
-
-      <!-- ========================================================== refund -->
-      <h2 id="refund">Redemption and refunds</h2>
-      <ul>
-        <li>
-          <strong>There is no cooling-off period.</strong> Once units are issued you
-          hold market exposure. Changing your mind means redeeming at the price
-          then prevailing, which may be lower than you paid.
-        </li>
-        <li>
-          <strong>Fees already charged are not refunded</strong> on redemption. They
-          pay for execution that has already happened.
-        </li>
-        <li>
-          <strong>Payments that cannot be matched are returned.</strong> A deposit
-          without a usable reference, or from an account not belonging to you, is
-          refunded to the source and no units are issued.
-        </li>
-        <li>
-          <strong>Failed payouts.</strong> If a payout is rejected by your bank —
-          usually a wrong or closed UPI ID — the amount is held and retried once
-          you correct the ID. It is not converted back into units.
-        </li>
-        <li>
-          <strong>Operational error.</strong> Where units are issued or redeemed at
-          a demonstrably wrong price because of an error on this side, the position
-          is corrected by a compensating ledger entry. The original entry is not
-          deleted.
-        </li>
-        <li>
-          Expected payout time: <strong data-settle>—</strong> from execution.
-        </li>
-      </ul>
-
-      <!-- ======================================================= grievance -->
-      <h2 id="grievance">Grievance redressal</h2>
-      <p>
-        Raise a complaint by email with your account email address and the relevant
-        transaction reference. Every reference in your
-        <a href="transactions.html">history</a> is unique and is enough to locate
-        the entry.
-      </p>
-      <div class="card card-solid">
-        <div class="grid g-2">
-          <div class="stat">
-            <span class="stat-k">Grievance officer</span>
-            <span>[Name to be appointed]</span>
-          </div>
-          <div class="stat">
-            <span class="stat-k">Email</span>
-            <span>[grievance address]</span>
-          </div>
-          <div class="stat">
-            <span class="stat-k">Acknowledgement</span>
-            <span>Within 48 hours</span>
-          </div>
-          <div class="stat">
-            <span class="stat-k">Resolution target</span>
-            <span>21 days</span>
-          </div>
+      <!-- ============================================================= risk -->
+      <section id="risk" data-reveal>
+        <div class="section-head">
+          <span class="section-num">01</span>
+          <h2 class="serif" style="font-size:1.5rem">Risk disclosure</h2>
         </div>
-      </div>
-      <p class="small muted">
-        The placeholders above must be filled with a real named officer and a
-        monitored address before this platform accepts money from anyone.
-      </p>
 
-      <!-- ====================================================== regulatory -->
-      <h2 id="regulatory">Regulatory status</h2>
+        <div class="note-box bad" style="margin-bottom:var(--sp-4)">
+          <strong>You can lose money here, including a large part of what you put in.</strong>
+          ARV tracks Bitcoin. Between November 2021 and November 2022 Bitcoin fell
+          roughly 77%, and ARV would have fallen with it — a holder who bought at the
+          top and sold at the bottom would have taken a loss of that order. That is
+          not a worst case invented for a disclaimer; it happened, and this platform's
+          own chart shows it.
+        </div>
 
-      <div class="note-box warn">
-        <strong>Read this before you commit money.</strong> Virtual digital assets
-        in India are taxed but are not regulated as securities. This platform is
-        <strong>not</strong> registered with SEBI, is not a mutual fund or
-        collective investment scheme, is not an RBI-regulated deposit taker, and is
-        not covered by any investor protection, insurance or compensation scheme.
-        If it fails, there is no statutory fallback.
-      </div>
+        <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
+          <div><strong>The price is not managed.</strong> Nobody defends a level, and
+            there is no floor. If Bitcoin halves, ARV halves.</div>
+          <div><strong>Past performance says nothing.</strong> The five-year chart on
+            this site includes a period of very large gains. It is a record of what
+            happened, not a projection, and it is not a reason to expect a repeat.</div>
+          <div><strong>No capital protection and no insurance.</strong> Your holdings
+            are not covered by deposit insurance, by any investor protection or
+            compensation scheme, or by any guarantee from us. If this business fails
+            you are an unsecured creditor.</div>
+          <div><strong>Losses are not deductible.</strong> A gain is taxed at 30% plus
+            cess; a loss gets you nothing. You cannot set it against other gains, other
+            income, or a future year. The tax system here is asymmetric and it is
+            asymmetric against you.</div>
+          <div><strong>Liquidity depends on someone being there.</strong> A sale is
+            matched against a real buyer where one exists. Where none does, the
+            treasury steps in after the fallback window — but that is a facility, not a
+            promise that survives every market.</div>
+          <div><strong>Concentration.</strong> One asset, one currency pair. There is no
+            diversification in ARV whatsoever, by design.</div>
+          <div><strong>Operational and custody risk.</strong> Feeds fail, hosts go down,
+            keys can be lost, and a platform can be attacked. We reduce these risks; we
+            cannot remove them.</div>
+          <div><strong>Nothing here is advice.</strong> No part of this site is
+            investment, tax or legal advice, or a recommendation to buy or sell. We do
+            not know your circumstances and we are not authorised to advise on them.
+            Only commit money you can afford to lose entirely.</div>
+        </div>
+      </section>
 
-      <p>
-        Pooling money from the public to invest on their behalf, and holding
-        customer funds, engage a number of Indian regimes — among them registration
-        with the Financial Intelligence Unit as a reporting entity, obligations
-        under the Prevention of Money Laundering Act, the Banning of Unregulated
-        Deposit Schemes Act, and the collective investment scheme provisions of the
-        SEBI Act. Which of these apply depends on how the operation is actually
-        structured, and the answer is a matter for qualified counsel rather than
-        for software.
-      </p>
-      <p>
-        The operator must complete that analysis, obtain whatever registrations it
-        concludes are required, and have a securities lawyer or company secretary
-        review every page of this document before the platform is offered to the
-        public.
-      </p>
+      <!-- ============================================================= what -->
+      <section id="what" data-reveal>
+        <div class="section-head">
+          <span class="section-num">02</span>
+          <h2 class="serif" style="font-size:1.5rem">What ARV is</h2>
+        </div>
 
-      <p class="small muted" style="margin-top:var(--sp-6)">
-        This document is written as product documentation. It is not legal advice
-        and has not been reviewed by counsel.
+        <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
+          <p style="margin:0">
+            ARV is a unit of account on this platform whose rupee price is derived from
+            the price of Bitcoin. One ARV was defined as
+            <strong data-base>₹1.00</strong> at launch on
+            <strong data-launch>—</strong>, when Bitcoin was
+            <strong>$47,110.33</strong> and the dollar was
+            <strong>₹73.073</strong>. Every price since is that base moved by the change
+            in Bitcoin measured in rupees:
+          </p>
+
+          <div class="formula">
+            ARV = 1.00 &times; (BTC<sub>now</sub> &times; FX<sub>now</sub>) &divide;
+            (47,110.33 &times; 73.073)
+          </div>
+
+          <div><strong>It is derived, not discovered.</strong> Every fill on this
+            platform settles at that computed price. Orders queue for size, never for
+            price, so no single trade can move ARV away from Bitcoin. A limit order here
+            is a trigger — "act when the index reaches this level" — not an offer for
+            someone to accept.</div>
+
+          <div><strong>What ARV is not.</strong> Not a coin on any blockchain, not
+            transferable off this platform, not a token you can withdraw to a wallet,
+            not a share, not a deposit, not a unit of a mutual fund or collective
+            investment scheme, and not a stablecoin. It confers no ownership of this
+            business, no voting right and no dividend.</div>
+
+          <div><strong>Your claim is against us.</strong> Holding ARV is a contractual
+            claim on this platform for the rupee value of your units, settled in rupees.
+            It is not a claim on any Bitcoin.</div>
+
+          <div><strong>Trading pauses when the price is stale.</strong> If the feed is
+            older than the configured limit, orders are refused rather than filled at a
+            price we do not trust. A visible pause is the correct behaviour; filling at
+            yesterday's number is not.</div>
+        </div>
+      </section>
+
+      <!-- ======================================================= regulatory -->
+      <section id="regulatory" data-reveal>
+        <div class="section-head">
+          <span class="section-num">03</span>
+          <h2 class="serif" style="font-size:1.5rem">Regulatory status</h2>
+        </div>
+
+        <div class="note-box warn" style="margin-bottom:var(--sp-4)">
+          <strong>Not registered with any financial regulator.</strong>
+          Not with SEBI, not with the RBI, not with IRDAI or PFRDA. Virtual digital
+          assets are taxed in India but they are not, at the time of writing, a
+          regulated financial product, and this platform holds no licence to deal in
+          securities, to advise, or to take deposits.
+        </div>
+
+        <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
+          <div><strong>What that means for you.</strong> No regulator supervises how
+            this platform prices, matches or settles. There is no ombudsman scheme, no
+            compensation fund, and no regulatory route of appeal. Your recourse is
+            contractual and, ultimately, through the courts.</div>
+          <div><strong>What we do comply with.</strong> Income-tax obligations under
+            sections 115BBH and 194S, GST on our fees, and the reporting and
+            record-keeping we are required to do as a VDA service provider registered
+            with the Financial Intelligence Unit regime as it applies to us.</div>
+          <div><strong>We do not take deposits.</strong> Rupees you send sit in your
+            platform balance as a payable to you. We do not pay interest on them, we do
+            not promise a return on them, and we do not lend them out. Promising a
+            return on money taken from the public is an offence under the Banning of
+            Unregulated Deposit Schemes Act, 2019, and it is a line this platform does
+            not go near.</div>
+          <div><strong>Jurisdiction.</strong> Available to residents of India, subject to
+            the laws of India, with exclusive jurisdiction in the courts of India.</div>
+        </div>
+      </section>
+
+      <!-- ============================================================ terms -->
+      <section id="terms" data-reveal>
+        <div class="section-head">
+          <span class="section-num">04</span>
+          <h2 class="serif" style="font-size:1.5rem">Terms of use</h2>
+        </div>
+
+        <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
+          <div><strong>Eligibility.</strong> You must be 18 or over, resident in India,
+            acting for yourself, and using money that is lawfully yours. One account per
+            person. A second account for the same person or PAN may be closed and any
+            referral commission on it voided.</div>
+          <div><strong>Your account is yours to protect.</strong> Keep your password and
+            your one-time codes to yourself. Anything done through your session is
+            treated as done by you. Tell us at once if you think someone else has
+            access.</div>
+          <div><strong>Accuracy.</strong> The name, date of birth, PAN and address you
+            give must be true and must match your documents. A mismatch will hold up
+            verification and withdrawals.</div>
+          <div><strong>What you may not do.</strong> Use the platform for anyone else's
+            money, launder proceeds of crime, break sanctions, automate abuse of the
+            API, attempt to interfere with pricing or matching, or attack the
+            infrastructure. Any of these ends the account.</div>
+          <div><strong>What we may do.</strong> Refuse or reverse a transaction that
+            appears fraudulent or mistaken, hold a withdrawal while we verify it, pause
+            trading when the price feed is unreliable, and change fees or settings with
+            notice on this site. Where we reverse something, it appears as its own
+            ledger entry — never as an edit to the original.</div>
+          <div><strong>Fees.</strong> Entry and exit fees are shown before you confirm
+            any order, with GST on the fee stated separately. Deposits and withdrawals
+            carry no platform fee. Current rates are always in the footer of every page
+            and on the <a href="index.html#costs">overview</a>.</div>
+          <div><strong>Cancellation and refunds.</strong> An unfilled order can be
+            cancelled at any time and the escrow is released in full. A filled order
+            cannot be undone — it is an executed transaction, not a purchase of goods,
+            and there is no cooling-off period. A deposit that was never credited is
+            returned to the account it came from.</div>
+          <div><strong>Availability.</strong> We aim to be up continuously but we do not
+            guarantee it. Maintenance, host failure and feed outages happen, and during
+            an outage you may be unable to trade.</div>
+          <div><strong>Limits on our liability.</strong> We are liable for our own
+            failure to execute what you instructed, and for money we hold for you. We
+            are not liable for market losses, for the price of Bitcoin, for your tax
+            position, or for consequential loss. Nothing here excludes liability we
+            cannot lawfully exclude — including for fraud.</div>
+          <div><strong>Closing an account.</strong> You can withdraw your rupee balance
+            and stop using the platform whenever you like. We keep the records we are
+            required to keep, for as long as we are required to keep them.</div>
+        </div>
+      </section>
+
+      <!-- ============================================================ money -->
+      <section id="money" data-reveal>
+        <div class="section-head">
+          <span class="section-num">05</span>
+          <h2 class="serif" style="font-size:1.5rem">Money, orders &amp; settlement</h2>
+        </div>
+
+        <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
+          <div><strong>Deposits are credited on confirmation, not on scanning.</strong>
+            A UPI QR sends a request one way and returns nothing to us — no callback and
+            no signature. So we credit a deposit when we can see the money against the
+            bank statement, which is why we ask for a UTR or a screenshot. Usually
+            <strong data-dep-window>2–15 minutes</strong>.</div>
+          <div><strong>Money moves through your rupee balance, never person to
+            person.</strong> You never pay another user and no user ever pays you. That
+            is deliberate: direct transfers between strangers are how disputes,
+            chargebacks, mule accounts and frozen bank accounts happen.</div>
+          <div><strong>Buys fill immediately.</strong> Against resting sell orders where
+            they exist, and against the treasury otherwise.</div>
+          <div><strong>Sells prefer a real buyer.</strong> A sale is matched against
+            genuine demand first. If none arrives within the fallback window
+            (<strong data-fallback>60 minutes</strong>), the treasury takes the other
+            side at the same index price. Without that fallback a holder would be
+            trapped in a falling market, which is exactly when selling matters.</div>
+          <div><strong>Escrow.</strong> While a buy order rests, the rupees it needs —
+            including the fee and the GST on the fee — are held and cannot be spent
+            twice. While a sell order rests, the units are held the same way. Cancel and
+            the hold is released in full.</div>
+          <div><strong>Withdrawals go to your own UPI ID.</strong> To the VPA on your
+            verified profile and nowhere else. Usually
+            <strong data-wd-window>5 minutes to 1 hour</strong>. A withdrawal can be
+            cancelled by you until it is approved.</div>
+          <div><strong>The ledger is the record.</strong> Every rupee and every unit that
+            moves is written once, append-only. Your balance is a running total of it. If
+            the two ever disagree, the ledger is right, and we reconcile to it.</div>
+        </div>
+      </section>
+
+      <!-- ============================================================== tax -->
+      <section id="tax" data-reveal>
+        <div class="section-head">
+          <span class="section-num">06</span>
+          <h2 class="serif" style="font-size:1.5rem">Tax treatment</h2>
+        </div>
+
+        <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
+          <div><strong>30% plus 4% cess on gains, whatever your slab.</strong> Section
+            115BBH taxes income from transferring a virtual digital asset at a flat rate.
+            There is no long-term rate, no indexation and no basic exemption applied to
+            it.</div>
+          <div><strong>Only cost of acquisition is deductible.</strong> Not our fee, not
+            the GST on it, not any other expense. We show you those charges because you
+            paid them, and we mark them as non-deductible because they are.</div>
+          <div><strong>Losses cannot be set off or carried forward.</strong> Section
+            115BBH(2) blocks the set-off against other VDA gains, against any other
+            income, and into the following year. Your statement therefore reports gains
+            and losses separately and taxes the gains alone.</div>
+          <div><strong>1% TDS on sale, withheld by us.</strong> Section 194S applies once
+            your sale proceeds for the year pass the threshold, and crossing it makes the
+            whole of a transfer liable rather than only the part above it. TDS is a
+            credit against what you owe, not an extra tax, and it appears in Form 26AS
+            against your PAN.</div>
+          <div><strong>No PAN means 20%.</strong> Section 206AA raises the withholding
+            rate where we hold no PAN for you. This is the single most expensive blank
+            field on the site.</div>
+          <div><strong>Cost basis is FIFO.</strong> A sale consumes your oldest units
+            first, and the cost recorded against it is fixed at the moment of the sale.
+            A later purchase never changes an earlier disposal.</div>
+          <div><strong>Referral commission is ordinary income</strong> at your slab rate,
+            not a capital gain, and it does not affect the cost basis of your ARV.</div>
+          <div><strong>Your statement is not a return.</strong> Your
+            <a href="tax.html">tax statement</a> is a record of what this platform
+            executed and withheld. It is not a tax return, not a Form 16A, and it knows
+            nothing about holdings you have elsewhere. Check it against Form 26AS and
+            speak to a chartered accountant before you file.</div>
+        </div>
+      </section>
+
+      <!-- ============================================================== kyc -->
+      <section id="kyc" data-reveal>
+        <div class="section-head">
+          <span class="section-num">07</span>
+          <h2 class="serif" style="font-size:1.5rem">KYC &amp; anti-money-laundering</h2>
+        </div>
+
+        <div class="note-box ok" style="margin-bottom:var(--sp-4)">
+          <strong>We never ask for a full Aadhaar number, and we never store one.</strong>
+          Holding Aadhaar numbers without being a licensed authentication agency is an
+          offence under the Aadhaar Act, 2016, carrying imprisonment. The field on this
+          site accepts four digits and cannot accept twelve. When we add full
+          verification it will run through a licensed provider that answers yes or no
+          and never hands us the number.
+        </div>
+
+        <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
+          <div><strong>What we ask for, and why.</strong> Name, date of birth and address
+            to identify you; PAN because it decides your TDS rate and is required for
+            tax reporting; a UPI ID so withdrawals have somewhere to go. That is the
+            list.</div>
+          <div><strong>When we ask.</strong> At the point you first buy — not as a wall
+            in front of the door. You can look around, read everything and see live
+            prices without giving us anything.</div>
+          <div><strong>Verification is a person, not a rubber stamp.</strong> Usually
+            within 24 hours. If something does not match we say what it was so you can
+            correct it, rather than rejecting you without a reason.</div>
+          <div><strong>Monitoring.</strong> We watch for patterns that suggest money
+            laundering, accounts operated for someone else, and structuring around the
+            TDS threshold. We may ask about the source of funds, hold a withdrawal while
+            we do, and we are required to report suspicious activity. We will not tell
+            you that we have.</div>
+          <div><strong>Records.</strong> Identity records and transaction records are
+            kept for the statutory retention period after an account closes, because we
+            are required to keep them — not because we want the data.</div>
+        </div>
+      </section>
+
+      <!-- ========================================================== privacy -->
+      <section id="privacy" data-reveal>
+        <div class="section-head">
+          <span class="section-num">08</span>
+          <h2 class="serif" style="font-size:1.5rem">Privacy</h2>
+        </div>
+
+        <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
+          <div><strong>What we hold.</strong> Your email; your KYC details as listed
+            above; your PAN; the last four digits of Aadhaar if you gave them; your UPI
+            ID; every transaction and ledger entry; deposit UTRs and any screenshot you
+            upload; login and action audit records with IP address and user agent.</div>
+          <div><strong>What we do not hold.</strong> No full Aadhaar number. No card
+            numbers, no CVV, no UPI PIN and no bank password — payment happens inside
+            your own UPI app and we never see those. No location tracking. No advertising
+            or cross-site tracking cookies of any kind.</div>
+          <div><strong>Why we hold it.</strong> To run your account, to meet tax and AML
+            obligations, and to investigate fraud. Not to profile you and not to sell to
+            you.</div>
+          <div><strong>Who else sees it.</strong> Our hosting provider, which stores the
+            database; the tax authorities, as required; a payment or verification
+            provider where one is used, limited to what it needs; and law enforcement
+            where legally compelled. We do not sell personal data and we do not share it
+            for marketing.</div>
+          <div><strong>Cookies.</strong> One session cookie so you stay signed in, and a
+            CSRF token to stop a third-party site acting as you. Both are strictly
+            necessary and neither follows you anywhere.</div>
+          <div><strong>Security.</strong> Passwords are stored as salted hashes and are
+            never recoverable — a reset replaces them. Uploads are stored where the
+            server refuses to execute anything, and PAN is masked in the interface. No
+            system is perfect; if we suffer a breach affecting you we will tell you
+            promptly and say what happened.</div>
+          <div><strong>Your rights.</strong> Ask for a copy of your data, ask us to
+            correct it, and ask us to delete what we are not required to keep. Records we
+            must retain for tax or AML purposes we will keep, and we will tell you which
+            those are rather than refusing without explanation.</div>
+        </div>
+      </section>
+
+      <!-- ========================================================= referral -->
+      <section id="referral" data-reveal>
+        <div class="section-head">
+          <span class="section-num">09</span>
+          <h2 class="serif" style="font-size:1.5rem">Referrals</h2>
+        </div>
+
+        <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
+          <div><strong>5% of a referred person's first deposit, once.</strong> Paid from
+            our own margin into your rupee balance. Nothing is deducted from them, and
+            they pay no more than anyone else.</div>
+          <div><strong>Single level, and it stays that way.</strong> You are not paid on
+            the people they invite, and there is no ongoing cut of anyone's trading. A
+            multi-level structure paid out of deposits is a money circulation scheme
+            under the Prize Chits and Money Circulation Schemes (Banning) Act, 1978.</div>
+          <div><strong>Tiers pay in fees, not in cash.</strong> Higher tiers lower what
+            you pay to trade. A cash reward scaled to how much other people deposit is a
+            promised return funded by deposits, which is precisely what the BUDS Act,
+            2019 prohibits.</div>
+          <div><strong>Void where abused.</strong> Self-referral, a duplicate PAN, or a
+            deposit reversed after the commission was paid voids that commission and it
+            is recovered by a compensating ledger entry.</div>
+          <div><strong>Capped, and taxable.</strong> Capped per referral, and it is
+            income at your slab rate rather than a capital gain.</div>
+        </div>
+      </section>
+
+      <!-- ======================================================= complaints -->
+      <section id="complaints" data-reveal>
+        <div class="section-head">
+          <span class="section-num">10</span>
+          <h2 class="serif" style="font-size:1.5rem">Complaints &amp; contact</h2>
+        </div>
+
+        <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
+          <div><strong>Write to <a data-support-link href="#"><span data-support>—</span></a>.</strong>
+            Include your registered email and the reference of anything you are asking
+            about. We acknowledge within one working day and aim to resolve within
+            seven.</div>
+          <div><strong>If a balance looks wrong,</strong> say so and quote the ledger
+            reference. We reconcile the ledger against the wallet and correct any
+            difference with a compensating entry, which will be visible to you in your
+            <a href="transactions.html">history</a>.</div>
+          <div><strong>If you are unhappy with the outcome,</strong> there is no
+            regulatory ombudsman for this product — see
+            <a href="#regulatory">regulatory status</a>. Your remedy is contractual, in
+            the courts of India.</div>
+        </div>
+      </section>
+
+      <p class="tiny muted" style="max-width:78ch">
+        These terms may be updated. Material changes will be announced on this site
+        before they take effect, and the date at the top of this page will change. If a
+        translation of this page ever disagrees with the English, the English governs.
       </p>
 
     </div>
   </div>
+
 </main>
 
 <div data-footer></div>

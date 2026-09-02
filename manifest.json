@@ -1,13 +1,15 @@
 {
   "name": "ARV Coin",
   "short_name": "ARV",
-  "description": "An index unit priced at ₹1 at launch, tracking Bitcoin one for one. Live charts, transparent fees, and Indian VDA tax computed on every redemption.",
+  "description": "One unit, priced at ₹1 at launch, tracking Bitcoin one for one in rupees. Live index price, an order book that settles at that price, and Indian VDA tax computed on every sale.",
+  "id": "arv-coin",
   "start_url": "index.html",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "orientation": "portrait-primary",
-  "background_color": "#05070d",
-  "theme_color": "#05070d",
+  "background_color": "#07070a",
+  "theme_color": "#07070a",
   "categories": ["finance"],
   "lang": "en-IN",
   "dir": "ltr",
@@ -38,8 +40,9 @@
     }
   ],
   "shortcuts": [
-    { "name": "Charts", "url": "charts.html" },
-    { "name": "Portfolio", "url": "dashboard.html" },
-    { "name": "Buy ARV", "url": "buy.html" }
+    { "name": "Trade", "short_name": "Trade", "url": "trade.html" },
+    { "name": "Wallet", "short_name": "Wallet", "url": "dashboard.html" },
+    { "name": "Deposit", "short_name": "Deposit", "url": "deposit.html" },
+    { "name": "History", "short_name": "History", "url": "transactions.html" }
   ]
 }

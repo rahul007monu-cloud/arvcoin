@@ -4,79 +4,105 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>History — ARV Coin</title>
-<meta name="theme-color" content="#05070d">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#07070a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/core.css">
 <script src="arv-config.js"></script>
 </head>
 <body>
 
-<canvas id="helix-canvas" aria-hidden="true"></canvas>
 <div data-nav></div>
 
-<main class="page wrap wrap-wide" style="padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
+<main class="page wrap" style="max-width:1120px;padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
 
   <div class="row-between row-wrap" style="margin-bottom:var(--sp-5)">
     <div>
-      <h1 style="font-size:1.7rem;margin-bottom:4px">Transaction history</h1>
+      <h1 class="serif" style="font-size:1.8rem;margin-bottom:2px">History</h1>
       <div class="small muted">
-        Append-only. Nothing here can be edited or deleted — corrections are
-        posted as new entries with their own reference.
+        Every rupee and every unit that moved, once each. Nothing here is ever edited.
       </div>
     </div>
-    <button class="btn btn-ghost" data-csv>Export CSV</button>
+    <div class="row row-wrap" style="gap:8px">
+      <select data-fy style="width:auto;min-width:130px"></select>
+      <button class="btn btn-ghost btn-sm" data-csv>Export CSV</button>
+    </div>
   </div>
 
-  <div class="grid g-4" style="margin-bottom:var(--sp-4)">
-    <div class="card card-tight"><div class="stat">
-      <span class="stat-k">Total deposited</span><span class="stat-v" data-sum-in>—</span>
-    </div></div>
-    <div class="card card-tight"><div class="stat">
-      <span class="stat-k">Total redeemed</span><span class="stat-v" data-sum-out>—</span>
-    </div></div>
-    <div class="card card-tight"><div class="stat">
-      <span class="stat-k">Fees + GST paid</span><span class="stat-v" data-sum-fees>—</span>
-    </div></div>
-    <div class="card card-tight"><div class="stat">
-      <span class="stat-k">TDS withheld</span><span class="stat-v" data-sum-tds>—</span>
-      <span class="stat-sub">creditable at filing</span>
-    </div></div>
-  </div>
-
-  <div class="card card-flush">
-    <div class="card-head" style="padding:var(--sp-4);margin:0;flex-wrap:wrap">
-      <div class="tabs" data-filter>
-        <button class="tab on" data-type="">All</button>
-        <button class="tab" data-type="deposit">Deposits</button>
-        <button class="tab" data-type="redeem">Redemptions</button>
+  <!-- ============================================================== totals -->
+  <section class="card card-tight" style="margin-bottom:var(--sp-4)">
+    <div class="grid g-4" style="gap:var(--sp-5)">
+      <div class="stat">
+        <span class="stat-k">In</span>
+        <span class="stat-v up" data-in>—</span>
+        <span class="stat-sub">deposits, sales, commission</span>
       </div>
-      <select data-fy style="max-width:180px"></select>
+      <div class="stat">
+        <span class="stat-k">Out</span>
+        <span class="stat-v down" data-out>—</span>
+        <span class="stat-sub">purchases, withdrawals, charges</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Net rupee movement</span>
+        <span class="stat-v" data-net>—</span>
+        <span class="stat-sub" data-scope>—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Charges paid</span>
+        <span class="stat-v" data-charges>—</span>
+        <span class="stat-sub" data-charges-sub>fees, GST and TDS</span>
+      </div>
     </div>
+  </section>
 
-    <div class="table-wrap">
-      <table class="data">
-        <thead><tr>
-          <th>Reference</th><th>When</th><th>Type</th>
-          <th class="num">Units</th><th class="num">Price</th>
-          <th class="num">Gross</th><th class="num">Fees</th>
-          <th class="num">TDS</th><th class="num">Net</th>
-          <th class="num">Gain / loss</th><th>Status</th>
-        </tr></thead>
-        <tbody data-rows>
-          <tr><td colspan="11" class="empty">Loading…</td></tr>
-        </tbody>
-      </table>
+  <!-- ============================================================= filters -->
+  <div class="row-between row-wrap" style="margin-bottom:var(--sp-4);gap:var(--sp-3)">
+    <div class="tabs" data-groups>
+      <button class="tab on" data-group="">All</button>
+      <button class="tab" data-group="money">Money in &amp; out</button>
+      <button class="tab" data-group="trading">Trading</button>
+      <button class="tab" data-group="charges">Charges</button>
+      <button class="tab" data-group="rewards">Rewards</button>
+    </div>
+    <div class="tabs" data-views>
+      <button class="tab on" data-view="ledger">Ledger</button>
+      <button class="tab" data-view="trades">Fills</button>
     </div>
   </div>
 
-  <div class="note-box" style="margin-top:var(--sp-4)">
-    <strong>Reading the gain column.</strong> It is gross proceeds minus the FIFO
-    cost of acquisition. Platform fees are deliberately not subtracted, because
-    section 115BBH allows no deduction other than cost — so the taxable gain is
-    higher than a plain profit-and-loss figure would suggest.
-  </div>
+  <!-- ============================================================== ledger -->
+  <section class="card card-flush" data-pane="ledger">
+    <div class="table-wrap" data-rows>
+      <div class="empty"><span class="spinner"></span></div>
+    </div>
+    <div style="padding:var(--sp-4);text-align:center">
+      <button class="btn btn-ghost btn-sm hidden" data-more>Load older entries</button>
+      <div class="tiny muted hidden" data-end>That is the beginning of your account.</div>
+    </div>
+  </section>
+
+  <!-- ============================================================== fills -->
+  <section class="card card-flush hidden" data-pane="trades">
+    <div class="table-wrap" data-trades>
+      <div class="empty"><span class="spinner"></span></div>
+    </div>
+    <p class="tiny muted" style="padding:var(--sp-4);margin:0">
+      One row per fill. A sale shows the cost basis the oldest lots gave it and the
+      gain that follows — the same figures that reach your
+      <a href="tax.html">tax statement</a>. <em>Treasury</em> as counterparty means
+      we took the other side; the price is the index either way.
+    </p>
+  </section>
+
+  <p class="tiny muted" style="margin-top:var(--sp-4);max-width:70ch">
+    This is the book of record, and your balance is a running total of it. A
+    correction appears as its own entry rather than a change to the original, so
+    the two can always be checked against each other. If a number here ever
+    disagrees with your <a href="dashboard.html">wallet</a>, this one is right —
+    tell us and we will reconcile it.
+  </p>
 
 </main>
 

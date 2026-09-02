@@ -1,35 +1,59 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="ARV Coin">
+  <!--
+    Sterling mark: a milled silver plate carrying the letter A.
+
+    Designed for 16px first. At that size a helix, a chart or a coin edge all
+    collapse into grey mush, so the mark is one letterform with enough weight to
+    survive being three pixels wide — everything else is material, and material
+    reads at any size.
+  -->
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#f7931a"/>
-      <stop offset="55%" stop-color="#ff6b35"/>
-      <stop offset="100%" stop-color="#6ee7ff"/>
+    <!-- Brushed metal, matching --brushed in core.css so the favicon and the
+         wordmark are cut from the same surface. -->
+    <linearGradient id="brushed" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="22%"  stop-color="#d8dbe3"/>
+      <stop offset="48%"  stop-color="#9aa0ae"/>
+      <stop offset="68%"  stop-color="#eef0f4"/>
+      <stop offset="100%" stop-color="#b0b6c2"/>
     </linearGradient>
-    <linearGradient id="s1" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#f7931a" stop-opacity=".95"/>
-      <stop offset="100%" stop-color="#f7931a" stop-opacity=".35"/>
-    </linearGradient>
-    <linearGradient id="s2" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#6ee7ff" stop-opacity=".35"/>
-      <stop offset="100%" stop-color="#6ee7ff" stop-opacity=".95"/>
+
+    <!-- Overhead light on the plate, so the black is not flat. -->
+    <radialGradient id="plate" cx="34%" cy="18%" r="88%">
+      <stop offset="0%"   stop-color="#20202a"/>
+      <stop offset="58%"  stop-color="#101015"/>
+      <stop offset="100%" stop-color="#07070a"/>
+    </radialGradient>
+
+    <!-- Specular edge along the top, as on a bevelled metal case. -->
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity=".22"/>
+      <stop offset="40%"  stop-color="#ffffff" stop-opacity=".03"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
   </defs>
 
-  <rect width="64" height="64" rx="15" fill="#05070d"/>
-  <rect width="64" height="64" rx="15" fill="url(#g)" opacity=".14"/>
+  <rect width="64" height="64" rx="15" fill="url(#plate)"/>
+  <rect width="64" height="64" rx="15" fill="url(#edge)"/>
+  <rect x=".5" y=".5" width="63" height="63" rx="14.5" fill="none"
+        stroke="#ffffff" stroke-opacity=".16"/>
 
-  <!-- Double helix: two strands crossing, with block rungs between them. -->
-  <g fill="none" stroke-width="3" stroke-linecap="round">
-    <path d="M22 10 C 40 22, 40 42, 22 54" stroke="url(#s1)"/>
-    <path d="M42 10 C 24 22, 24 42, 42 54" stroke="url(#s2)"/>
+  <!-- Engine turning: fine concentric rings, the same motif as the hero plate.
+       Faint enough to vanish at small sizes rather than turn into moiré. -->
+  <g fill="none" stroke="#ffffff" stroke-opacity=".05">
+    <circle cx="32" cy="32" r="26"/>
+    <circle cx="32" cy="32" r="21"/>
+    <circle cx="32" cy="32" r="16"/>
   </g>
-  <g stroke="#ffb04d" stroke-width="2.4" stroke-linecap="round" opacity=".85">
-    <line x1="26" y1="18" x2="38" y2="18"/>
-    <line x1="30" y1="32" x2="34" y2="32"/>
-    <line x1="26" y1="46" x2="38" y2="46"/>
-  </g>
-  <g stroke="#a5f0ff" stroke-width="2.4" stroke-linecap="round" opacity=".8">
-    <line x1="28" y1="25" x2="36" y2="25"/>
-    <line x1="28" y1="39" x2="36" y2="39"/>
-  </g>
+
+  <!-- The letter A, drawn rather than set in type: no font dependency, and the
+       crossbar sits low so the counter stays open when it is 16px wide. -->
+  <path d="M32 13.5 L45.5 50 L38.9 50 L36.2 42.2 L27.8 42.2 L25.1 50 L18.5 50 Z
+           M29.6 36.9 L34.4 36.9 L32 29.6 Z"
+        fill="url(#brushed)"/>
+
+  <!-- One hairline under the mark: the rule that runs through the whole
+       interface, and it makes the letter sit on something. -->
+  <rect x="20" y="53.6" width="24" height="1.1" rx=".55"
+        fill="#b9bec9" fill-opacity=".55"/>
 </svg>

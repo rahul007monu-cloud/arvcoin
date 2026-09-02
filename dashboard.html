@@ -3,147 +3,220 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Portfolio — ARV Coin</title>
-<meta name="theme-color" content="#05070d">
+<title>Wallet — ARV Coin</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#07070a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/core.css">
 <script src="arv-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js" defer></script>
 </head>
 <body>
 
-<canvas id="helix-canvas" aria-hidden="true"></canvas>
 <div data-nav></div>
 
 <main class="page wrap" style="padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
 
+  <!-- ============================================================ greeting -->
   <div class="row-between row-wrap" style="margin-bottom:var(--sp-5)">
     <div>
-      <h1 style="font-size:1.7rem;margin-bottom:4px">Portfolio</h1>
-      <div class="small muted" data-mode-note></div>
+      <h1 class="serif" style="font-size:1.8rem;margin-bottom:2px">
+        <span data-greeting>Welcome</span>
+      </h1>
+      <div class="small muted" data-sub>Your rupee balance and ARV holding</div>
     </div>
-    <div class="row">
-      <a href="buy.html" class="btn btn-primary">Buy ARV</a>
-      <a href="withdraw.html" class="btn btn-ghost">Redeem</a>
-    </div>
-  </div>
-
-  <!-- ============================================================ headline -->
-  <div class="grid g-4" style="margin-bottom:var(--sp-4)">
-    <div class="card card-float">
-      <div class="stat">
-        <span class="stat-k">Current value</span>
-        <span class="stat-v stat-v-lg" data-value>—</span>
-        <span class="stat-sub"><span data-units>—</span> units</span>
-      </div>
-    </div>
-    <div class="card card-float">
-      <div class="stat">
-        <span class="stat-k">Unrealised P&amp;L</span>
-        <span class="stat-v" data-pnl>—</span>
-        <span class="stat-sub"><span class="chip flat" data-pnl-pct>—</span></span>
-      </div>
-    </div>
-    <div class="card card-float">
-      <div class="stat">
-        <span class="stat-k">Invested</span>
-        <span class="stat-v" data-invested>—</span>
-        <span class="stat-sub">avg cost <span data-avg-cost>—</span></span>
-      </div>
-    </div>
-    <div class="card card-float">
-      <div class="stat">
-        <span class="stat-k">ARV price</span>
-        <span class="stat-v" data-price>—</span>
-        <span class="stat-sub">since launch <span data-launch>—</span></span>
-      </div>
+    <div class="row row-wrap">
+      <a href="deposit.html" class="btn btn-ghost">Add funds</a>
+      <a href="trade.html" class="btn btn-primary">Trade</a>
     </div>
   </div>
 
-  <div class="grid" style="grid-template-columns:1.6fr 1fr;gap:var(--sp-4);align-items:start">
+  <!-- ========================================================= gate notices -->
+  <div class="note-box warn hidden" style="margin-bottom:var(--sp-4)" data-kyc-notice>
+    <strong>KYC not complete.</strong>
+    You can browse and hold, but a first purchase and any withdrawal need it.
+    <a href="profile.html#kyc" class="arrow">Complete KYC</a>
+  </div>
+  <div class="note-box warn hidden" style="margin-bottom:var(--sp-4)" data-paused-notice>
+    <strong>Trading is paused.</strong>
+    <span data-paused-reason></span> Your balances are unaffected.
+  </div>
 
-    <!-- ========================================================= main chart -->
+  <!-- ============================================================== wallet -->
+  <div class="card" data-reveal="weighty" style="margin-bottom:var(--sp-4)">
+    <div class="wallet-split">
+
+      <!-- rupees -->
+      <div>
+        <div class="stat-k" style="margin-bottom:var(--sp-2)">Rupee balance</div>
+        <div class="stat-v stat-v-lg" data-inr>—</div>
+        <div class="small muted" style="margin-top:6px">
+          <span class="wallet-locked hidden" data-inr-locked></span>
+        </div>
+        <div class="row" style="margin-top:var(--sp-4)">
+          <a href="deposit.html" class="btn btn-sm">Deposit</a>
+          <a href="withdraw.html" class="btn btn-sm btn-ghost">Withdraw</a>
+        </div>
+        <div class="tiny muted" style="margin-top:var(--sp-3)">
+          Rupees sit here between a deposit and a purchase, and again after a sale.
+          Nothing moves between users' bank accounts.
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- ARV -->
+      <div>
+        <div class="stat-k" style="margin-bottom:var(--sp-2)">ARV holding</div>
+        <div class="stat-v stat-v-lg" data-units>—</div>
+        <div class="small muted" style="margin-top:6px">
+          worth <span class="strong" data-value>—</span>
+          <span class="wallet-locked hidden" data-units-locked></span>
+        </div>
+        <div class="row" style="margin-top:var(--sp-4)">
+          <a href="trade.html?side=buy" class="btn btn-sm btn-buy">Buy</a>
+          <a href="trade.html?side=sell" class="btn btn-sm btn-sell">Sell</a>
+        </div>
+        <div class="tiny muted" style="margin-top:var(--sp-3)">
+          Units track Bitcoin one for one. Selling credits rupees here, which you
+          then withdraw.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================================================================ P&L -->
+  <div class="grid g-4" data-reveal-group style="margin-bottom:var(--sp-4)">
+    <div class="card card-tight card-lift" data-reveal><div class="stat">
+      <span class="stat-k">ARV price</span>
+      <span class="stat-v" data-price>—</span>
+      <span class="stat-sub"><span class="chip flat" data-change>—</span> 24h</span>
+    </div></div>
+
+    <div class="card card-tight card-lift" data-reveal><div class="stat">
+      <span class="stat-k">Invested</span>
+      <span class="stat-v" data-invested>—</span>
+      <span class="stat-sub">at <span data-avg-cost>—</span> average</span>
+    </div></div>
+
+    <div class="card card-tight card-lift" data-reveal><div class="stat">
+      <span class="stat-k">Unrealised</span>
+      <span class="stat-v" data-unrealised>—</span>
+      <span class="stat-sub"><span class="chip flat" data-unrealised-pct>—</span></span>
+    </div></div>
+
+    <div class="card card-tight card-lift" data-reveal><div class="stat">
+      <span class="stat-k">Realised</span>
+      <span class="stat-v" data-realised>—</span>
+      <span class="stat-sub">from completed sales</span>
+    </div></div>
+  </div>
+
+  <div class="split">
+
     <div class="stack">
-      <div class="chart-shell">
+      <!-- ============================================================ chart -->
+      <div class="chart-shell" data-reveal>
         <div class="chart-bar">
           <div>
-            <strong>ARV price</strong>
-            <div class="tiny muted">Dashed line marks your average cost</div>
+            <strong>ARV / INR</strong>
+            <div class="tiny muted" data-cost-line-note>Your average cost is marked on the chart</div>
           </div>
-          <div class="tabs" data-tf-tabs>
-            <button class="tab" data-tf="1h">1H</button>
-            <button class="tab on" data-tf="1D">1D</button>
-            <button class="tab" data-tf="1W">1W</button>
-          </div>
+          <div class="tabs" data-range-tabs></div>
         </div>
         <div class="chart-canvas" data-chart></div>
         <div class="chart-legend">
           <div class="legend-item" data-feed-status><span class="live-dot off"></span>connecting…</div>
+          <div class="spacer"></div>
+          <div class="legend-item" data-candle-count></div>
         </div>
       </div>
 
-      <!-- ============================================== recent transactions -->
-      <div class="card card-flush">
+      <!-- ===================================================== open orders -->
+      <div class="card card-flush" data-reveal>
         <div class="card-head" style="padding:var(--sp-4);margin:0">
-          <h3 style="font-size:1rem">Recent activity</h3>
-          <a href="transactions.html" class="arrow btn btn-ghost btn-sm">All history</a>
+          <h3 style="font-size:1rem">Open orders</h3>
+          <a href="trade.html" class="btn btn-ghost btn-sm arrow">Trade</a>
         </div>
         <div class="table-wrap">
           <table class="data">
             <thead><tr>
-              <th>When</th><th>Type</th><th class="num">Units</th>
-              <th class="num">Price</th><th class="num">Amount</th><th>Status</th>
+              <th>Reference</th><th>Side</th><th>Type</th>
+              <th class="num">Remaining</th><th class="num">Trigger</th>
+              <th>Status</th><th></th>
             </tr></thead>
-            <tbody data-txns>
-              <tr><td colspan="6" class="empty">Loading…</td></tr>
+            <tbody data-orders>
+              <tr><td colspan="7" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ======================================================== activity -->
+      <div class="card card-flush" data-reveal>
+        <div class="card-head" style="padding:var(--sp-4);margin:0">
+          <h3 style="font-size:1rem">Recent activity</h3>
+          <a href="transactions.html" class="btn btn-ghost btn-sm arrow">All history</a>
+        </div>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr>
+              <th>When</th><th>What</th><th class="num">Units</th>
+              <th class="num">Price</th><th class="num">Amount</th>
+            </tr></thead>
+            <tbody data-activity>
+              <tr><td colspan="5" class="empty">Loading…</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- ============================================================ sidebar -->
+    <!-- ============================================================ side -->
     <div class="stack">
 
-      <!-- tax exposure -->
-      <div class="card card-tight">
+      <!-- what selling everything would net -->
+      <div class="card card-tight" data-reveal>
         <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
-          <h4 style="font-size:0.95rem">If you redeemed everything now</h4>
+          <h4 style="font-size:.95rem">If you sold everything now</h4>
         </div>
-        <div class="ledger-list" data-what-if>
-          <div class="ledger-row"><span class="l">Loading…</span></div>
+        <div class="ledger-list" data-whatif>
+          <div class="ledger-row"><span class="l muted">—</span></div>
         </div>
-        <a href="withdraw.html" class="btn btn-ghost btn-sm btn-block" style="margin-top:var(--sp-3)">
-          Open redeem screen
-        </a>
+        <div class="tiny muted" style="margin-top:var(--sp-3)">
+          The 30% plus cess is your own liability at filing, not something withheld
+          here. Only the exit fee, GST and 1% TDS come off the payout.
+        </div>
       </div>
 
-      <!-- allocation -->
-      <div class="card card-tight">
-        <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
-          <h4 style="font-size:0.95rem">What backs your units</h4>
-        </div>
-        <div data-allocation></div>
-      </div>
-
-      <!-- cost basis lots -->
-      <div class="card card-flush">
+      <!-- market -->
+      <div class="card card-flush" data-reveal>
         <div class="card-head" style="padding:var(--sp-4);margin:0">
-          <h4 style="font-size:0.95rem">Cost basis lots</h4>
-          <span class="badge">FIFO</span>
+          <h4 style="font-size:.95rem">Market</h4>
         </div>
-        <div class="table-wrap">
-          <table class="data">
-            <thead><tr><th>Acquired</th><th class="num">Units</th><th class="num">At</th></tr></thead>
-            <tbody data-lots><tr><td colspan="3" class="empty">—</td></tr></tbody>
-          </table>
+        <div data-watchlist><div class="empty"><span class="spinner"></span></div></div>
+      </div>
+
+      <!-- refer -->
+      <div class="card card-tight" data-reveal>
+        <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
+          <h4 style="font-size:.95rem">Refer and earn</h4>
+          <span class="badge metal" data-tier hidden></span>
         </div>
-        <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
-          Redemptions consume the oldest lot first. This is what determines the
-          cost of acquisition, and therefore the taxable gain, on every redemption.
+        <p class="small" style="margin-bottom:var(--sp-3)">
+          <span data-ref-pct>5%</span> of the first deposit anyone you refer makes,
+          credited straight to your rupee balance.
+        </p>
+        <div class="qr-vpa" style="justify-content:space-between">
+          <span class="mono" data-ref-code>—</span>
+          <button class="btn btn-sm btn-ghost" data-copy-ref>Copy link</button>
         </div>
+        <a href="referral.html" class="btn btn-ghost btn-sm btn-block arrow" style="margin-top:var(--sp-3)">
+          See your referrals
+        </a>
       </div>
 
     </div>

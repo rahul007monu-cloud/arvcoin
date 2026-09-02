@@ -5,34 +5,54 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Not found — ARV Coin</title>
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#05070d">
+<meta name="theme-color" content="#07070a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/core.css">
 <script src="arv-config.js"></script>
 </head>
 <body>
 
-<canvas id="helix-canvas" aria-hidden="true"></canvas>
 <div data-nav></div>
 
 <main class="page wrap" style="max-width:560px;padding-top:var(--sp-8);padding-bottom:var(--sp-8);text-align:center">
-  <div class="mono" style="font-size:4rem;font-weight:700;color:var(--tx-3);line-height:1">404</div>
-  <h1 style="font-size:1.5rem;margin-top:var(--sp-4)">That page does not exist</h1>
-  <p class="muted">
-    The link may be out of date. Your holdings and history are unaffected.
+
+  <div class="num" style="font-size:4.5rem;font-weight:600;color:var(--tx-3);line-height:1;letter-spacing:-.04em">404</div>
+
+  <h1 class="serif" style="font-size:1.6rem;margin-top:var(--sp-4)">That page does not exist</h1>
+
+  <p class="muted" style="max-width:44ch;margin:var(--sp-3) auto 0">
+    The link is probably out of date. Nothing has happened to your money — your
+    balance, your holdings and every ledger entry are exactly where they were.
   </p>
-  <div class="row" style="justify-content:center;flex-wrap:wrap;margin-top:var(--sp-5)">
+
+  <div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px;margin-top:var(--sp-5)">
     <a href="index.html" class="btn btn-primary">Overview</a>
-    <a href="charts.html" class="btn btn-ghost">Charts</a>
-    <a href="dashboard.html" class="btn btn-ghost">Portfolio</a>
+    <a href="trade.html" class="btn btn-ghost">Trade</a>
+    <a href="dashboard.html" class="btn btn-ghost">Wallet</a>
+    <a href="transactions.html" class="btn btn-ghost">History</a>
   </div>
+
+  <p class="tiny muted" style="margin-top:var(--sp-6)">
+    If you reached this from a link on this site, that is our mistake —
+    <a data-support-link href="#">tell us</a> and we will fix it.
+  </p>
+
 </main>
 
 <div data-footer></div>
 <script type="module">
   import * as ui from './js/ui.js';
-  ui.boot({ feed: false, ticker: false });
+
+  // No feed on a dead end: it would open a websocket to paint a ticker nobody
+  // came here to read.
+  ui.boot({ feed: false }).then(function () {
+    var email = globalThis.ARV_CONFIG.UI.supportEmail;
+    ui.els('[data-support-link]').forEach(function (a) {
+      a.href = 'mailto:' + email + '?subject=' + encodeURIComponent('Broken link: ' + location.pathname);
+    });
+  });
 </script>
 </body>
 </html>

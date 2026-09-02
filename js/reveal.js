@@ -67,9 +67,11 @@ function show(el, instant) {
   setTimeout(function () { el.classList.add('settled'); }, 1300 + delay * 1000);
 }
 
+var SELECTOR = '[data-reveal], .rule, .underline-draw';
+
 /** Reveal everything, no animation. The safety net and the reduced-motion path. */
 export function revealAll(root) {
-  (root || document).querySelectorAll('[data-reveal], .rule, .underline-draw')
+  (root || document).querySelectorAll(SELECTOR)
     .forEach(function (el) { el.classList.add('shown', 'settled'); });
 }
 
@@ -77,7 +79,7 @@ export function init() {
   if (started) return;
   started = true;
 
-  var targets = document.querySelectorAll('[data-reveal], .rule, .underline-draw');
+  var targets = document.querySelectorAll(SELECTOR);
   if (!targets.length) return;
 
   if (reduced || !('IntersectionObserver' in window)) {
@@ -94,10 +96,21 @@ export function init() {
       observer.unobserve(entry.target);
     });
   }, {
-    // A little before the element reaches the viewport, so movement has finished
-    // by the time it is properly in view rather than starting then.
-    rootMargin: '0px 0px -12% 0px',
-    threshold: 0.08
+    // A little *before* the element reaches the viewport, so the movement has
+    // finished by the time it is properly in view rather than starting then. That
+    // means growing the root downward, which is a positive bottom margin — a
+    // negative one shrinks the root and reveals later, the opposite of the intent.
+    //
+    // It also removes a hazard: an element sitting wholly inside an excluded
+    // bottom band, on a page already scrolled as far as it goes, can never enter a
+    // shrunk root and would stay at opacity 0 permanently. No current page ends
+    // that way — the footer is always below the last revealed block — but it would
+    // be a nasty thing to discover by adding one.
+    rootMargin: '0px 0px 8% 0px',
+    // Any intersection at all. A threshold is a *ratio of the element's own area*,
+    // so a zero-height container has a ratio that is always zero and would never
+    // qualify against any positive threshold.
+    threshold: 0
   });
 
   var vh = window.innerHeight;
@@ -114,6 +127,10 @@ export function init() {
 /**
  * Register content added after load — a table that has just been filled, a list
  * rendered from an API response.
+ *
+ * A page that paints rows with innerHTML replaces the nodes being watched, so the
+ * new ones have to be handed back. Pages that render their own content call this;
+ * see home.js and dashboard.js.
  */
 export function observe(root) {
   if (!observer) {

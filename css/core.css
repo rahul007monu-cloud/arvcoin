@@ -187,11 +187,46 @@ hr { border: 0; border-top: 1px solid var(--line); margin: var(--sp-5) 0; }
 .row-wrap { flex-wrap: wrap; }
 .spacer { flex: 1; }
 
+/* Tracks are minmax(0, 1fr), never a bare 1fr.
+   `1fr` is shorthand for `minmax(auto, 1fr)`, and that `auto` floor is the
+   min-content width of whatever is inside. One nowrap formula or one wide table
+   in a cell therefore inflates the whole track past its container and the page
+   scrolls sideways on a phone — with the overflow appearing on innocent siblings,
+   which makes it maddening to trace. The explicit 0 floor removes the whole
+   class of bug, and `min-width: 0` on the children does the same for flex and
+   grid items that scroll internally. */
 .grid { display: grid; gap: var(--sp-4); }
-.g-2 { grid-template-columns: repeat(2, 1fr); }
-.g-3 { grid-template-columns: repeat(3, 1fr); }
-.g-4 { grid-template-columns: repeat(4, 1fr); }
+.grid > * { min-width: 0; }
+.g-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.g-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .g-auto { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+
+/* Page-level splits: a wide main column and a narrower rail.
+   Declared here rather than as an inline style on each page, because an inline
+   `grid-template-columns` beats every media query — which is exactly how a phone
+   ends up scrolling sideways with no obvious cause. */
+.split {
+  display: grid; gap: var(--sp-4); align-items: start;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+}
+.split-hero {
+  display: grid; gap: var(--sp-7); align-items: center;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
+}
+.split > *, .split-hero > * { min-width: 0; }
+
+/* A row of figures that sizes to its content on a wide screen. */
+.stat-strip { display: grid; grid-template-columns: repeat(4, auto); gap: var(--sp-5); }
+.stat-strip > * { min-width: 0; }
+
+@media (max-width: 980px) {
+  .split, .split-hero { grid-template-columns: minmax(0, 1fr); }
+  .split-hero { align-items: start; gap: var(--sp-5); }
+}
+@media (max-width: 560px) {
+  .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
+}
 
 /* ------------------------------------------------------------------- nav --- */
 
@@ -241,6 +276,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: var(--sp-5) 0; }
   background: var(--k-2); border: 1px solid var(--line);
   font-size: .85rem;
 }
+/* An author `display` beats the UA stylesheet's rule for [hidden], so the ticker
+   would sit there showing two em-dashes until a price arrived. It stays out of
+   the layout until it has something to say. */
+.nav-ticker[hidden] { display: none; }
 .nav-ticker .k {
   font-size: .68rem; text-transform: uppercase; letter-spacing: .09em; color: var(--tx-3);
 }
@@ -543,7 +582,10 @@ input.num-input {
 
 /* ------------------------------------------------------------------ table -- */
 
-.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* `min-width: 0` is what actually makes this scroll instead of stretching its
+   parent. Without it the wrapper's min-content is the table's, and a nine-column
+   tax table drags the whole page wider than the phone. */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; min-width: 0; }
 table.data { width: 100%; border-collapse: collapse; font-size: .87rem; }
 table.data th {
   position: sticky; top: 0; z-index: 1;
@@ -819,6 +861,30 @@ table.data tfoot td {
 .progress { height: 4px; border-radius: 2px; background: var(--k-3); overflow: hidden; }
 .progress span { display: block; height: 100%; background: var(--brushed-dim); }
 
+/* ------------------------------------------------------------------ legal -- */
+
+/* Two columns on a desktop, one on a phone. The contents list stops being
+   sticky when it stacks — a sticky block above the content it indexes just eats
+   the screen. */
+.legal-layout {
+  display: grid; grid-template-columns: 200px minmax(0, 1fr);
+  gap: var(--sp-6); align-items: start;
+}
+.legal-layout > * { min-width: 0; }
+
+.toc { position: sticky; top: 80px; }
+.toc ul { list-style: none; margin: 0; padding: 0; line-height: 2; }
+.toc a { color: var(--tx-2); text-decoration: none; display: block;
+  padding-left: 9px; border-left: 1px solid transparent; transition: all .15s var(--ease); }
+.toc a:hover { color: var(--tx-0); }
+.toc a.on { color: var(--s-0); border-left-color: var(--s-2); }
+
+@media (max-width: 860px) {
+  .legal-layout { grid-template-columns: minmax(0, 1fr); gap: var(--sp-5); }
+  .toc { position: static; }
+  .toc ul { columns: 2; column-gap: var(--sp-4); line-height: 1.9; }
+}
+
 /* ----------------------------------------------------------------- footer -- */
 
 .foot {
@@ -867,7 +933,22 @@ table.data tfoot td {
   :root { --sp-5: 16px; --sp-6: 24px; --sp-7: 32px; --sp-8: 48px; --sp-9: 64px; }
   body { font-size: 14.5px; }
   .wrap { padding: 0 var(--sp-4); }
-  .g-2, .g-3, .g-4, .g-auto { grid-template-columns: 1fr; }
+  .g-2, .g-3, .g-4, .g-auto { grid-template-columns: minmax(0, 1fr); }
+  .wallet-split { grid-template-columns: minmax(0, 1fr); }
+  .wallet-split .divider { height: 1px; }
+  .identity { grid-template-columns: minmax(0, 1fr); text-align: center; }
+
+  /* Segmented controls hold more labels than a 390px screen has room for, so they
+     scroll rather than push the page sideways. */
+  .tabs, .side-toggle { max-width: 100%; overflow-x: auto; }
+  .tabs { scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  /* Flex items default to min-width: auto, which is min-content — so a row
+     holding a scrollable tab strip or a long label still refuses to shrink and
+     pushes past the screen edge. Same fix as the grid tracks, applied where the
+     layout is flex. */
+  .row > *, .row-between > *, .chart-bar > *, .card-head > * { min-width: 0; }
   .card { padding: var(--sp-4); border-radius: var(--r); }
   .stat-v { font-size: 1.3rem; }
   .stat-v-lg { font-size: 1.85rem; }
@@ -910,6 +991,23 @@ table.data tfoot td {
   body { background: #fff; color: #000; }
   .card { border: 1px solid #ccc; background: #fff; box-shadow: none; }
   * { color: #000 !important; }
+
+  /* Anything still waiting to be revealed would print as a blank block, so the
+     animation's starting state is overridden rather than relied upon. */
+  [data-reveal] { opacity: 1 !important; transform: none !important; filter: none !important; }
+
+  /* The tax statement is the page people actually print, and it is mostly
+     tables. Without borders and a repeated header a multi-page table is
+     unreadable on paper. */
+  table.data { border: 1px solid #999; }
+  table.data thead { display: table-header-group; }
+  table.data th, table.data td { border-bottom: 1px solid #ccc; background: #fff !important; }
+  table.data tr, .card, .ledger-row { break-inside: avoid; }
+  .ledger-row { border-bottom: 1px solid #eee; }
+  .badge, .chip { border: 1px solid #999 !important; background: #fff !important; }
+  .progress { border: 1px solid #999; }
+  .progress span { background: #999 !important; }
+  a[href^="http"]::after { content: " (" attr(href) ")"; font-size: .7em; }
 }
 
 

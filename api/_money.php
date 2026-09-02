@@ -433,6 +433,24 @@ function quote_sell(array $user, int $unitsU8, float $nav, int $costBasisPaise, 
 /* ============================================================= ledger ===== */
 
 /**
+ * A rupee amount for a ledger note.
+ *
+ * Fee, GST and TDS entries carry a delta of zero, because the charge is already
+ * inside the net figure on the buy or sell entry beside them — posting it again as
+ * its own movement would double-count it and break the rule that the ledger sums
+ * to the wallet.
+ *
+ * But an entry that says only "Entry fee 0.5%" leaves the holder to work out what
+ * they were actually charged, from a percentage of a number that is not on the
+ * row. So the amount goes in the note: it is a statement of fact rather than a
+ * movement, which is exactly what these rows are.
+ */
+function money_note(int $paise): string
+{
+    return '₹' . number_format($paise / 100, 2);
+}
+
+/**
  * Append a ledger entry.
  *
  * The ledger is the book of record; wallet rows are a cached balance that must

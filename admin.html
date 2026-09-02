@@ -4,28 +4,61 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Operations — ARV Coin</title>
-<meta name="theme-color" content="#05070d">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#07070a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/core.css">
 <script src="arv-config.js"></script>
 </head>
 <body>
 
-<canvas id="helix-canvas" aria-hidden="true"></canvas>
 <div data-nav></div>
 
 <main class="page wrap wrap-wide" style="padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
 
-  <h1 style="font-size:1.7rem">Operations</h1>
-  <p class="muted" style="max-width:70ch">
-    Treasury reconciliation, pending payments and configuration. Every action here
-    is re-authorised server-side against the operator flag — showing a button is
-    not what grants permission to press it.
-  </p>
+  <div class="row-between row-wrap" style="margin-bottom:var(--sp-4)">
+    <div>
+      <h1 class="serif" style="font-size:1.8rem;margin-bottom:2px">Operations</h1>
+      <div class="small muted">
+        Every action here is re-authorised on the server. Showing a button is not
+        what grants permission to press it.
+      </div>
+    </div>
+    <div class="row">
+      <span class="feed-status" data-feed-status><span class="live-dot off"></span>—</span>
+      <button class="btn btn-ghost btn-sm" data-refresh>Refresh</button>
+    </div>
+  </div>
+
+  <div data-warnings style="margin-bottom:var(--sp-4)"></div>
+
+  <!-- ============================================================== queues -->
+  <div class="grid g-4" style="margin-bottom:var(--sp-4)">
+    <div class="card card-tight"><div class="stat">
+      <span class="stat-k">Deposits waiting</span>
+      <span class="stat-v" data-q-deposits>—</span>
+      <span class="stat-sub"><span data-q-deposits-late>—</span> past the window</span>
+    </div></div>
+    <div class="card card-tight"><div class="stat">
+      <span class="stat-k">Withdrawals to send</span>
+      <span class="stat-v" data-q-withdrawals>—</span>
+      <span class="stat-sub"><span data-q-withdrawals-late>—</span> overdue</span>
+    </div></div>
+    <div class="card card-tight"><div class="stat">
+      <span class="stat-k">KYC to review</span>
+      <span class="stat-v" data-q-kyc>—</span>
+      <span class="stat-sub">24 hour target</span>
+    </div></div>
+    <div class="card card-tight"><div class="stat">
+      <span class="stat-k">ARV price</span>
+      <span class="stat-v" data-price>—</span>
+      <span class="stat-sub" data-price-age>—</span>
+    </div></div>
+  </div>
 
   <!-- ====================================================== reconciliation -->
-  <div class="card" style="margin:var(--sp-5) 0">
+  <section class="card" style="margin-bottom:var(--sp-4)">
     <div class="card-head">
       <div>
         <h3 style="font-size:1.05rem;margin:0">Treasury reconciliation</h3>
@@ -36,104 +69,140 @@
       <span class="badge warn">check daily</span>
     </div>
 
-    <div class="grid" style="grid-template-columns:1fr 1fr;gap:var(--sp-5);align-items:start">
+    <div class="grid g-2" style="gap:var(--sp-5);align-items:start">
       <div>
-        <div class="ledger-list" data-recon></div>
+        <div class="ledger-list" data-obligation></div>
       </div>
-
       <div>
         <div class="field" style="margin-bottom:var(--sp-4)">
-          <label for="actual-btc">Bitcoin actually held (BTC)</label>
-          <input id="actual-btc" class="num-input" type="text" inputmode="decimal"
+          <label for="held">Bitcoin actually held (BTC)</label>
+          <input id="held" class="num-input" type="text" inputmode="decimal"
                  placeholder="0.00000000" autocomplete="off">
           <span class="hint">
-            Read this off the exchange or wallet where the treasury sits, then
-            compare against the requirement on the left.
+            Read this off the exchange or wallet the treasury sits in.
           </span>
         </div>
-        <div class="ledger-list" data-recon-diff></div>
-        <p class="tiny muted" style="margin-top:var(--sp-3)">
-          This is the check that matters. Unit holders are owed the index return,
-          and the only thing that can deliver it is Bitcoin actually held in the
-          right quantity. A drift here compounds silently — every day it is not
-          checked, the shortfall is being funded by whoever redeems last.
-        </p>
+        <div class="ledger-list" data-diff></div>
+        <div class="ledger-list" data-ledger-check style="margin-top:var(--sp-3)"></div>
       </div>
     </div>
-  </div>
 
-  <div class="grid" style="grid-template-columns:1fr 1fr;gap:var(--sp-4);align-items:start">
+    <p class="tiny muted" style="margin:var(--sp-4) 0 0">
+      Under half a percent of the requirement is ordinary execution drift. More than
+      that needs correcting before the next redemption, because the shortfall is
+      paid for by whoever exits last — and it compounds quietly.
+    </p>
+  </section>
 
-    <!-- ======================================================= pending pays -->
-    <div class="card card-flush">
+  <div class="grid g-2" style="gap:var(--sp-4);align-items:start">
+
+    <!-- ========================================================= deposits -->
+    <section class="card card-flush">
       <div class="card-head" style="padding:var(--sp-4);margin:0">
-        <h3 style="font-size:1rem">Deposits awaiting payment</h3>
-        <span class="badge" data-pending-count>0</span>
+        <h3 style="font-size:1rem">Deposits awaiting confirmation</h3>
       </div>
       <div class="table-wrap">
         <table class="data">
           <thead><tr>
-            <th>Reference</th><th>Created</th><th class="num">Amount</th><th></th>
+            <th>Who</th><th class="num">Amount</th><th>UTR</th><th>Waiting</th><th></th>
           </tr></thead>
-          <tbody data-pending>
-            <tr><td colspan="4" class="empty">Loading…</td></tr>
-          </tbody>
+          <tbody data-deposits><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
         </table>
       </div>
       <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
-        A UPI QR returns no confirmation, so these stay open until the bank credit
-        is matched. Units are issued at the price at the moment of confirmation.
+        Match the UTR against the bank statement before confirming. Units are issued
+        at the price at the moment of confirmation, not when the QR was shown.
       </div>
-    </div>
+    </section>
 
-    <!-- ============================================================ payouts -->
-    <div class="card card-flush">
+    <!-- ====================================================== withdrawals -->
+    <section class="card card-flush">
       <div class="card-head" style="padding:var(--sp-4);margin:0">
-        <h3 style="font-size:1rem">Payouts to send</h3>
-        <span class="badge" data-payout-count>0</span>
+        <h3 style="font-size:1rem">Withdrawals to pay</h3>
       </div>
       <div class="table-wrap">
         <table class="data">
           <thead><tr>
-            <th>Reference</th><th>UPI ID</th><th class="num">Amount</th><th></th>
+            <th>Who</th><th class="num">Amount</th><th>UPI ID</th><th>Waiting</th><th></th>
           </tr></thead>
-          <tbody data-payouts>
-            <tr><td colspan="4" class="empty">Loading…</td></tr>
-          </tbody>
+          <tbody data-withdrawals><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
         </table>
       </div>
       <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
-        Amounts are net of exit fee, GST and TDS. The 30% plus cess is not
-        withheld here — it is the holder's own liability.
+        Amounts are already net of exit fee, GST and TDS. Send the UPI payment, then
+        mark it paid with the UTR so it is traceable.
       </div>
-    </div>
+    </section>
 
   </div>
 
-  <!-- ============================================================== config -->
-  <div class="card" style="margin-top:var(--sp-4)">
-    <div class="card-head">
-      <h3 style="font-size:1rem">Configuration in force</h3>
-      <span class="badge info" data-mode-badge>—</span>
+  <!-- =================================================================== KYC -->
+  <section class="card card-flush" style="margin-top:var(--sp-4)">
+    <div class="card-head" style="padding:var(--sp-4);margin:0">
+      <h3 style="font-size:1rem">KYC to review</h3>
     </div>
-    <div class="grid g-3" data-config></div>
-    <div data-warnings style="margin-top:var(--sp-4)"></div>
-  </div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>Who</th><th>Name</th><th>PAN</th><th>DOB</th>
+          <th>Address</th><th>Waiting</th><th></th>
+        </tr></thead>
+        <tbody data-kyc><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
 
-  <!-- =============================================================== tax owed -->
-  <div class="card" style="margin-top:var(--sp-4)">
+  <!-- ================================================================= money -->
+  <section class="card" style="margin-top:var(--sp-4)">
     <div class="card-head">
-      <h3 style="font-size:1rem">Withheld on behalf of holders</h3>
-      <span class="badge warn">must be deposited</span>
+      <h3 style="font-size:1rem">Money held on behalf of others</h3>
+      <span class="badge warn">liabilities, not revenue</span>
     </div>
-    <div class="grid g-3" data-tax-owed></div>
+    <div class="grid g-4" data-money></div>
     <div class="note-box warn" style="margin-top:var(--sp-4)">
-      TDS collected under section 194S is not platform revenue. It is money
-      withheld from holders that has to be deposited with the department and
-      reported, so that it appears in each holder's Form 26AS. GST collected on
-      fees is likewise a liability, not income.
+      TDS collected under section 194S is not income. It is holders' money that must
+      be deposited with the department and reported so it appears in each holder's
+      Form 26AS. GST on fees is likewise a liability. Only the platform fee line is
+      actual revenue.
     </div>
-  </div>
+  </section>
+
+  <!-- ============================================================== history -->
+  <section class="card" style="margin-top:var(--sp-4)">
+    <div class="card-head">
+      <h3 style="font-size:1rem">Price history</h3>
+    </div>
+    <div class="table-wrap" style="margin-bottom:var(--sp-4)">
+      <table class="data">
+        <thead><tr><th>Timeframe</th><th class="num">Candles</th><th>From</th><th>To</th></tr></thead>
+        <tbody data-coverage><tr><td colspan="4" class="empty">—</td></tr></tbody>
+      </table>
+    </div>
+    <div class="row row-wrap">
+      <button class="btn btn-sm" data-backfill="1D">Backfill daily (5 years)</button>
+      <button class="btn btn-sm" data-backfill="1h">Backfill hourly (90 days)</button>
+      <button class="btn btn-sm" data-backfill="1m">Backfill minute (7 days)</button>
+    </div>
+    <p class="tiny muted" style="margin:var(--sp-3) 0 0">
+      Run these once after setup. Each paces its own requests to avoid being
+      rate-limited, so the daily one takes a couple of minutes.
+    </p>
+  </section>
+
+  <!-- ============================================================= settings -->
+  <section class="card" style="margin-top:var(--sp-4)">
+    <div class="card-head">
+      <h3 style="font-size:1rem">Settings</h3>
+      <span class="badge">server-side source of truth</span>
+    </div>
+    <div class="grid g-3" data-settings></div>
+    <p class="tiny muted" style="margin:var(--sp-4) 0 0">
+      These decide money — the front-end config is only a copy for quoting. Loss
+      set-off and fee deductibility are deliberately not editable: the law does not
+      permit either, and a toggle for them would produce a wrong tax statement for
+      every user.
+    </p>
+  </section>
 
 </main>
 

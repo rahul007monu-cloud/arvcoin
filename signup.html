@@ -3,62 +3,135 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Create an account — ARV Coin</title>
-<meta name="theme-color" content="#05070d">
+<title>Open an account — ARV Coin</title>
+<meta name="theme-color" content="#07070a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/core.css">
 <script src="arv-config.js"></script>
 </head>
 <body>
 
-<canvas id="helix-canvas" aria-hidden="true"></canvas>
 <div data-nav></div>
 
-<main class="page wrap" style="max-width:440px;padding-top:var(--sp-7);padding-bottom:var(--sp-8)">
-  <div class="card">
-    <h1 style="font-size:1.5rem;margin-bottom:var(--sp-2)">Create an account</h1>
-    <p class="small muted" style="margin-bottom:var(--sp-5)">
-      Start from ₹100. Pay by UPI.
-    </p>
+<main class="page">
+  <section class="hero" style="padding:var(--sp-7) 0">
+    <div class="hero-media" data-hero-media></div>
 
-    <form data-form class="stack">
-      <div class="field">
-        <label for="name">Full name</label>
-        <input id="name" type="text" autocomplete="name">
-        <span class="hint">As it appears on your PAN, for the tax statement</span>
+    <div class="wrap hero-inner" style="max-width:480px">
+      <div class="card" data-reveal>
+
+        <div style="text-align:center;margin-bottom:var(--sp-5)">
+          <h1 class="serif" style="font-size:1.9rem;margin-bottom:6px">Open an account</h1>
+          <p class="small muted" style="margin:0">
+            Start from ₹100. Pay by UPI.
+          </p>
+        </div>
+
+        <!-- referral, shown only when a code came in on the link -->
+        <div class="note-box ok hidden" style="margin-bottom:var(--sp-4)" data-ref-note>
+          Referred by <strong data-ref-code></strong>. They earn
+          <strong data-ref-pct>5%</strong> of your first deposit — it costs you nothing.
+        </div>
+
+        <!-- ================================================ step 1: details -->
+        <form data-form class="stack" data-panel="credentials">
+          <div class="field">
+            <label for="name">Full name</label>
+            <input id="name" name="fullName" type="text" autocomplete="name" required>
+            <span class="hint">As it appears on your PAN — the tax statement uses it.</span>
+          </div>
+
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="email"
+                   inputmode="email" required>
+            <span class="hint">We send a code here to confirm it is yours.</span>
+          </div>
+
+          <div class="field">
+            <label for="pw">Password</label>
+            <input id="pw" name="password" type="password" autocomplete="new-password"
+                   minlength="8" required>
+            <span class="hint">At least 8 characters.</span>
+          </div>
+
+          <div class="field hidden" data-ref-field>
+            <label for="ref">Referral code</label>
+            <input id="ref" name="referralCode" type="text" maxlength="16"
+                   style="text-transform:uppercase" autocomplete="off">
+          </div>
+
+          <label class="check">
+            <input type="checkbox" data-accept required>
+            <span>
+              I have read the
+              <a href="legal.html#risk" target="_blank" rel="noopener">risk disclosure</a>
+              and <a href="legal.html#terms" target="_blank" rel="noopener">terms</a>.
+              I understand ARV tracks Bitcoin, that its value can fall as well as
+              rise, and that I may get back less than I put in.
+            </span>
+          </label>
+
+          <button type="submit" class="btn btn-primary btn-block btn-lg">Create account</button>
+        </form>
+
+        <!-- ==================================================== step 2: OTP -->
+        <div data-panel="otp" class="hidden">
+          <div class="note-box" style="margin-bottom:var(--sp-4)">
+            We emailed a 6-digit code to <strong data-otp-email>your address</strong>.
+            It expires in 10 minutes.
+          </div>
+
+          <form data-otp-form class="stack">
+            <div class="field">
+              <label for="code">Verification code</label>
+              <input id="code" class="otp-input" type="text" inputmode="numeric"
+                     autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}"
+                     placeholder="000000" required>
+              <span class="err hidden" data-otp-err></span>
+            </div>
+            <label class="check">
+              <input type="checkbox" data-trust checked>
+              <span>Remember this device for 30 days.</span>
+            </label>
+            <button type="submit" class="btn btn-primary btn-block btn-lg">Verify and continue</button>
+          </form>
+
+          <div class="row" style="justify-content:space-between;margin-top:var(--sp-4)">
+            <button class="btn btn-ghost btn-sm" data-resend>Send a new code</button>
+            <button class="btn btn-ghost btn-sm" data-back>Change email</button>
+          </div>
+        </div>
+
+        <div class="rule" style="margin:var(--sp-5) 0"></div>
+
+        <p class="small muted center" style="margin:0">
+          Already registered? <a href="login.html">Sign in</a>
+        </p>
+
+        <div class="note-box warn hidden" style="margin-top:var(--sp-4)" data-not-installed>
+          <strong>Not set up yet.</strong> This site has no database configured.
+          Open <code>install.php</code> to finish setup.
+        </div>
       </div>
-      <div class="field">
-        <label for="email">Email</label>
-        <input id="email" type="email" autocomplete="email" required>
+
+      <!-- What happens next, so the KYC step is not a surprise -->
+      <div class="card card-tight" data-reveal style="--reveal-delay:150ms;margin-top:var(--sp-4)">
+        <h5 style="margin-bottom:var(--sp-3)">What comes next</h5>
+        <div class="steps" style="margin:0">
+          <div class="step on"><span class="n">01</span><span class="t">Confirm email</span></div>
+          <div class="step"><span class="n">02</span><span class="t">KYC with PAN</span></div>
+          <div class="step"><span class="n">03</span><span class="t">Deposit by UPI</span></div>
+          <div class="step"><span class="n">04</span><span class="t">Buy ARV</span></div>
+        </div>
+        <p class="tiny muted" style="margin:var(--sp-3) 0 0">
+          KYC needs your PAN because it decides the TDS rate on every sale. We do
+          not store your Aadhaar number.
+        </p>
       </div>
-      <div class="field">
-        <label for="pw">Password</label>
-        <input id="pw" type="password" autocomplete="new-password" minlength="8" required>
-        <span class="hint">At least 8 characters</span>
-      </div>
-
-      <label class="check">
-        <input type="checkbox" required>
-        <span>
-          I have read the <a href="legal.html#risk" target="_blank" rel="noopener">risk
-          disclosure</a> and <a href="legal.html#terms" target="_blank" rel="noopener">terms</a>,
-          and I understand that ARV tracks Bitcoin and can fall in value.
-        </span>
-      </label>
-
-      <button type="submit" class="btn btn-primary btn-block btn-lg">Create account</button>
-    </form>
-
-    <p class="small muted center" style="margin:var(--sp-5) 0 0">
-      Already registered? <a href="login.html">Sign in</a>
-    </p>
-
-    <div class="note-box" style="margin-top:var(--sp-4)" data-local-note hidden>
-      <strong>Running without a backend.</strong> Supabase is not configured, so
-      this account and its holdings will live in this browser only.
     </div>
-  </div>
+  </section>
 </main>
 
 <div data-footer></div>
