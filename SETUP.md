@@ -64,7 +64,19 @@ says so and asks you to delete it by hand; it does not pretend.
 hPanel → **Advanced → Cron Jobs**. Every minute:
 
 ```
-curl -s https://yourdomain.com/api/cron.php?job=all
+curl -s https://yourdomain.com/api/cron.php
+```
+
+No query string, deliberately. hPanel rejects a cron command containing characters
+like `?` and `=` with "some characters are not allowed", and `job` defaults to `all`
+anyway — so `cron.php?job=all` and `cron.php` do exactly the same thing, and only one
+of them can be pasted into the form.
+
+If your host prefers a PHP-type cron over a URL, this also works and skips HTTP
+entirely:
+
+```
+php /home/uXXXXXXXX/public_html/api/cron.php
 ```
 
 This ingests the price, appends candles, builds the chart on its first few runs,
