@@ -274,6 +274,14 @@ export function watchlist() {
   return request('market', 'watchlist', { method: 'GET' });
 }
 
+/* --------------------------------------------------------------- assistant -- */
+
+// Support assistant. Answers ARV questions from a built-in knowledge base (works
+// with no key) or Gemini when the operator has configured one. Read-only.
+export function assistant(question, history) {
+  return request('assistant', 'ask', { data: { question: question, history: history || [] } });
+}
+
 export function marketStats() {
   return request('market', 'stats', { method: 'GET' });
 }
