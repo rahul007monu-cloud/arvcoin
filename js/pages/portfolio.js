@@ -144,7 +144,7 @@ async function paintWhatIf() {
     var r = await api.quoteSell(parseFloat(w.arvUnits) || units);
     var q = r.quote;
 
-    ui.setText('[data-exit-net]', ui.fmtPaise(q.balanceTaxPaise));
+    ui.setText('[data-exit-net]', ui.fmtPaise(q.netPayoutPaise));
 
     if (!host) return;
 
@@ -156,18 +156,8 @@ async function paintWhatIf() {
       ['Credited to rupees', q.netPayoutPaise, 'net'],
       [null],
       ['Cost of acquisition', q.costBasisPaise, 'info'],
-      [q.pnlPaise >= 0 ? 'Realised gain' : 'Realised loss', q.pnlPaise, 'pnl'],
-      ['Tax at ' + q.effectiveTaxPct.toFixed(1) + '%', q.totalTaxPaise, 'liability',
-       'Not withheld \u2014 payable by you when you file'],
-      ['Balance at filing', q.balanceTaxPaise, 'liability-total']
+      [q.pnlPaise >= 0 ? 'Realised gain' : 'Realised loss', q.pnlPaise, 'pnl']
     ]);
-
-    if (q.lossNotSetOff) {
-      host.insertAdjacentHTML('beforeend',
-        '<div class="ledger-row k-warning"><span class="note">This loss could not be set '
-        + 'off against other gains or carried forward \u2014 section 115BBH permits neither.'
-        + '</span></div>');
-    }
   } catch (e) {
     ui.setText('[data-exit-net]', '\u2014');
     if (host) {

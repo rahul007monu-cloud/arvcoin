@@ -618,17 +618,7 @@ function sellRows(q) {
     + row('Credited to rupees', q.netPayoutPaise, 'net')
     + '<div class="ledger-divider"></div>'
     + row('Cost of acquisition (FIFO)', q.costBasisPaise, 'info')
-    + row(q.pnlPaise >= 0 ? 'Realised gain' : 'Realised loss', q.pnlPaise, 'pnl')
-    + row('Tax at ' + q.effectiveTaxPct.toFixed(1) + '%', q.totalTaxPaise, 'liability',
-          'Not withheld \u2014 payable by you when you file')
-    + row('Less TDS already withheld', -q.tdsPaise, 'liability')
-    + row('Balance at filing', q.balanceTaxPaise, 'liability-total');
-
-  if (q.lossNotSetOff) {
-    s += '<div class="ledger-row k-warning"><span class="note">This loss cannot be set off '
-       + 'against other gains or carried forward \u2014 section 115BBH permits neither.'
-       + '</span></div>';
-  }
+    + row(q.pnlPaise >= 0 ? 'Realised gain' : 'Realised loss', q.pnlPaise, 'pnl');
   return s;
 }
 
