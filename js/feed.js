@@ -202,7 +202,7 @@ var ADAPTERS = {
   kraken: {
     label: 'Kraken',
     hasSocket: true,
-    wsSymbols: { XBTUSD: 'BTC/USD', ETHUSD: 'ETH/USD', SOLUSD: 'SOL/USD' },
+    wsSymbols: { XBTUSD: 'BTC/USD', ETHUSD: 'ETH/USD', SOLUSD: 'SOL/USD', XRPUSD: 'XRP/USD' },
     async probe(signal) {
       var j = await getJson('https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=1', signal);
       if (!j || (j.error && j.error.length) || !j.result) throw new Error('bad payload');

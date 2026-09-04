@@ -20,10 +20,11 @@ require __DIR__ . '/_feed.php';
 $action = $_GET['action'] ?? 'snapshot';
 
 switch ($action) {
-    case 'snapshot':  handle_snapshot();  break;
-    case 'candles':   handle_candles();   break;
-    case 'watchlist': handle_watchlist(); break;
-    case 'stats':     handle_stats();     break;
+    case 'snapshot':      handle_snapshot();      break;
+    case 'candles':       handle_candles();       break;
+    case 'asset_candles': handle_asset_candles(); break;
+    case 'watchlist':     handle_watchlist();     break;
+    case 'stats':         handle_stats();         break;
     default:
         json_fail(400, 'Unknown action.');
 }
@@ -192,6 +193,74 @@ function handle_candles(): void
     ]);
 }
 
+/* ====================================================== asset candles ===== */
+
+/**
+ * Per-asset candles, in USD, from asset_candles.
+ *
+ * The dollar twin of handle_candles(): same request shape and same response
+ * shape, but keyed by an asset (BTC, ETH, SOL, XRP) and quoted in dollars exactly
+ * as the exchange reported it. asset_candles carries no fx_rate — these assets
+ * are display-only, weight 0, and never converted to rupees or fed into the
+ * index. It powers the clickable coin charts on the trade screen.
+ *
+ * The key is allowlisted so this can never be turned into an arbitrary read of
+ * whatever asset_key a caller invents.
+ */
+function handle_asset_candles(): void
+{
+    require_method('GET');
+
+    $key   = strtoupper((string)($_GET['key'] ?? ''));
+    $tf    = (string)($_GET['tf'] ?? '1m');
+    $days  = isset($_GET['days']) && $_GET['days'] !== '' ? (int)$_GET['days'] : null;
+    $limit = max(10, min(3000, (int)($_GET['limit'] ?? 2600)));
+
+    if (!in_array($key, ['BTC', 'ETH', 'SOL', 'XRP'], true)) {
+        json_fail(422, 'Unknown asset.');
+    }
+    if (!in_array($tf, ['1m', '5m', '15m', '1h', '4h', '1D', '1W'], true)) {
+        json_fail(422, 'Unknown timeframe.');
+    }
+
+    // Coins have no launch anchor of their own, so the window is simply the
+    // requested lookback; without one, everything stored.
+    $from = $days !== null ? max(0, time() - $days * 86400) : 0;
+
+    $rows = q(
+        'SELECT UNIX_TIMESTAMP(ts) AS t, open, high, low, close, volume
+           FROM asset_candles
+          WHERE asset_key = ? AND tf = ? AND ts >= FROM_UNIXTIME(?)
+          ORDER BY ts ASC
+          LIMIT ?',
+        [$key, $tf, $from, $limit]
+    )->fetchAll();
+
+    if (!$rows) {
+        json_ok([
+            'key' => $key, 'tf' => $tf, 'candles' => [], 'count' => 0,
+            'hint' => 'No candles stored for ' . $key . ' at this timeframe yet. An operator '
+                    . 'needs to run the history backfill from the Operations page.',
+        ]);
+    }
+
+    json_ok([
+        'key'     => $key,
+        'tf'      => $tf,
+        'count'   => count($rows),
+        'from'    => gmdate('c', (int)$rows[0]['t']),
+        'to'      => gmdate('c', (int)$rows[count($rows) - 1]['t']),
+        'candles' => array_map(static fn($r) => [
+            't' => (int)$r['t'] * 1000,
+            'o' => (float)$r['open'],
+            'h' => (float)$r['high'],
+            'l' => (float)$r['low'],
+            'c' => (float)$r['close'],
+            'v' => (float)$r['volume'],
+        ], $rows),
+    ]);
+}
+
 /* ========================================================== watchlist ===== */
 
 function handle_watchlist(): void
@@ -199,7 +268,7 @@ function handle_watchlist(): void
     require_method('GET');
 
     $out = [];
-    foreach (['BTC' => 'Bitcoin', 'ETH' => 'Ethereum', 'SOL' => 'Solana'] as $key => $name) {
+    foreach (['BTC' => 'Bitcoin', 'ETH' => 'Ethereum', 'SOL' => 'Solana', 'XRP' => 'XRP'] as $key => $name) {
         $last = q1('SELECT close, UNIX_TIMESTAMP(ts) AS t FROM asset_candles
                      WHERE asset_key = ? AND tf = "1m" ORDER BY ts DESC LIMIT 1', [$key]);
         $open = qval('SELECT open FROM asset_candles

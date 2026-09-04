@@ -17,11 +17,23 @@ import { TF_MINUTES } from '../feed.js';
 
 var CFG = globalThis.ARV_CONFIG;
 
+// The assets the chart can show. 'ARV' is the index itself (INR, from
+// arv_candles); the rest are the tracked coins (USD, from asset_candles) and are
+// display-only — selecting one never touches the order form or the money path.
+var CHART_ASSETS = [
+  { key: 'ARV', label: 'ARV' },
+  { key: 'BTC', label: 'BTC' },
+  { key: 'ETH', label: 'ETH' },
+  { key: 'SOL', label: 'SOL' },
+  { key: 'XRP', label: 'XRP' }
+];
+
 var st = {
   user: null,
   snap: null,
   side: 'buy',
   otype: 'market',
+  asset: 'ARV',
   tf: CFG.CHARTS.defaultTimeframe,
   ctype: 'candles',
   chart: null,
@@ -78,13 +90,58 @@ function paintOhlc(k) {
   if (!host || !k) return;
   var up = k.c >= k.o;
   host.innerHTML =
-    '<span>O <b>' + ui.fmtPrice(k.o) + '</b></span>'
-    + '<span>H <b>' + ui.fmtPrice(k.h) + '</b></span>'
-    + '<span>L <b>' + ui.fmtPrice(k.l) + '</b></span>'
-    + '<span>C <b class="' + (up ? 'up' : 'down') + '">' + ui.fmtPrice(k.c) + '</b></span>';
+    '<span>O <b>' + fmtAssetPrice(k.o) + '</b></span>'
+    + '<span>H <b>' + fmtAssetPrice(k.h) + '</b></span>'
+    + '<span>L <b>' + fmtAssetPrice(k.l) + '</b></span>'
+    + '<span>C <b class="' + (up ? 'up' : 'down') + '">' + fmtAssetPrice(k.c) + '</b></span>';
 }
 
 /* ------------------------------------------------------------------- chart -- */
+
+/** True when the chart is showing a tracked coin (USD) rather than the ARV index (INR). */
+function isCoinAsset() {
+  return st.asset !== 'ARV';
+}
+
+/** Decimals for the current asset's axis: ARV rupees vs USD coin prices. */
+function assetPriceDecimals() {
+  return isCoinAsset() ? 2 : CFG.INDEX.priceDecimals;
+}
+
+/** Format a price for the OHLC readout: rupees for ARV, dollars for a coin. */
+function fmtAssetPrice(v) {
+  if (v == null || !isFinite(v)) return '\u2014';
+  if (isCoinAsset()) return '$' + Number(v).toLocaleString(CFG.UI.locale, {
+    minimumFractionDigits: 2, maximumFractionDigits: assetPriceDecimals()
+  });
+  return ui.fmtPrice(v);
+}
+
+function buildAssetTabs() {
+  var host = ui.el('[data-asset-tabs]');
+  if (!host) return;
+  host.innerHTML = CHART_ASSETS.map(function (a) {
+    return '<button class="tab' + (a.key === st.asset ? ' on' : '') + '" data-asset="'
+      + a.key + '">' + a.label + '</button>';
+  }).join('');
+
+  ui.els('[data-asset-tabs] .tab').forEach(function (b) {
+    b.addEventListener('click', function () {
+      if (b.dataset.asset === st.asset) return;
+      ui.els('[data-asset-tabs] .tab').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      st.asset = b.dataset.asset;
+      // Tear the live tick subscription down before the series is discarded, so
+      // an in-flight tick never writes to a dead chart.
+      if (st.unsubTick) { try { st.unsubTick(); } catch (_) {} st.unsubTick = null; }
+      st.chart = null;
+      st.series = null;
+      st.liveBar = null;
+      ui.el('[data-chart]').innerHTML = '';
+      loadChart();
+    });
+  });
+}
 
 function buildTfTabs() {
   var host = ui.el('[data-tf-tabs]');
@@ -129,11 +186,15 @@ async function loadChart() {
   if (!host || !globalThis.LightweightCharts) return;
 
   try {
-    var r = await api.candles(st.tf, daysFor(st.tf), CFG.CHARTS.maxCandles);
+    var coin = isCoinAsset();
+    var r = coin
+      ? await api.assetCandles(st.asset, st.tf, daysFor(st.tf), CFG.CHARTS.maxCandles)
+      : await api.candles(st.tf, daysFor(st.tf), CFG.CHARTS.maxCandles);
     st.candles = r.candles || [];
 
+    var label = coin ? st.asset + ' \u00b7 USD \u00b7 ' : '';
     ui.setText('[data-candle-count]', st.candles.length
-      ? st.candles.length + ' candles \u00b7 ' + ui.fmtDate(st.candles[0].t) + ' to now'
+      ? label + st.candles.length + ' candles \u00b7 ' + ui.fmtDate(st.candles[0].t) + ' to now'
       : (r.hint || 'no candles for this timeframe'));
 
     if (!st.candles.length) return;
@@ -159,16 +220,19 @@ async function loadChart() {
                                labelBackgroundColor: '#24242e' } },
       localization: {
         locale: CFG.UI.locale,
-        priceFormatter: function (p) { return p.toFixed(CFG.INDEX.priceDecimals); }
+        priceFormatter: function (p) { return p.toFixed(assetPriceDecimals()); }
       }
     });
+
+    var dp = assetPriceDecimals();
+    var minMove = coin ? 0.01 : 0.0001;
 
     if (st.ctype === 'candles') {
       st.series = st.chart.addCandlestickSeries({
         upColor: '#3ecf8e', downColor: '#f0616d',
         borderVisible: false,
         wickUpColor: '#3ecf8e', wickDownColor: '#f0616d',
-        priceFormat: { type: 'price', precision: CFG.INDEX.priceDecimals, minMove: 0.0001 }
+        priceFormat: { type: 'price', precision: dp, minMove: minMove }
       });
       st.series.setData(st.candles.map(function (k) {
         return { time: Math.floor(k.t / 1000), open: k.o, high: k.h, low: k.l, close: k.c };
@@ -193,30 +257,34 @@ async function loadChart() {
         topColor: 'rgba(223,226,233,.18)',
         bottomColor: 'rgba(223,226,233,.01)',
         lineWidth: 2,
-        priceFormat: { type: 'price', precision: CFG.INDEX.priceDecimals, minMove: 0.0001 }
+        priceFormat: { type: 'price', precision: dp, minMove: minMove }
       });
       st.series.setData(st.candles.map(function (k) {
         return { time: Math.floor(k.t / 1000), value: k.c };
       }));
     }
 
-    // The launch level, so the whole series reads against ₹1.
-    st.series.createPriceLine({
-      price: CFG.INDEX.arvBaseInr,
-      color: 'rgba(185,190,201,.3)',
-      lineStyle: L.LineStyle.Dashed, lineWidth: 1,
-      axisLabelVisible: true, title: '\u20b91'
-    });
-
-    // The user's own cost, when they hold something.
-    var w = st.user && st.user.wallet;
-    if (w && w.avgCostNav > 0) {
+    // The launch level and the user's cost only make sense for ARV — a coin chart
+    // is a plain USD price with no index anchor and nothing the user holds.
+    if (!coin) {
+      // The launch level, so the whole series reads against ₹1.
       st.series.createPriceLine({
-        price: w.avgCostNav,
-        color: 'rgba(224,176,85,.75)',
+        price: CFG.INDEX.arvBaseInr,
+        color: 'rgba(185,190,201,.3)',
         lineStyle: L.LineStyle.Dashed, lineWidth: 1,
-        axisLabelVisible: true, title: 'your cost'
+        axisLabelVisible: true, title: '\u20b91'
       });
+
+      // The user's own cost, when they hold something.
+      var w = st.user && st.user.wallet;
+      if (w && w.avgCostNav > 0) {
+        st.series.createPriceLine({
+          price: w.avgCostNav,
+          color: 'rgba(224,176,85,.75)',
+          lineStyle: L.LineStyle.Dashed, lineWidth: 1,
+          axisLabelVisible: true, title: 'your cost'
+        });
+      }
     }
 
     st.chart.subscribeCrosshairMove(function (param) {
@@ -286,6 +354,23 @@ function liveArvPrice() {
 }
 
 /**
+ * The live price for whatever asset the chart is showing.
+ *
+ * ARV is the BTC->INR index (liveArvPrice); a coin is its raw USD last trade
+ * straight from the feed — the same feed, the same tick, no conversion, because
+ * the coin chart is quoted in dollars. feed.priceUsd(key) works for every
+ * selected asset because handleTrade() sets state.prices for ALL assets, and XRP
+ * now streams too since it is in the WATCHLIST.
+ */
+function livePrice() {
+  if (isCoinAsset()) {
+    var p = feed.priceUsd(st.asset);
+    return (p != null && isFinite(p) && p > 0) ? p : null;
+  }
+  return liveArvPrice();
+}
+
+/**
  * Grow the chart tick by tick.
  *
  * Only ever the last bar is touched: a tick in the current tf bucket mutates its
@@ -297,7 +382,7 @@ function liveArvPrice() {
  */
 function onLiveTick() {
   if (!st.series || !st.chart) return;
-  var price = liveArvPrice();
+  var price = livePrice();
   if (price == null) return;
 
   var secs = tfSeconds();
@@ -692,6 +777,7 @@ function sideConfigLight() {
 
 (async function () {
   ui.setText('[data-fallback]', String(CFG.MARKET.sellFallbackMinutes));
+  buildAssetTabs();
   buildTfTabs();
 
   await ui.boot({ feed: false });
@@ -762,7 +848,9 @@ function sideConfigLight() {
 async function resyncLiveBar() {
   if (!st.series) return;
   try {
-    var r = await api.candles(st.tf, daysFor(st.tf), 2);
+    var r = isCoinAsset()
+      ? await api.assetCandles(st.asset, st.tf, daysFor(st.tf), 2)
+      : await api.candles(st.tf, daysFor(st.tf), 2);
     var rows = r.candles || [];
     var last = rows[rows.length - 1];
     if (!last) return;

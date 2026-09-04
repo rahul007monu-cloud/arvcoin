@@ -57,6 +57,13 @@
         binance: 'SOLUSDT', okx: 'SOL-USDT', coinbase: 'SOL-USD',
         kraken: 'SOLUSD', coingecko: 'solana'
       }
+    },
+    {
+      key: 'XRP', name: 'XRP', colour: '#7f8593',
+      symbols: {
+        binance: 'XRPUSDT', okx: 'XRP-USDT', coinbase: 'XRP-USD',
+        kraken: 'XRPUSD', coingecko: 'ripple'
+      }
     }
   ];
 
