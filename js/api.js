@@ -258,9 +258,10 @@ export function candles(tf, days, limit) {
 /**
  * Per-asset candles, in USD.
  *
- * The dollar twin of candles(): the ARV chart uses candles() (arv_candles, INR),
- * a clickable coin uses this (asset_candles, USD). `key` is one of BTC, ETH, SOL,
- * XRP — the server allowlists it.
+ * The dollar twin of candles(): the ARV chart uses candles() (INR — the server
+ * derives it from BTC's asset_candles, scaled by the index formula), a clickable
+ * coin uses this (asset_candles, USD). `key` is one of BTC, ETH, SOL, XRP — the
+ * server allowlists it.
  */
 export function assetCandles(key, tf, days, limit) {
   return request('market', 'asset_candles', {

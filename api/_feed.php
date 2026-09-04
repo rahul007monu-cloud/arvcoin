@@ -32,17 +32,26 @@ require_once __DIR__ . '/_schema.php';
  * The zero-weight watchlist assets, stored in asset_candles for the dashboard
  * and the per-asset charts but never entering the index or the money path.
  *
- * BTC is deliberately absent: it is ingested and backfilled by its own dedicated
- * path (it is the one weighted basket asset, and the ARV index is computed from
- * it), so it is already written to asset_candles separately. This mirrors the
- * client's ARV_CONFIG.WATCHLIST (ETH, SOL, XRP) — display-only, weight 0.
+ * BTC is absent from the WATCHLIST because it is the one weighted basket asset
+ * (the ARV index is computed from it), not a display-only zero-weight coin. It
+ * still has a full asset_candles series of its own — see asset_keys(): ingest
+ * writes its 1m rows, and backfill_asset_tf()/rollup_assets() maintain its higher
+ * timeframes exactly like the watchlist coins, because the ARV chart is now
+ * DERIVED from BTC's asset_candles (market.php handle_candles()). This list
+ * mirrors the client's ARV_CONFIG.WATCHLIST (ETH, SOL, XRP) — display-only,
+ * weight 0.
  */
 function watchlist_keys(): array
 {
     return ['ETH', 'SOL', 'XRP'];
 }
 
-/** Every asset that has its own asset_candles series: the basket plus the watchlist. */
+/**
+ * Every asset that has its own asset_candles series: the basket (BTC) plus the
+ * watchlist. All of these are backfilled and rolled up into asset_candles at
+ * every timeframe. BTC additionally underpins the ARV chart, which is derived
+ * from its candles rather than kept in a separate arv_candles series.
+ */
 function asset_keys(): array
 {
     return array_merge(['BTC'], watchlist_keys());
@@ -242,13 +251,21 @@ function backfill_tf(string $tf = '1D', int $days = 0): array
  * assets carry weight 0, so there is no fx conversion and no arv_candles write;
  * the chart shows the coin in dollars exactly as the exchange reports it.
  *
- * BTC is excluded on purpose: its asset_candles are produced by the dedicated
- * ingest/backfill path, so backfilling it here would duplicate that work.
+ * BTC is included as well as the watchlist. Two things need full BTC history in
+ * asset_candles: the clickable BTC coin chart, and — since the fix that stopped
+ * maintaining a fragile separate arv_candles series for display — the ARV chart,
+ * which market.php now DERIVES from BTC's asset_candles on the fly (ARV is BTC
+ * scaled by a constant, per-candle fx applied). Ingest only writes BTC's 1m rows
+ * to asset_candles, so its 5m/15m/1h/4h/1D/1W rows have to be backfilled here
+ * exactly like the watchlist coins. This does not double-write: ingest fills 1m,
+ * this fills the deep higher-timeframe history, rollup_assets() keeps the
+ * in-progress buckets current. (arv_candles is still written by ingest for the
+ * money/NAV path; it is simply no longer what the chart reads.)
  */
 function backfill_asset_tf(string $assetKey, string $tf = '1D', int $days = 0): array
 {
-    if (!in_array($assetKey, watchlist_keys(), true)) {
-        throw new RuntimeException('backfill_asset_tf is for watchlist assets only (ETH, SOL, XRP).');
+    if (!in_array($assetKey, asset_keys(), true)) {
+        throw new RuntimeException('backfill_asset_tf is for basket/watchlist assets only (BTC, ETH, SOL, XRP).');
     }
 
     $allowed = ['5m' => 30, '15m' => 90, '1m' => 7, '1h' => 90, '4h' => 730, '1D' => 0, '1W' => 0];
@@ -306,15 +323,16 @@ function backfill_asset_tf(string $assetKey, string $tf = '1D', int $days = 0): 
  *
  * The USD, per-asset twin of rollup_all(): only the current bucket of each frame
  * is rewritten, because completed buckets are already correct. BTC is rolled up
- * by the dedicated path (its asset_candles are maintained alongside arv_candles),
- * so it is not re-rolled here.
+ * here too (over asset_keys(), not just the watchlist): ingest writes BTC's 1m
+ * rows to asset_candles, and its higher timeframes must stay current so the BTC
+ * coin chart — and the ARV chart derived from it — do not stall a bucket behind.
  */
 function rollup_assets(): array
 {
     $sizes = ['5m' => 300, '15m' => 900, '1h' => 3600, '4h' => 14400, '1D' => 86400];
     $done = [];
 
-    foreach (watchlist_keys() as $key) {
+    foreach (asset_keys() as $key) {
         $done[$key] = [];
         foreach ($sizes as $tf => $secs) {
             $bucket = intdiv(time(), $secs) * $secs;
@@ -804,6 +822,31 @@ function fx_at(array $curve, int $ms): float
 }
 
 
+/**
+ * The stored USD/INR curve, straight from fx_rates, shaped for fx_at().
+ *
+ * The offline twin of fetch_fx_curve(): it makes NO network call, reading only
+ * what has already been stored — ingest writes today's rate every run, and a
+ * history backfill fills the daily series back to launch. That matters because
+ * its one caller is the public chart endpoint (market.php derives the ARV chart
+ * from BTC candles and must value each candle at its own day's rate), and a page
+ * load must never block on an upstream currency API.
+ *
+ * Rows are returned oldest-first so fx_at() can binary-search them; the result is
+ * forward-filled by fx_at() (latest rate at or before a timestamp), and a
+ * timestamp older than the earliest stored day resolves to that earliest rate —
+ * the same clamp fetch_fx_curve()/fx_at() already apply.
+ */
+function fx_curve_from_db(): array
+{
+    $curve = [];
+    foreach (q('SELECT day, usd_inr FROM fx_rates ORDER BY day ASC')->fetchAll() as $r) {
+        $curve[] = ['ms' => strtotime($r['day'] . ' 00:00:00 UTC') * 1000, 'rate' => (float)$r['usd_inr']];
+    }
+    return $curve;
+}
+
+
 /* ============================================================ bookkeeping = */
 
 function cron_record(string $job, string $status, string $message): void
@@ -1007,8 +1050,10 @@ function auto_backfill_after(string $step): string
     ];
 
     // Assets are backfilled after the ARV chain, each running the same tf chain.
-    // Order: ARV -> ETH -> SOL -> XRP -> done.
-    $assets  = watchlist_keys();
+    // Order: ARV -> BTC -> ETH -> SOL -> XRP -> done. BTC is first among the
+    // assets because the ARV chart is derived from its asset_candles, so its full
+    // history is what the index chart depends on.
+    $assets  = asset_keys();
     $assetKey = null;
     $tf = $step;
     if (strpos($step, ':') !== false) {

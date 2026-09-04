@@ -57,7 +57,20 @@ declare(strict_types=1);
 // Also: a self-healing check is added at the TOP of auto_backfill_step() so that
 // if the chain is 'done'/'stalled' but candles_wiped_v10 is set, it is reset to
 // '1D' immediately, catching any future deploy-ordering edge case.
-const ARV_SCHEMA_VERSION = 10;
+//
+// 11 makes the ARV CHART DERIVE FROM BTC's asset_candles instead of the fragile
+// separate arv_candles series (see market.php handle_candles()). ARV is BTC
+// scaled by a constant, so the chart is now built on the fly from the same
+// reliably-backfilled asset_candles that power the coin charts — always as full
+// as the BTC chart, at every timeframe, with no dependency on the
+// arv_candles backfill/wipe/chain that broke the chart repeatedly. For that BTC
+// must have full asset_candles history at every timeframe; it previously did not
+// (ingest wrote only BTC 1m; backfill_asset_tf()/rollup_assets()/
+// auto_backfill_after() excluded it). Those now include BTC, and this migration
+// re-queues the backfill chain from the head so the new BTC asset steps actually
+// run on installs whose chain had already reached 'done'. Candles/scheduling/
+// settings only — no wallet, lot, ledger, or unit writes.
+const ARV_SCHEMA_VERSION = 11;
 
 function arv_schema(): array
 {
@@ -1118,6 +1131,43 @@ function arv_migrations(PDO $pdo): array
             setting_set($wipeFlag, '1');
             $done[] = 'schema-10 (fresh install): wiped arv_candles, set anchor to 2015/₹21.08';
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Schema 11: derive the ARV chart from BTC's asset_candles.
+    //
+    // Why this exists. The ARV chart repeatedly broke because it read a SEPARATE
+    // arv_candles series that depends on being backfilled/rolled-up/never-wiped,
+    // and schema-10's wipe + re-queue left it nearly empty on the live install
+    // (an empty arv_candles → an empty ARV chart) while the coin charts, which
+    // read the reliably-backfilled asset_candles, stayed full.
+    //
+    // The fix (in code): market.php handle_candles() now DERIVES ARV candles from
+    // BTC's asset_candles on the fly — ARV = arv_base_inr × (BTC_usd × fx) /
+    // (base_btc_usd × base_fx_usd_inr), i.e. index_price() applied per candle — so
+    // the ARV chart is dot-for-dot the BTC chart, INR-scaled, at every timeframe.
+    //
+    // For that BTC needs a FULL asset_candles history at every timeframe. It
+    // previously did not: ingest writes only BTC's 1m rows, and BTC was excluded
+    // from backfill_asset_tf()/rollup_assets()/auto_backfill_after(). Those now
+    // include BTC (asset_keys()), but a live install whose backfill chain already
+    // reached 'done' would never run the new BTC steps — so re-queue the chain
+    // from the head. ARV frames already at/above their row-count floor are skipped
+    // fast (no rebuild flag is set here), then the BTC asset frames build, then
+    // ETH/SOL/XRP (also skipped fast if full), then 'done'.
+    //
+    // CANDLES / SCHEDULING / SETTINGS ONLY. Does NOT touch wallets, lots, the
+    // append-only ledger, fills, users, or cost basis, and does NOT re-run any
+    // unit rescale. Guarded by its own flag so it runs exactly once.
+    $btcAssetFlag = 'btc_asset_candles_v11';
+    if (!setting_b($btcAssetFlag, false)) {
+        setting_set('auto_backfill_next', '1D');
+        setting_set('auto_backfill_fails', '0');
+        setting_set('auto_backfill_fail_step', '');
+        setting_set($btcAssetFlag, '1');
+        $done[] = 'schema-11: ARV chart now derives from BTC asset_candles; re-queued the '
+                . 'backfill chain so BTC gets full asset_candles history at every timeframe '
+                . '(candles/scheduling only; no wallet/lot/ledger/unit writes)';
     }
 
     if ($done) {
