@@ -83,8 +83,8 @@
 
         <div class="card card-flush">
           <div class="card-head" style="padding:var(--sp-4);margin:0">
-            <h4 style="font-size:.95rem">Order book</h4>
-            <span class="badge">queue, not an auction</span>
+            <h4 style="font-size:.95rem">Market</h4>
+            <span class="badge">index-priced · no spread</span>
           </div>
           <div style="padding:var(--sp-4)">
             <div class="depth" data-depth>
@@ -92,9 +92,9 @@
             </div>
           </div>
           <div class="tiny muted" style="padding:0 var(--sp-4) var(--sp-4)">
-            There is no bid/ask spread — every fill settles at the index price. What
-            matters is how much wants in and out, and how long the queue ahead of
-            you is.
+            Every buy and sell settles at the live index price — there is no bid/ask
+            spread. Buys fill instantly; a sell rests only until a buyer takes it or
+            the treasury does.
           </div>
         </div>
 
