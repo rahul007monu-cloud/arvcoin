@@ -679,37 +679,52 @@ async function loadBook() {
   try {
     var r = await api.book();
     var b = r.book;
-    if (!b) {
-      host.innerHTML = '<div class="empty tiny">The book opens when the price feed is live.</div>';
+    var nav = (r.price && r.price.nav != null)
+      ? r.price.nav
+      : (st.snap && st.snap.price ? st.snap.price.nav : null);
+    if (nav == null) {
+      host.innerHTML = '<div class="empty tiny">The market opens when the price feed is live.</div>';
       return;
     }
 
-    var buy = b.buyDepthPaise || 0;
-    var sell = b.sellDepthPaise || 0;
-    var max = Math.max(buy, sell, 1);
+    var s = st.snap && st.snap.stats;
 
-    host.innerHTML =
-      '<div>'
-        + '<div class="row-between tiny" style="margin-bottom:5px">'
-          + '<span class="up strong">Wanting to buy</span>'
-          + '<span class="num">' + ui.fmtPaise(buy) + '</span></div>'
-        + '<div class="depth-bar buy"><span style="width:' + ((buy / max) * 100).toFixed(1) + '%"></span></div>'
-        + '<div class="tiny muted" style="margin-top:4px">'
-          + ui.fmtUnits(b.buyDepthUnits, 2) + ' ARV \u00b7 ' + (b.buys || []).length + ' orders</div>'
-      + '</div>'
-      + '<div>'
-        + '<div class="row-between tiny" style="margin-bottom:5px">'
-          + '<span class="down strong">Wanting to sell</span>'
-          + '<span class="num">' + ui.fmtPaise(sell) + '</span></div>'
-        + '<div class="depth-bar sell"><span style="width:' + ((sell / max) * 100).toFixed(1) + '%"></span></div>'
-        + '<div class="tiny muted" style="margin-top:4px">'
-          + ui.fmtUnits(b.sellDepthUnits, 2) + ' ARV \u00b7 ' + (b.sells || []).length + ' orders</div>'
-      + '</div>'
-      + '<div class="row-between tiny muted" style="padding-top:var(--sp-3);border-top:1px solid var(--line)">'
-        + '<span>Everything settles at</span>'
-        + '<span class="num strong">' + ui.fmtPrice(b.nav) + '</span></div>';
+    // This venue has no bid/ask book: buys fill instantly and everything settles
+    // at the index price. Show the settle price and 24h range instead of an empty
+    // two-sided ladder, and surface resting sells only when some actually exist —
+    // never a permanent "₹0".
+    var html =
+      '<div class="row-between" style="align-items:baseline">'
+        + '<span class="tiny muted">Settles at</span>'
+        + '<span class="num strong" style="font-size:1.15rem">' + ui.fmtPrice(nav) + '</span>'
+      + '</div>';
+
+    if (s) {
+      html +=
+        '<div class="row-between tiny" style="margin-top:11px">'
+          + '<span class="muted">24h high</span><span class="num up">' + ui.fmtPrice(s.high24h) + '</span></div>'
+        + '<div class="row-between tiny" style="margin-top:4px">'
+          + '<span class="muted">24h low</span><span class="num down">' + ui.fmtPrice(s.low24h) + '</span></div>';
+    }
+
+    var sellUnits = b ? parseFloat(b.sellDepthUnits) || 0 : 0;
+    if (sellUnits > 0) {
+      var n = (b.sells || []).length;
+      html +=
+        '<div class="row-between tiny" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">'
+          + '<span class="down strong">Waiting to sell</span>'
+          + '<span class="num">' + ui.fmtUnits(b.sellDepthUnits, 2) + ' ARV</span></div>'
+        + '<div class="tiny muted" style="margin-top:3px">' + n + (n === 1 ? ' order' : ' orders')
+          + ' \u00b7 the treasury buys any left after ' + CFG.MARKET.sellFallbackMinutes + ' min</div>';
+    } else {
+      html +=
+        '<div class="tiny muted" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">'
+          + 'No orders waiting \u2014 buys and sells fill right away at the price above.</div>';
+    }
+
+    host.innerHTML = html;
   } catch (_) {
-    host.innerHTML = '<div class="empty tiny">Book unavailable.</div>';
+    host.innerHTML = '<div class="empty tiny">Market unavailable.</div>';
   }
 }
 
