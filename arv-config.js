@@ -112,7 +112,10 @@
   //
   var INDEX = {
     quote: 'INR',
-    arvBaseInr: 17.83,
+    // Retargeted to ~$100 USD today. Math: ARV ≈ $100 × fx ≈ $100 × 90 = ₹9,000.
+    // BTC_launch_inr = 277.89 × 63.50 = 17,645.915. BTC_now_inr ≈ ₹75,33,497.
+    // arv_base_inr = 9000 × (17,645.915 / 75,33,497) ≈ 21.08.
+    arvBaseInr: 21.08,
     launchIso: '2015-07-20T00:00:00Z',
     launchMs: Date.UTC(2015, 6, 20, 0, 0, 0),
     baseUsd: { BTC: 277.89 },

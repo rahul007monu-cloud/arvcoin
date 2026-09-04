@@ -43,7 +43,21 @@ declare(strict_types=1);
 // spike) are all recomputed to the single current anchor. It does NOT re-run the
 // v8 unit rescale and never touches wallets, lots, or the ledger — only candles,
 // backfill scheduling, and settings.
-const ARV_SCHEMA_VERSION = 9;
+//
+// 10 is a FORCEFUL CANDLE REBUILD and retarget to ~$100 USD today (~₹9,000):
+// The v9 rebuild flag arv_candles_rebuild_v9 was set but NEVER consumed because
+// auto_backfill_step() early-returns when auto_backfill_next is 'done' or
+// 'stalled' (leftover from the v8 run) — the rebuild flag was set but the chain
+// never advanced past that early-return to read it. Old ₹2 candles survived,
+// new-anchor ingest wrote recent minutes only → the end-of-chart spike.
+// This migration: (a) guards units_rescaled_v8 (never re-rescale), (b) DELETES
+// all arv_candles rows outright (candles carry no money — safe), (c) force-sets
+// all four anchor settings to the $100-today anchor (arv_base_inr=21.08), and
+// (d) resets the backfill chain from '1D' so the full rebuild runs cleanly.
+// Also: a self-healing check is added at the TOP of auto_backfill_step() so that
+// if the chain is 'done'/'stalled' but candles_wiped_v10 is set, it is reset to
+// '1D' immediately, catching any future deploy-ordering edge case.
+const ARV_SCHEMA_VERSION = 10;
 
 function arv_schema(): array
 {
@@ -596,7 +610,7 @@ function arv_default_settings(): array
         // value honestly reads ~₹17.83 — the real consequence of tracking BTC's
         // genuine ~560x run. Deep history is daily/weekly only; no free source
         // serves minute data this far back (see README, "A note on history depth").
-        'arv_base_inr'          => '17.83',
+        'arv_base_inr'          => '21.08',
         'launch_at'             => '2015-07-20 00:00:00',
         'base_btc_usd'          => '277.89',
         'base_fx_usd_inr'       => '63.50',
@@ -1026,6 +1040,84 @@ function arv_migrations(PDO $pdo): array
         $done[] = 'index: corrective anchor to 2015/₹17.83 (~₹10,000 today), '
                 . 're-queued UNCONDITIONAL full candle rebuild (candles/settings only; '
                 . 'no unit rescale, no wallet/lot/ledger writes)';
+    }
+
+    // ---------------------------------------------------------------------
+    // Schema 10: forceful candle wipe + retarget to ~$100 USD today (~₹9,000).
+    //
+    // Why this exists. Schema-9 set arv_candles_rebuild_v9='1' intending to
+    // trigger a full candle recompute, but auto_backfill_step() early-returns
+    // when auto_backfill_next is 'done' or 'stalled' (left over from the v8
+    // run):
+    //
+    //     if ($next === 'done' || $next === 'stalled') { return null; }
+    //
+    // This check runs BEFORE the rebuild flag is ever read, so the chain never
+    // advanced past it. The rebuild flag was set but never consumed. Old ₹2
+    // candles survived, fresh ingest wrote new-anchor minutes only → the
+    // end-of-chart vertical spike remained live on arvcoin.com.
+    //
+    // The fix here is definitive:
+    //   (a) Guard: units_rescaled_v8 MUST be '1' — never re-run the unit rescale.
+    //   (b) Idempotency: candles_wiped_v10 must NOT already be '1'.
+    //   (c) Force-set all four anchor settings to the $100-today anchor.
+    //       Target: ARV ≈ $100 × fx_now ≈ $100 × 90 = ₹9,000.
+    //       Math: BTC_launch_inr = 277.89 × 63.50 = 17,645.915
+    //             BTC_now_inr ≈ ₹75,33,497
+    //             arv_base_inr = 9000 × (17645.915 / 7533497) ≈ 21.08
+    //   (d) DELETE FROM arv_candles — ALL rows, ALL timeframes. Candles carry no
+    //       money (pure display/market data). This is the only way to guarantee
+    //       that no mixed-anchor row survives from any prior partial rebuild.
+    //   (e) Reset auto_backfill_next='1D', clear fails so the chain runs cleanly.
+    //   (f) Clear the stale v9 flags so they do not confuse future logic.
+    //   (g) Set candles_wiped_v10='1' as the idempotency guard.
+    //
+    // Does NOT touch: wallets, lots, ledger, fills, users, cost basis — only
+    // settings + arv_candles.
+    $wipeFlag = 'candles_wiped_v10';
+    $rescaledOk = setting_b('units_rescaled_v8', false);   // (a)
+    if ($rescaledOk && !setting_b($wipeFlag, false)) {     // (b)
+        // (c) Force-set all four canonical anchor settings.
+        setting_set('arv_base_inr',    '21.08');
+        setting_set('launch_at',       '2015-07-20 00:00:00');
+        setting_set('base_btc_usd',    '277.89');
+        setting_set('base_fx_usd_inr', '63.50');
+
+        // (d) Wipe ALL arv_candles rows — guaranteed clean slate for the rebuild.
+        //     Candles carry no money. Safe.
+        $pdo->exec('DELETE FROM arv_candles');
+
+        // (e) Reset the backfill chain to the start so the full history is rebuilt.
+        setting_set('auto_backfill_next', '1D');
+        setting_set('auto_backfill_fails', '0');
+        setting_set('auto_backfill_fail_step', '');
+
+        // (f) Clear stale v9 flags.
+        setting_set('arv_candles_rebuild_v9', '');
+        setting_set('anchor_recomputed_v9',   '');
+
+        // (g) Idempotency guard.
+        setting_set($wipeFlag, '1');
+
+        $done[] = 'schema-10: wiped arv_candles, force-set anchor to 2015/₹21.08 (~$100 today), '
+                . 'reset backfill to 1D (candles/settings only; no unit rescale, no wallet/lot/ledger writes)';
+    } elseif (!$rescaledOk) {
+        // Installation without v8 rescale — still force-set anchor and wipe.
+        // units_rescaled_v8 is absent on fresh installs; arv_candles is empty on
+        // those anyway, so the DELETE is a no-op and the anchor set is safe.
+        if (!setting_b($wipeFlag, false)) {
+            setting_set('arv_base_inr',    '21.08');
+            setting_set('launch_at',       '2015-07-20 00:00:00');
+            setting_set('base_btc_usd',    '277.89');
+            setting_set('base_fx_usd_inr', '63.50');
+            $pdo->exec('DELETE FROM arv_candles');
+            setting_set('auto_backfill_next', '1D');
+            setting_set('auto_backfill_fails', '0');
+            setting_set('auto_backfill_fail_step', '');
+            setting_set('arv_candles_rebuild_v9', '');
+            setting_set($wipeFlag, '1');
+            $done[] = 'schema-10 (fresh install): wiped arv_candles, set anchor to 2015/₹21.08';
+        }
     }
 
     if ($done) {
