@@ -484,6 +484,23 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
   font-size: .74rem; text-transform: uppercase; letter-spacing: .22em;
   color: var(--tx-3); margin-bottom: var(--sp-4);
 }
+/* The eyebrow as a live status pill: a pulsing dot + label, so the page reads as
+   a live market at first glance. */
+.hero-eyebrow.live {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 13px; margin-bottom: var(--sp-5);
+  border: 1px solid var(--line-2); border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03); color: var(--tx-2);
+  letter-spacing: .16em;
+}
+.hero-eyebrow.live .live-dot { width: 7px; height: 7px; }
+/* A soft aura behind the display headline, for depth against the plate. */
+.hero h1::before {
+  content: ''; position: absolute; z-index: -1;
+  left: -4%; top: -10%; width: 74%; height: 120%;
+  background: radial-gradient(56% 56% at 32% 42%, rgba(152, 164, 190, 0.16), transparent 70%);
+  filter: blur(36px); pointer-events: none;
+}
 
 /* Display type with a light source travelling through it, so the wordmark reads
    as engraved rather than filled. Paused under reduced-motion below. */
