@@ -805,6 +805,14 @@ function sideConfigLight() {
 
 (async function () {
   ui.setText('[data-fallback]', String(CFG.MARKET.sellFallbackMinutes));
+
+  // A chart can be pre-selected from a link (e.g. tapping BTC on the overview
+  // watchlist opens trade.html?asset=BTC straight on the BTC chart).
+  var wantedAsset = new URLSearchParams(location.search).get('asset');
+  if (wantedAsset && CHART_ASSETS.some(function (a) { return a.key === wantedAsset; })) {
+    st.asset = wantedAsset;
+  }
+
   buildAssetTabs();
   buildTfTabs();
 

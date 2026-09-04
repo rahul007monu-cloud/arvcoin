@@ -301,49 +301,57 @@ hr { border: 0; border-top: 1px solid var(--line); margin: var(--sp-5) 0; }
 
 /* ------------------------------------------------------ bottom tab bar ----- */
 
-/* A fixed bottom navigation for mobile, in the style of a trading app. Hidden
-   on desktop (the top .nav remains); shown at the mobile breakpoint below. Icons
-   inherit currentColor so they stay on the silver-on-black palette, and the
-   active tab lights up like the top nav's .on state. */
-.tabbar { display: none; }
+/* A fixed bottom navigation in the style of a trading app, shown on BOTH mobile
+   and desktop (the top .nav stays as well). Icons inherit currentColor so they
+   keep the silver-on-black palette, and the active tab lights up like the top
+   nav's .on state. */
+.tabbar {
+  display: flex; position: fixed; z-index: 200;
+  left: 0; right: 0; bottom: 0;
+  background: rgba(7,7,10,.94);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.tabbar .tab {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; padding: 8px 4px; min-height: 52px;
+  color: var(--tx-3); text-align: center;
+  transition: color .15s var(--ease);
+}
+.tabbar .tab:hover { color: var(--tx-1); }
+.tabbar .tab.on { color: var(--s-0); }
+.tabbar .tab.on .tab-ic { filter: drop-shadow(0 0 8px rgba(223,226,233,.28)); }
+.tabbar .tab-ic { display: grid; place-items: center; height: 22px; }
+.tabbar .tab-ic svg { display: block; }
+.tabbar .tab-l {
+  font-size: .66rem; font-weight: 600; letter-spacing: .02em;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
-/* Matches the 880px breakpoint where .nav-links collapse into the "More"
-   hamburger (see the 880px block). Aligning the two means the moment the inline
-   top links disappear, the bottom tab bar takes over as the primary navigation,
-   with no dead band (previously 761-880px showed only the hamburger). */
-@media (max-width: 880px) {
+/* Keep the fixed bar from covering the last of the page or the footer. */
+body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+
+/* On desktop, centre the bar and cap its width so it reads as a control rather
+   than a full-width mobile bar; the top nav remains the primary desktop nav. */
+@media (min-width: 881px) {
   .tabbar {
-    display: flex; position: fixed; z-index: 200;
-    left: 0; right: 0; bottom: 0;
-    background: rgba(7,7,10,.94);
-    backdrop-filter: blur(22px) saturate(140%);
-    -webkit-backdrop-filter: blur(22px) saturate(140%);
-    border-top: 1px solid var(--line);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    left: 50%; right: auto; transform: translateX(-50%);
+    width: auto; max-width: 620px;
+    border: 1px solid var(--line-2); border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+    padding: 0 8px;
   }
-  .tabbar .tab {
-    flex: 1 1 0; min-width: 0;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 3px; padding: 8px 4px; min-height: 52px;
-    color: var(--tx-3); text-align: center;
-    transition: color .15s var(--ease);
-  }
-  .tabbar .tab:hover { color: var(--tx-1); }
-  .tabbar .tab.on { color: var(--s-0); }
-  .tabbar .tab.on .tab-ic { filter: drop-shadow(0 0 8px rgba(223,226,233,.28)); }
-  .tabbar .tab-ic { display: grid; place-items: center; height: 22px; }
-  .tabbar .tab-ic svg { display: block; }
-  .tabbar .tab-l {
-    font-size: .66rem; font-weight: 600; letter-spacing: .02em;
-    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
+  .tabbar .tab { flex: 0 0 auto; padding: 10px 20px; min-height: 56px; }
+  .tabbar .tab-l { font-size: .72rem; }
+}
 
-  /* Keep the fixed bar from covering the last of the page or the footer. */
-  body { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
-
-  /* On mobile the bottom bar is the primary navigation, so the hamburger becomes
-     a secondary "More" overflow for Deposit/Withdraw/Refer/Profile/Help. Surface
-     the Help entry that is hidden on desktop. */
+/* On mobile the bottom bar is the primary navigation, so the hamburger becomes
+   a secondary "More" overflow for Deposit/Withdraw/Refer/Profile/Help. Surface
+   the Help entry that is inline on desktop. */
+@media (max-width: 880px) {
   .nav-help { display: block; }
 }
 
@@ -1446,7 +1454,8 @@ table.data tfoot td {
   z-index: 60;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  /* Sit above the bottom tab bar (now shown on desktop too, ~56px tall). */
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
   width: min(440px, calc(100vw - 24px));
   display: flex;
   align-items: center;
