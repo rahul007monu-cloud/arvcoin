@@ -167,6 +167,16 @@ hr { border: 0; border-top: 1px solid var(--line); margin: var(--sp-5) 0; }
 
 .up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--flat); }
 .muted { color: var(--tx-2); } .dim { color: var(--tx-3); }
+
+/* The USD companion beside a ₹ figure. A muted secondary: smaller, dimmer and
+   lighter so it reads as context and never competes with the rupee price. */
+.price-usd {
+  color: var(--tx-3);
+  font-weight: 400;
+  font-size: .82em;
+  letter-spacing: -.01em;
+  margin-left: .12em;
+}
 .small { font-size: .85rem; } .tiny { font-size: .76rem; }
 .right { text-align: right; } .center { text-align: center; }
 .nowrap { white-space: nowrap; } .hidden { display: none !important; }
@@ -282,6 +292,59 @@ hr { border: 0; border-top: 1px solid var(--line); margin: var(--sp-5) 0; }
 .nav-ticker[hidden] { display: none; }
 .nav-ticker .k {
   font-size: .68rem; text-transform: uppercase; letter-spacing: .09em; color: var(--tx-3);
+}
+
+/* Help lives in the collapsible menu; on desktop the links row shows inline and
+   the Help entry is redundant with the footer, so it only surfaces once the
+   menu becomes the mobile "More" overflow (see the 880px block). */
+.nav-help { display: none; }
+
+/* ------------------------------------------------------ bottom tab bar ----- */
+
+/* A fixed bottom navigation for mobile, in the style of a trading app. Hidden
+   on desktop (the top .nav remains); shown at the mobile breakpoint below. Icons
+   inherit currentColor so they stay on the silver-on-black palette, and the
+   active tab lights up like the top nav's .on state. */
+.tabbar { display: none; }
+
+/* Matches the 880px breakpoint where .nav-links collapse into the "More"
+   hamburger (see the 880px block). Aligning the two means the moment the inline
+   top links disappear, the bottom tab bar takes over as the primary navigation,
+   with no dead band (previously 761-880px showed only the hamburger). */
+@media (max-width: 880px) {
+  .tabbar {
+    display: flex; position: fixed; z-index: 200;
+    left: 0; right: 0; bottom: 0;
+    background: rgba(7,7,10,.94);
+    backdrop-filter: blur(22px) saturate(140%);
+    -webkit-backdrop-filter: blur(22px) saturate(140%);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .tabbar .tab {
+    flex: 1 1 0; min-width: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; padding: 8px 4px; min-height: 52px;
+    color: var(--tx-3); text-align: center;
+    transition: color .15s var(--ease);
+  }
+  .tabbar .tab:hover { color: var(--tx-1); }
+  .tabbar .tab.on { color: var(--s-0); }
+  .tabbar .tab.on .tab-ic { filter: drop-shadow(0 0 8px rgba(223,226,233,.28)); }
+  .tabbar .tab-ic { display: grid; place-items: center; height: 22px; }
+  .tabbar .tab-ic svg { display: block; }
+  .tabbar .tab-l {
+    font-size: .66rem; font-weight: 600; letter-spacing: .02em;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* Keep the fixed bar from covering the last of the page or the footer. */
+  body { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
+
+  /* On mobile the bottom bar is the primary navigation, so the hamburger becomes
+     a secondary "More" overflow for Deposit/Withdraw/Refer/Profile/Help. Surface
+     the Help entry that is hidden on desktop. */
+  .nav-help { display: block; }
 }
 
 /* --------------------------------------------------------------- surfaces -- */
@@ -892,7 +955,7 @@ table.data tfoot td {
   border-top: 1px solid var(--line); background: rgba(7,7,10,.6);
   font-size: .84rem; color: var(--tx-2);
 }
-.foot-grid { display: grid; gap: var(--sp-5); grid-template-columns: 1.6fr repeat(3, 1fr); margin-bottom: var(--sp-5); }
+.foot-grid { display: grid; gap: var(--sp-5); grid-template-columns: 1.6fr repeat(4, 1fr); margin-bottom: var(--sp-5); }
 .foot ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
 .foot a { color: var(--tx-2); }
 .foot a:hover { color: var(--s-1); }
@@ -987,7 +1050,7 @@ table.data tfoot td {
 }
 
 @media print {
-  body::before, .nav, .foot, .toast-host, .btn, .hero-media { display: none !important; }
+  body::before, .nav, .tabbar, .foot, .toast-host, .btn, .hero-media { display: none !important; }
   body { background: #fff; color: #000; }
   .card { border: 1px solid #ccc; background: #fff; box-shadow: none; }
   * { color: #000 !important; }

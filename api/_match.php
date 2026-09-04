@@ -5,7 +5,7 @@
  * ---------------------------------------------------------------------------
  * Why this is a queue and not an auction
  * ---------------------------------------------------------------------------
- * ARV's price is a formula: ₹1.78 at the 2015 launch, moved by Bitcoin's percentage change.
+ * ARV's price is a formula: ₹17.83 at the 2015 launch, moved by Bitcoin's percentage change.
  * An order book that also *discovered* price would fight that formula — on a thin
  * day a single trade at a silly level would drag the chart away from Bitcoin and
  * break the one promise the product makes.

@@ -65,13 +65,15 @@ function paintPrice(snap) {
   if (!snap || !snap.price || snap.price.nav == null) return;
   var nav = snap.price.nav;
 
-  ui.paintPrice('[data-hero-price]', nav, 'hero');
+  // Live rate from this same snapshot, then the hero price with its $ companion.
+  ui.setUsdInr(snap.index && snap.index.fxUsdInr);
+  ui.paintPriceDual('[data-hero-price]', nav, 'hero');
   st.last = nav;
 
   if (snap.stats) {
     ui.paintChange('[data-hero-change]', snap.stats.change24hPct);
-    ui.setText('[data-ath]', ui.fmtPrice(snap.stats.allTimeHigh));
-    ui.setText('[data-atl]', ui.fmtPrice(snap.stats.allTimeLow));
+    ui.setHtml('[data-ath]', ui.fmtDual(snap.stats.allTimeHigh));
+    ui.setHtml('[data-atl]', ui.fmtDual(snap.stats.allTimeLow));
 
     var l = ui.el('[data-hero-launch]');
     if (l) {
@@ -152,7 +154,7 @@ async function loadChart() {
     }));
 
     // The launch level, so the whole history reads against the launch anchor
-    // (now ₹1.78, drawn from CFG.INDEX.arvBaseInr rather than a hard-coded ₹1).
+    // (now ₹17.83, drawn from CFG.INDEX.arvBaseInr rather than a hard-coded ₹1).
     series.createPriceLine({
       price: CFG.INDEX.arvBaseInr,
       color: 'rgba(185,190,201,.35)',
@@ -208,7 +210,7 @@ async function loadWatchlist() {
   if (snap && snap.price && snap.price.nav != null) {
     rows.push({
       key: 'ARV', name: 'ARV Coin', cls: 'arv',
-      price: ui.fmtPrice(snap.price.nav),
+      price: ui.fmtDual(snap.price.nav),
       sub: 'Index unit · tracks Bitcoin',
       change: snap.stats ? snap.stats.change24hPct : null,
       spark: st.candles.length ? st.candles.slice(-60).map(function (k) { return k.c; }) : null,

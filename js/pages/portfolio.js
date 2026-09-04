@@ -43,6 +43,10 @@ function paintPortfolio() {
 
   if (!w) return;
 
+  // The USD/INR rate is threaded in from the snapshot before painting so the $
+  // companion below matches the ticker everywhere. Falls back to config.
+  ui.setUsdInr(st.snap && st.snap.index && st.snap.index.fxUsdInr);
+
   // Cash is the free balance plus anything held in open orders; ARV value is the
   // live valuation of the whole holding. Together they are the portfolio.
   var cashPaise = (w.inrPaise || 0) + (w.inrLockedPaise || 0);
@@ -51,7 +55,9 @@ function paintPortfolio() {
 
   ui.setText('[data-total]', ui.fmtPaise(totalPaise));
   ui.setText('[data-cash]', ui.fmtPaise(cashPaise));
-  ui.setText('[data-arv-value]', ui.fmtPaise(arvPaise));
+  // ARV holding value is priced at the live NAV, so it carries the muted $
+  // companion. avgCostNav below stays ₹-only \u2014 it is a historical cost basis.
+  ui.setHtml('[data-arv-value]', ui.fmtDualPaise(arvPaise));
   ui.setText('[data-units]', ui.fmtUnits(w.arvTotalUnits, 4));
 
   var cashPct = totalPaise > 0 ? (cashPaise / totalPaise) * 100 : 0;
