@@ -120,24 +120,32 @@ function ingest_prices(): array
 /**
  * Build history back to launch.
  *
- * Tiered on purpose — daily since launch, hourly for a quarter, minute for a
- * week. Five years of minute candles would be 2.6 million rows that no API will
- * serve and no chart needs.
+ * Tiered on purpose — daily/weekly all the way to launch (~2015, roughly ten
+ * years), hourly for a quarter, 15m/5m for the recent weeks, minute for a week.
+ * Ten years of minute candles would be millions of rows that no free API will
+ * serve and no chart needs; deep history is honestly daily/weekly, and the
+ * minute/tick view exists only for the recent window (see README).
  *
  * Requests are paced. Hammering a free endpoint earns a 429 and a half-finished
  * series, which is worse than taking two minutes.
  */
 function backfill_tf(string $tf = '1D', int $days = 0): array
 {
-    $allowed = ['1m' => 7, '1h' => 90, '4h' => 730, '1D' => 0, '1W' => 0];
+    // Depth per timeframe, in days. 1D/1W = 0 means "all the way to launch"
+    // (now ~2015, roughly ten years of daily/weekly). The sub-hour frames only
+    // cover the recent window a free API will actually page: five years of 1m is
+    // ~2.6M rows nobody serves, so minute/tick history is recent-only by design.
+    $allowed = ['5m' => 30, '15m' => 90, '1m' => 7, '1h' => 90, '4h' => 730, '1D' => 0, '1W' => 0];
     if (!isset($allowed[$tf])) {
-        throw new RuntimeException('tf must be one of 1m, 1h, 4h, 1D, 1W');
+        throw new RuntimeException('tf must be one of 5m, 15m, 1m, 1h, 4h, 1D, 1W');
     }
     if ($days <= 0) {
         $days = $allowed[$tf];
     }
 
-    $launch = strtotime((string)setting('launch_at', '2021-09-01 00:00:00'));
+    // The clamp below and this window both hang off launch_at, which is now the
+    // 2015-07-20 anchor, so daily/weekly history pages back roughly ten years.
+    $launch = strtotime((string)setting('launch_at', '2015-07-20 00:00:00'));
     $from   = $days > 0 ? max($launch, time() - $days * 86400) : $launch;
 
     $curve = fetch_fx_curve($from, time());
@@ -229,6 +237,8 @@ function symbol_for(string $source, string $key): string
 
 function okx_bar(string $tf): string
 {
+    // OKX uppercases the hour/day/week bars but keeps minute bars lowercase
+    // (5m, 15m, 1m), which the default passthrough already returns correctly.
     return match ($tf) {
         '1h' => '1H', '4h' => '4H', '1D' => '1D', '1W' => '1W',
         default => $tf,
@@ -736,11 +746,15 @@ function auto_backfill_step(): ?array
 
 function auto_backfill_after(string $tf): string
 {
-    // 1W was missing from this chain, so the weekly series — the one the longest
-    // "5 years at a glance" view is drawn from — never got its history and showed a
-    // single candle. It is built right after 1D (and derives from daily data, so it
-    // is cheap), before the shorter recent windows.
-    return ['1D' => '1W', '1W' => '1h', '1h' => '1m', '1m' => 'done'][$tf] ?? 'done';
+    // Deep history first, then progressively finer recent windows:
+    //   1D -> 1W -> 1h -> 15m -> 5m -> 1m -> done
+    // 1W derives from daily data so it is cheap and comes right after 1D. The
+    // sub-hour frames (15m, 5m, 1m) only cover the recent window a free API will
+    // page — the chart's tick-by-tick view lives there — so they come last.
+    return [
+        '1D' => '1W', '1W' => '1h', '1h' => '15m',
+        '15m' => '5m', '5m' => '1m', '1m' => 'done',
+    ][$tf] ?? 'done';
 }
 
 /**
@@ -752,13 +766,19 @@ function auto_backfill_after(string $tf): string
  */
 function auto_backfill_floor(string $tf): int
 {
-    $launch = strtotime((string)setting('launch_at', '2021-09-01 00:00:00'));
+    $launch = strtotime((string)setting('launch_at', '2015-07-20 00:00:00'));
     $days   = max(1, (int)floor((time() - $launch) / 86400));
 
     switch ($tf) {
         case '1D': return (int)($days * 0.9);
         case '1W': return (int)(($days / 7) * 0.9);
         case '1h': return 1500;
+        // Recent-window frames. backfill_tf() pages 15m for ~90 days
+        // (~90*96=8640 rows) and 5m for ~30 days (~30*288=8640 rows); the floor is
+        // a "is it empty or filled?" check, deliberately well under the ideal so a
+        // gap in an exchange's history does not wedge the chain.
+        case '15m': return 3000;
+        case '5m':  return 3000;
         case '1m': return 5000;
         default:   return 1;
     }

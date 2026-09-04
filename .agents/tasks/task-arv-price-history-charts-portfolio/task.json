@@ -1,0 +1,7 @@
+{
+  "task_id": "task-arv-price-history-charts-portfolio",
+  "task_description": "Two-part change to ARV Coin. PART 1 (B option): add a separate Portfolio page (portfolio.html) with total value, cash-vs-ARV split, performance chart with avg-cost line, P&L cards and the 'if you sold everything now' breakdown, and slim the Wallet (dashboard.html) to cash + units + quick actions + orders + activity. PART 2: (a) rescale ARV to ~1000 rupees today while still tracking BTC proportionally; (b) extend history toward 10-15 years as deep as real BTC data exists, keeping tiered granularity and honestly surfacing that minute-level 10y+ tick data is not attainable from free sources; (c) fix chart UX so every timeframe/range renders a full continuous series, default to the 1-minute chart, and make charts update tick-by-tick in real time from the BTC live feed; (d) add BTC/ETH/SOL/XRP as clickable assets whose charts also render tick-by-tick. Money invariants (integer paise, units*1e8, append-only ledger, index-price fills, issuance cannot move price, stale feed pauses trading) must be preserved; the base rescale requires a guarded units migration for existing installs.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"],
+  "blocked_reason": null
+}

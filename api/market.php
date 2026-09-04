@@ -42,8 +42,8 @@ function handle_snapshot(): void
     tick_if_needed();
 
     $meta   = arv_nav_meta();
-    $launch = strtotime((string)setting('launch_at', '2021-09-01 00:00:00'));
-    $base   = setting_f('arv_base_inr', 1.0);
+    $launch = strtotime((string)setting('launch_at', '2015-07-20 00:00:00'));
+    $base   = setting_f('arv_base_inr', 1.78);
 
     $stats = $meta['nav'] !== null ? window_stats((float)$meta['nav']) : null;
 
@@ -154,7 +154,7 @@ function handle_candles(): void
         json_fail(422, 'Unknown timeframe.');
     }
 
-    $launch = strtotime((string)setting('launch_at', '2021-09-01 00:00:00'));
+    $launch = strtotime((string)setting('launch_at', '2015-07-20 00:00:00'));
     $from   = $days !== null ? max($launch, time() - $days * 86400) : $launch;
 
     $rows = q(

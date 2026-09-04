@@ -102,7 +102,10 @@ candles, complete about three minutes after the scheduler starts.
 
 One timeframe per run rather than all three, because all three take about
 thirty-five seconds and a scheduled job should finish inside its own minute. Progress
-is kept in `auto_backfill_next`, which walks `1D → 1h → 1m → done`.
+is kept in `auto_backfill_next`, which walks `1D → 1W → 1h → 15m → 5m → 1m → done`.
+Daily and weekly reach back to the 2015 launch; the sub-hour frames only cover the
+recent window a free API will page, because no free source serves minute data ten
+years deep.
 
 If an exchange refuses to page history it retries on the next run, and after twenty
 refusals it stops and records `stalled` rather than hammering a free endpoint all
@@ -227,7 +230,7 @@ Settings. No deploy needed.
 | `web_tick` | 1 | Let a page load refresh a stale price. Set to 0 once the cron is trusted |
 | `web_tick_min_seconds` | 45 | Floor between fallback fetches, so a dead feed cannot be retried on every request |
 | `auto_backfill` | 1 | Let the cron build an empty chart |
-| `auto_backfill_next` | 1D | Progress: `1D → 1h → 1m → done`. Set back to `1D` to rebuild |
+| `auto_backfill_next` | 1D | Progress: `1D → 1W → 1h → 15m → 5m → 1m → done`. Set back to `1D` to rebuild |
 
 The launch reference — `launch_at`, `base_btc_usd`, `base_fx_usd_inr` — is also in
 `settings`, but **changing it after anyone has traded rewrites the entire price

@@ -68,10 +68,29 @@
   //   BTC/USD open of the 2021-09-01 00:00 UTC daily candle = 47110.33  (Coinbase)
   //   USD/INR reference for that date                        = 73.073   (Frankfurter)
   //
-  // A five-year history is the point of that date. An index with a few months
-  // behind it tells a reader nothing — five years covers a full cycle, including
-  // the 2022 drawdown, so the chart shows what holding this actually feels like
-  // rather than only the pleasant stretch.
+  // A roughly ten-year history is the point of that date. The launch anchor is
+  // 2015-07-20 — the day Coinbase listed BTC-USD and the earliest date a free
+  // exchange API (Coinbase, then OKX) reliably serves daily Bitcoin candles. An
+  // index with a few years behind it covers a couple of full cycles; ten years
+  // covers the 2017 run, the 2018 winter, the 2021 top, the 2022 drawdown and
+  // the 2024-25 recovery, so the chart shows what holding this actually feels
+  // like rather than only the pleasant stretch.
+  //
+  // HONEST DATA LIMIT — read before "improving" this. Free exchange APIs serve
+  // *daily* Bitcoin only back to ~2015, and NO free source serves *minute* data
+  // ten years deep (five years of 1m alone is ~2.6M rows). So the deep history
+  // is genuinely daily/weekly, and the minute/tick-by-tick view only exists for
+  // the recent window. The chart is tiered on purpose; we do not synthesise fake
+  // candles to paper over the gap. See README.md ("A note on history depth").
+  //
+  // Both anchor figures are real, published observations for 2015-07-20 and are
+  // never revised, because the whole index hangs off them: BTC/USD daily open
+  // ≈ $277.89, USD/INR ≈ 63.50 that day.
+  //
+  // arvBaseInr is chosen together with the launch so that today's price sits
+  // near ₹1000 rather than a couple of rupees. With a 2015 launch the
+  // now/launch multiple is large (~560x for BTC≈$110k, USD/INR≈90), so the base
+  // is small: 1000 / 560 ≈ 1.78. See the NAV arithmetic in README/SETUP.
   //
   // Quoted in rupees because deposits are rupees and the treasury holds Bitcoin.
   // That makes ARV's printed change equal what the money actually did, currency
@@ -80,11 +99,11 @@
   //
   var INDEX = {
     quote: 'INR',
-    arvBaseInr: 1.0,
-    launchIso: '2021-09-01T00:00:00Z',
-    launchMs: Date.UTC(2021, 8, 1, 0, 0, 0),
-    baseUsd: { BTC: 47110.33 },
-    baseFxUsdInr: 73.073,
+    arvBaseInr: 1.78,
+    launchIso: '2015-07-20T00:00:00Z',
+    launchMs: Date.UTC(2015, 6, 20, 0, 0, 0),
+    baseUsd: { BTC: 277.89 },
+    baseFxUsdInr: 63.50,
     rebalance: 'drift',
     priceDecimals: 4,
     unitDecimals: 8
