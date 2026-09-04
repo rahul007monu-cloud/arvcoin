@@ -70,7 +70,34 @@ declare(strict_types=1);
 // re-queues the backfill chain from the head so the new BTC asset steps actually
 // run on installs whose chain had already reached 'done'. Candles/scheduling/
 // settings only — no wallet, lot, ledger, or unit writes.
-const ARV_SCHEMA_VERSION = 11;
+//
+// 12 is a CORRECTIVE UNIT RESCALE — a money-path repair. Schema-8 correctly
+// paired its anchor move (arv_base_inr 1.0 → 1.78) with a rescale of every
+// holding's UNIT COUNT by F = newNav/oldNav, so value = units × NAV and paise
+// cost basis were preserved. But schema-9 (1.78 → 17.83) and schema-10
+// (17.83 → 21.08) BOTH changed the anchor WITHOUT rescaling units. So on the
+// live DB the anchor is 21.08 while unit counts are still at the 1.78 scale
+// (last rescaled at v8): NAV = base × (BTC market terms that CANCEL) is
+// (21.08/1.78) ≈ 11.84× too high relative to the units, so value = units × NAV
+// is inflated ~11.84× while invested_paise (real rupees) is unchanged → a
+// phantom unrealised profit of ~11.84×. Schema-12 fixes ONLY the unit counts:
+// it divides qualifying old-anchor unit counts by F = 21.08/1.78, multiplies
+// their lots.nav by F, recomputes each wallet from its own lots, posts one
+// compensating append-only ledger 'adjustment' per affected holder (ref
+// rescale_v12) so the reconcile stays balanced, and zeroes dust — mirroring v8
+// EXACTLY. It does NOT change any anchor setting (21.08 is correct) and never
+// touches invested_paise / cost_paise / realised P&L.
+//
+// !!!  INVARIANT FOR ALL FUTURE MIGRATIONS  !!!
+// NAV = arv_base_inr × (BTC_now_inr / BTC_launch_inr). ANY change to
+// arv_base_inr (or the launch/base_btc_usd/base_fx_usd_inr anchors that define
+// NAV) rescales every existing holding's value by a constant factor F. A change
+// to those settings MUST be paired with a unit-count rescale like schema-8/12
+// (divide unit counts by F, multiply lots.nav by F, post a compensating ledger
+// adjustment, recompute wallets from lots), or every existing holding's value —
+// and its unrealised P&L — is silently multiplied by F. Schema-9 and schema-10
+// forgot this and created the very bug schema-12 repairs. Do NOT repeat it.
+const ARV_SCHEMA_VERSION = 12;
 
 function arv_schema(): array
 {
@@ -1025,6 +1052,15 @@ function arv_migrations(PDO $pdo): array
     // per-unit NAV/candles, not the unit counts. There is no re-division of
     // units and no ledger entry from this migration.
     //
+    // !!!  BUG THAT SCHEMA-12 HAD TO REPAIR  !!!  Changing arv_base_inr here
+    // (1.78 → 17.83) multiplied NAV — and therefore value = units × NAV — by
+    // 17.83/1.78 ≈ 10× for EVERY existing holding, while invested_paise stayed
+    // fixed, producing phantom unrealised profit. Because this block left the
+    // unit counts alone, that inflation went live. An anchor change MUST be
+    // paired with a unit rescale (see schema-8 and the corrective schema-12);
+    // "settings carry no money" is true of the setting ROW, but the NAV it
+    // defines most certainly does. Do NOT change an anchor without a rescale.
+    //
     // Guarded by its own flag so it runs exactly once and is idempotent.
     $anchorFlag = 'anchor_recomputed_v9';
     if (!setting_b($anchorFlag, false)) {
@@ -1087,6 +1123,14 @@ function arv_migrations(PDO $pdo): array
     //
     // Does NOT touch: wallets, lots, ledger, fills, users, cost basis — only
     // settings + arv_candles.
+    //
+    // !!!  SAME BUG AS SCHEMA-9  !!!  Force-setting arv_base_inr (17.83 → 21.08)
+    // again multiplied NAV — and value = units × NAV — for every existing
+    // holding, with no matching unit rescale, compounding the phantom profit v9
+    // introduced. Net effect of v9+v10 vs the last rescale at v8: value inflated
+    // by 21.08/1.78 ≈ 11.84×. Repaired by schema-12. ANY future anchor change
+    // MUST be paired with a unit rescale (schema-8/12) — do not change an anchor
+    // here without one.
     $wipeFlag = 'candles_wiped_v10';
     $rescaledOk = setting_b('units_rescaled_v8', false);   // (a)
     if ($rescaledOk && !setting_b($wipeFlag, false)) {     // (b)
@@ -1168,6 +1212,222 @@ function arv_migrations(PDO $pdo): array
         $done[] = 'schema-11: ARV chart now derives from BTC asset_candles; re-queued the '
                 . 'backfill chain so BTC gets full asset_candles history at every timeframe '
                 . '(candles/scheduling only; no wallet/lot/ledger/unit writes)';
+    }
+
+    // ---------------------------------------------------------------------
+    // Schema 12: CORRECTIVE UNIT RESCALE for the anchor moves schema-9 and
+    // schema-10 made without one. This is a MONEY-PATH repair and is written as
+    // defensively as schema-8, which it mirrors EXACTLY.
+    //
+    // The disease. NAV = arv_base_inr × (BTC_now_inr / BTC_launch_inr). Schema-8
+    // rescaled every holding's unit COUNT when it moved the anchor to 1.78, so
+    // value = units × NAV and paise cost basis were preserved. Schema-9
+    // (1.78 → 17.83) and schema-10 (17.83 → 21.08) then moved the anchor again
+    // but did NOT rescale units. So today the anchor is 21.08 while the unit
+    // counts are still at the 1.78 scale (last rescaled at v8). The current NAV
+    // is therefore (21.08/1.78) ≈ 11.84× too high relative to the units, so
+    // value = units × NAV is inflated ~11.84× while invested_paise (immutable,
+    // real rupees) is unchanged → a phantom unrealised profit of ~11.84×. The
+    // wallet_public() arithmetic (value − invested) is correct; the DATA is wrong.
+    //
+    // The cure (identical shape to schema-8):
+    //   F = current_anchor / anchor_units_were_last_rescaled_at = 21.08 / 1.78.
+    //   Because NAV = base × (market terms that cancel), F is EXACTLY the ratio
+    //   of the two arv_base_inr values — no market data needed. Computed in SQL
+    //   as a DECIMAL expression from the two string literals, never a PHP float.
+    //   Divide qualifying unit counts by F, multiply lots.nav by F. Then
+    //   units_new × NAV_now == units_old × NAV_at_1.78_scale: value and paise
+    //   cost basis preserved, only the printed unit count and per-unit price move.
+    //
+    // CRITICAL GUARD — only OLD-anchor (1.78-era) holdings, never current-anchor
+    // holdings. A lot bought at the 1.78 anchor has nav ≈ ₹1,000 (1.78 × the
+    // ~561 BTC now/launch multiple). A lot bought at the current 21.08 anchor has
+    // nav ≈ ₹11,800. These bands are an order of magnitude apart, so we rescale a
+    // lot ONLY when nav < 5000 — safely between ₹1,000 and ₹10,000+. Rescaling a
+    // lot already at the current anchor would BREAK it (divide a correct holding
+    // by 11.84); the threshold prevents that. (Operator: before running on the
+    // live DB, eyeball SELECT id,nav,acquired_at FROM lots ORDER BY nav to
+    // confirm the two bands really are cleanly separated by 5000 for your data.)
+    //
+    // Wallets are RECOMPUTED FROM LOTS, never blindly divided, because a wallet
+    // may hold a mix of old- and new-anchor lots. The true invariant (verified in
+    // the code: sell orders escrow units wallet→locked but consume lots only at
+    // FILL) is arv_units + arv_locked_units == Σ lots.units_remaining. So after
+    // rescaling lots we set arv_locked_units = Σ the holder's OPEN SELL orders'
+    // locked_units and arv_units = Σ lots.units_remaining − arv_locked_units.
+    // That keeps both the wallet⇄lots invariant and the wallet⇄orders invariant
+    // (wallets.arv_locked_units == Σ open sell orders.locked_units) intact.
+    //
+    // Open sell orders. locked_units live only on resting SELL orders (buys lock
+    // rupees). Cancelling an order returns its locked_units to the wallet, so if
+    // we rescale a holder's lots but leave a stale un-rescaled order, a later
+    // cancel would return 11.84× too many units. We therefore rescale open sell
+    // orders' locked_units by /F, but ONLY for holders whose held lots are
+    // UNAMBIGUOUSLY old-anchor (they have an open lot with nav < 5000 and NO open
+    // lot with nav >= 5000). Done BEFORE the lot rescale, while nav < 5000 still
+    // identifies old lots. A holder with a genuinely MIXED book (both bands) is
+    // left for manual live-DB review (see report) — an early-site rarity — and
+    // the recompute clamps arv_units at 0 so no invariant is violated meanwhile.
+    //
+    // invested_paise / cost_paise / realised_pnl_paise are IMMUTABLE (real
+    // rupees) — never touched, exactly like schema-8. One compensating
+    // append-only ledger 'adjustment' (ref rescale_v12) is posted per holder
+    // whose total units actually changed, for the exact unit delta computed in
+    // SQL, so Σ wallets units == Σ ledger arv_delta_units stays balanced. Dust:
+    // a lot flooring to 0 units gets cost_paise zeroed; a wallet flooring to 0
+    // total units gets invested_paise zeroed — same as schema-8. Guarded by
+    // units_rescaled_v12, wrapped in a transaction with rollback on error.
+    //
+    // Does NOT change any anchor setting (21.08 is correct — ~$100 today) and
+    // does NOT touch arv-config.js.
+    $rescaleV12Flag = 'units_rescaled_v12';
+    if (!setting_b($rescaleV12Flag, false)) {
+        // We can only compute F = 21.08/1.78 safely when the anchor is actually
+        // at 21.08 AND v8 established the 1.78 unit scale. If an operator has
+        // hand-tuned arv_base_inr to something else, F is unknown — record the
+        // flag so we never try again, but leave every unit and setting alone.
+        $lastRescaleAnchor = '1.78';   // anchor at which units were last rescaled (v8)
+        $curAnchor         = '21.08';  // current canonical anchor (v10), unchanged here
+        $onKnownAnchors =
+            setting_b('units_rescaled_v8', false) &&
+            (string)setting('arv_base_inr', '') === $curAnchor;
+
+        if ($onKnownAnchors) {
+            // F as a SQL DECIMAL from the two anchor literals bound as strings —
+            // no PHP float ever touches a unit count. F = 21.08 / 1.78 ≈ 11.8427.
+            $fExpr = '(CAST(? AS DECIMAL(30,10)) / CAST(? AS DECIMAL(30,10)))';
+            $fArgs = [$curAnchor, $lastRescaleAnchor];
+
+            // Reusable correlated sub-expressions, kept byte-identical between the
+            // ledger INSERT and the wallet UPDATE so the two agree to the last
+            // representable digit and the reconcile stays exactly balanced.
+            //   sumLots  = Σ this holder's lots.units_remaining  (= total held)
+            //   sumLock  = Σ this holder's OPEN SELL orders.locked_units (= locked)
+            //   newAvail = GREATEST(sumLots − sumLock, 0)
+            //   newTotal = newAvail + sumLock   (== sumLots unless clamped)
+            $sumLots = 'COALESCE((SELECT SUM(l.units_remaining) FROM lots l WHERE l.user_id = w.user_id), 0)';
+            $sumLock = "COALESCE((SELECT SUM(o.locked_units) FROM orders o
+                                   WHERE o.user_id = w.user_id AND o.side = 'sell'
+                                     AND o.status IN ('open','triggered','partial')), 0)";
+            $newAvail  = "GREATEST({$sumLots} - {$sumLock}, 0)";
+            $newTotal  = "({$newAvail} + {$sumLock})";
+            $oldTotal  = '(w.arv_units + w.arv_locked_units)';
+
+            $pdo->beginTransaction();
+            try {
+                // (1) Rescale open SELL orders by /F for holders whose held units
+                // are unambiguously old-anchor. ALL unit-denominated fields move
+                // together (units, filled_units, locked_units) so the order stays
+                // internally consistent — the matching engine reads order.units for
+                // its "fully filled" check ($filled >= $total in _match.php) and
+                // consume_lots pulls the remaining locked units from the (rescaled)
+                // lots, so a half-rescaled order would never fill out and would
+                // return the wrong quantity on cancel. The rupee fields
+                // (filled_paise, locked_paise) are NOT touched: a sell locks units,
+                // not rupees, and any filled_paise is real historical proceeds.
+                // MUST run before the lot rescale, while nav < 5000 still marks old
+                // lots. side='sell' only (buys lock rupees, not units).
+                $ord = $pdo->prepare(
+                    "UPDATE orders o
+                        SET o.units = o.units / {$fExpr},
+                            o.filled_units = o.filled_units / {$fExpr},
+                            o.locked_units = o.locked_units / {$fExpr}
+                      WHERE o.side = 'sell'
+                        AND o.status IN ('open','triggered','partial')
+                        AND EXISTS (SELECT 1 FROM lots l
+                                     WHERE l.user_id = o.user_id
+                                       AND l.units_remaining > 0 AND l.nav < 5000)
+                        AND NOT EXISTS (SELECT 1 FROM lots l2
+                                         WHERE l2.user_id = o.user_id
+                                           AND l2.units_remaining > 0 AND l2.nav >= 5000)"
+                );
+                $ord->execute(array_merge($fArgs, $fArgs, $fArgs));
+
+                // (2) Rescale ONLY old-anchor lots: divide unit counts by F,
+                // multiply per-lot nav by F. cost_paise is left exactly as it was.
+                // The nav < 5000 guard leaves current-anchor lots (nav ≈ ₹11.8k)
+                // untouched.
+                $lot = $pdo->prepare(
+                    "UPDATE lots
+                        SET units = units / {$fExpr},
+                            units_remaining = units_remaining / {$fExpr},
+                            nav = nav * {$fExpr}
+                      WHERE nav < 5000"
+                );
+                $lot->execute(array_merge($fArgs, $fArgs, $fArgs));
+
+                // (3) BEFORE touching wallets, post one compensating 'adjustment'
+                // per holder whose TOTAL units actually change, recording the exact
+                // delta = newTotal − oldTotal computed in SQL against the DECIMAL
+                // columns (no PHP float; the append-only INSERT is the sanctioned
+                // way to correct the ledger). newTotal here is byte-identical to
+                // what the wallet UPDATE in (4) writes, so Σ wallets units and
+                // Σ ledger arv_delta_units stay equal to the last digit.
+                $ledgerAdj = $pdo->prepare(
+                    "INSERT INTO ledger (user_id, kind, inr_delta_paise, arv_delta_units, nav, ref, note, fy)
+                     SELECT w.user_id, 'adjustment', 0,
+                            {$newTotal} - {$oldTotal},
+                            NULL, 'rescale_v12',
+                            'Corrective rescale: schema-9/10 moved arv_base_inr (1.78→17.83→21.08) without rescaling unit counts; units divided by F = 21.08/1.78, lots.nav ×F. Holding value and paise cost basis unchanged.',
+                            ''
+                       FROM wallets w
+                      WHERE {$newTotal} <> {$oldTotal}"
+                );
+                $ledgerAdj->execute();
+
+                // (4) Recompute every wallet from its own lots + open sell orders.
+                // arv_locked_units = Σ open sell orders.locked_units (already
+                // rescaled in step 1 where applicable); arv_units = the rest of the
+                // holder's lots. GREATEST(...,0) both satisfies chk_wallet_nonneg
+                // and clamps the rare mixed-book edge (documented) without ever
+                // breaking the reconcile, since (3) used the identical expression.
+                $wal = $pdo->prepare(
+                    "UPDATE wallets w
+                        SET w.arv_locked_units = {$sumLock},
+                            w.arv_units        = {$newAvail}"
+                );
+                $wal->execute();
+
+                // (5) Dust coherence, identical to schema-8. Dividing a
+                // DECIMAL(28,8) by F ≈ 11.84 floors sub-~1.2e-7 holdings to 0.
+                // Cost basis in paise is deliberately untouched by the rescale, so
+                // a floored holding would otherwise strand invested/cost > 0 against
+                // 0 units (value = units×nav = 0, a phantom −100% position). The
+                // residual is genuine dust; collapse it to a clean zero.
+                //
+                // Lots first: a lot with no remaining units carries no live cost
+                // basis (consume_lots only reads units_remaining > 0).
+                $pdo->prepare(
+                    'UPDATE lots SET cost_paise = 0 WHERE units_remaining = 0 AND cost_paise <> 0'
+                )->execute();
+
+                // Wallets: a holder floored to zero total units drops the stranded
+                // invested_paise. Realised P&L already booked stays as-is.
+                $pdo->prepare(
+                    'UPDATE wallets SET invested_paise = 0
+                      WHERE (arv_units + arv_locked_units) = 0 AND invested_paise <> 0'
+                )->execute();
+
+                $pdo->commit();
+                $done[] = 'schema-12: corrective unit rescale by F = 21.08/1.78 (≈11.84) for old-anchor '
+                        . 'holdings (lots.nav < 5000) that schema-9/10 left un-rescaled; divided their '
+                        . 'unit counts by F, multiplied lots.nav by F, rescaled matching open-sell '
+                        . 'locked_units, recomputed wallets from lots, posted per-holder ledger '
+                        . 'adjustments (rescale_v12), zeroed dust — value + paise cost basis preserved, '
+                        . 'anchor unchanged';
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                throw $e;
+            }
+        } else {
+            $done[] = 'schema-12: skipped unit rescale — anchor is not the canonical 21.08 (or v8 '
+                    . 'never ran), so F = 21.08/1.78 is not known to apply; left units and settings untouched';
+        }
+
+        // Record the flag regardless, so the rescale can never run twice.
+        setting_set($rescaleV12Flag, '1');
     }
 
     if ($done) {
