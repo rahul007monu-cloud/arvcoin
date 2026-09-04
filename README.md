@@ -1,6 +1,6 @@
 # ARV Coin
 
-**One unit, ₹1 at launch, tracking Bitcoin one for one in rupees.**
+**One unit, ₹1.78 at the 2015 launch, tracking Bitcoin one for one in rupees.**
 
 Deposit by UPI, buy ARV, watch it move with Bitcoin minute by minute, sell back to
 your bank. Fees, GST, FIFO cost basis and Indian VDA tax are computed and itemised
