@@ -308,10 +308,13 @@ export function mountNav(user) {
     + '<a href="index.html" class="brand">'
       + '<span class="brand-mark">A</span><span>' + esc(CFG.UI.brand) + '</span></a>'
     + '<div class="nav-links" data-navlinks>' + links + '</div>'
-    + '<div class="nav-ticker" data-nav-ticker hidden>'
+    // The live price is a link to the chart: tapping the ARV price anywhere in
+    // the header takes you straight to the trade chart.
+    + '<a href="trade.html" class="nav-ticker" data-nav-ticker hidden'
+      + ' title="Open the ARV chart" style="text-decoration:none;cursor:pointer">'
       + '<span class="k">ARV</span>'
       + '<span class="num" data-nav-price>\u2014</span>'
-      + '<span class="chip flat" data-nav-change>\u2014</span></div>'
+      + '<span class="chip flat" data-nav-change>\u2014</span></a>'
     + '<div class="row" style="gap:8px">' + right + '</div>'
     + '<button class="nav-toggle" data-navtoggle aria-label="More" aria-expanded="false">\u2261</button>'
     + '</div></nav>'
