@@ -51,8 +51,7 @@ function paintWallet() {
   ui.setText('[data-units]', ui.fmtUnits(w.arvUnits, 4));
   // Holding value is priced at the live NAV, so it carries the $ companion. The
   // rate comes from the snapshot via paintNavTicker; falls back to config.
-  ui.setHtml('[data-value]', ui.fmtPaise(w.valuePaise)
-    + ' <span class="price-usd">(' + ui.fmtUsd(w.valuePaise / 100) + ')</span>');
+  ui.setHtml('[data-value]', ui.fmtDualPaise(w.valuePaise));
   if (parseFloat(w.arvLockedUnits) > 0) {
     var lu = ui.el('[data-units-locked]');
     lu.classList.remove('hidden');

@@ -57,8 +57,7 @@ function paintPortfolio() {
   ui.setText('[data-cash]', ui.fmtPaise(cashPaise));
   // ARV holding value is priced at the live NAV, so it carries the muted $
   // companion. avgCostNav below stays ₹-only \u2014 it is a historical cost basis.
-  ui.setHtml('[data-arv-value]', ui.fmtPaise(arvPaise)
-    + ' <span class="price-usd">(' + ui.fmtUsd(arvPaise / 100) + ')</span>');
+  ui.setHtml('[data-arv-value]', ui.fmtDualPaise(arvPaise));
   ui.setText('[data-units]', ui.fmtUnits(w.arvTotalUnits, 4));
 
   var cashPct = totalPaise > 0 ? (cashPaise / totalPaise) * 100 : 0;

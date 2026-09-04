@@ -87,6 +87,20 @@ export function fmtDual(rupees, dRs, dUsd) {
   return rs + ' <span class="price-usd">(' + usd + ')</span>';
 }
 
+/**
+ * The paise-input twin of fmtDual, for wallet/portfolio value surfaces that
+ * carry integer paise rather than a rupee price. The ₹ figure leads via
+ * fmtPaise; the $ companion trails in the same muted .price-usd span. It obeys
+ * the identical fallback contract as fmtDual — when the dollar value cannot be
+ * formed (no rate / non-finite), the ₹ figure stands ALONE with no stray '(—)'.
+ */
+export function fmtDualPaise(paise, dUsd) {
+  var rs = fmtPaise(paise);
+  var usd = fmtUsd((paise || 0) / 100, dUsd);
+  if (usd === '\u2014') return rs;
+  return rs + ' <span class="price-usd">(' + usd + ')</span>';
+}
+
 export function fmtBig(rupees) {
   if (rupees == null || !isFinite(rupees)) return '\u2014';
   return symbol + Math.round(rupees).toLocaleString(locale);

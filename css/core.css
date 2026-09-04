@@ -307,7 +307,11 @@ hr { border: 0; border-top: 1px solid var(--line); margin: var(--sp-5) 0; }
    active tab lights up like the top nav's .on state. */
 .tabbar { display: none; }
 
-@media (max-width: 760px) {
+/* Matches the 880px breakpoint where .nav-links collapse into the "More"
+   hamburger (see the 880px block). Aligning the two means the moment the inline
+   top links disappear, the bottom tab bar takes over as the primary navigation,
+   with no dead band (previously 761-880px showed only the hamburger). */
+@media (max-width: 880px) {
   .tabbar {
     display: flex; position: fixed; z-index: 200;
     left: 0; right: 0; bottom: 0;
