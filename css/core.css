@@ -1434,3 +1434,46 @@ table.data tfoot td {
 .google-slot iframe {
   max-width: 100% !important;
 }
+
+
+/* ------------------------------------------------------ PWA install banner --
+
+   A visible, dismissible "Install app" prompt shown when the browser reports the
+   app is installable (beforeinstallprompt). Fixed near the bottom; on mobile it
+   sits above the fixed bottom tab bar so the two never overlap. */
+.pwa-install {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  width: min(440px, calc(100vw - 24px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #14141b;
+  border: 1px solid var(--line-2);
+  border-radius: 16px;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.55);
+}
+.pwa-install[hidden] { display: none; }
+.pwa-install .pwa-ic .brand-mark { width: 34px; height: 34px; }
+.pwa-install .pwa-tx { display: flex; flex-direction: column; flex: 1; line-height: 1.28; }
+.pwa-install .pwa-tx b { font-size: 13px; color: var(--tx-1); }
+.pwa-install .pwa-tx span { font-size: 11px; color: var(--tx-2); }
+.pwa-install .pwa-x {
+  background: none;
+  border: 0;
+  color: var(--tx-2);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.pwa-install .pwa-x:hover { color: var(--tx-1); }
+
+/* Clear the mobile bottom tab bar (shown at <=880px). */
+@media (max-width: 880px) {
+  .pwa-install { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+}
