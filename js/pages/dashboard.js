@@ -30,7 +30,6 @@ function paintWallet() {
   var u = st.user;
   if (!u) return;
   var w = u.wallet;
-  var nav = st.snap && st.snap.price ? st.snap.price.nav : null;
 
   ui.setText('[data-greeting]',
     (u.fullName ? u.fullName.split(' ')[0] : 'Welcome') + (u.fullName ? '\u2019s wallet' : ''));
@@ -52,17 +51,8 @@ function paintWallet() {
     lu.textContent = '\u00b7 ' + ui.fmtUnits(w.arvLockedUnits, 4) + ' in open orders';
   }
 
-  ui.setText('[data-invested]', ui.fmtPaise(w.investedPaise));
-  ui.setText('[data-avg-cost]', w.avgCostNav > 0 ? ui.fmtPrice(w.avgCostNav) : '\u2014');
-
-  ui.paintSigned('[data-unrealised]', w.unrealisedPaise, { base: 'stat-v' });
-  ui.paintChange('[data-unrealised-pct]', w.unrealisedPct);
-  ui.paintSigned('[data-realised]', w.realisedPaise, { base: 'stat-v' });
-
-  if (nav != null) {
-    ui.paintPrice('[data-price]', nav, 'dash');
-    if (st.snap.stats) ui.paintChange('[data-change]', st.snap.stats.change24hPct);
-  }
+  // Full P&L (invested, unrealised, realised, avg cost) and the exit breakdown
+  // now live on portfolio.html; the Wallet stays focused on cash and units.
 
   // Referral
   ui.setText('[data-ref-code]', u.referralCode || '\u2014');
@@ -89,72 +79,6 @@ function paintPaused() {
   box.classList.toggle('hidden', !paused);
   if (paused) {
     ui.setText('[data-paused-reason]', (f && f.note) || 'The price feed is not current.');
-  }
-}
-
-/* ------------------------------------------------------------------ what-if -- */
-
-/**
- * The full cost of exiting, computed from the live price.
- *
- * Uses the same percentages the server charges. It is an estimate only because
- * the price moves between here and a fill — which the note says rather than
- * implying a guarantee.
- */
-async function paintWhatIf() {
-  var host = ui.el('[data-whatif]');
-  if (!host || !st.user) return;
-
-  var w = st.user.wallet;
-  var units = w ? parseFloat(w.arvTotalUnits) : 0;
-
-  if (!units) {
-    host.innerHTML = '<div class="ledger-row"><span class="l muted">'
-      + 'You hold no units yet. <a href="trade.html">Buy ARV</a></span></div>';
-    return;
-  }
-
-  try {
-    // Ask the server: it applies the user's own tier fees, their PAN status and
-    // their financial-year TDS position, none of which the browser should guess.
-    var r = await api.quoteSell(parseFloat(w.arvUnits) || units);
-    var q = r.quote;
-
-    host.innerHTML = rows([
-      ['Gross value', q.grossPaise, 'gross'],
-      ['Exit fee + GST', -(q.feePaise + q.gstPaise), 'charge'],
-      ['TDS withheld' + (q.tds && q.tds.applies ? ' (' + q.tds.ratePct + '%)' : ''),
-       -q.tdsPaise, 'tds', q.tds ? q.tds.reason : null],
-      ['Credited to rupees', q.netPayoutPaise, 'net'],
-      [null],
-      ['Cost of acquisition', q.costBasisPaise, 'info'],
-      [q.pnlPaise >= 0 ? 'Realised gain' : 'Realised loss', q.pnlPaise, 'pnl'],
-      ['Tax at ' + q.effectiveTaxPct.toFixed(1) + '%', q.totalTaxPaise, 'liability',
-       'Not withheld \u2014 payable by you when you file'],
-      ['Balance at filing', q.balanceTaxPaise, 'liability-total']
-    ]);
-
-    if (q.lossNotSetOff) {
-      host.insertAdjacentHTML('beforeend',
-        '<div class="ledger-row k-warning"><span class="note">This loss could not be set '
-        + 'off against other gains or carried forward \u2014 section 115BBH permits neither.'
-        + '</span></div>');
-    }
-  } catch (e) {
-    host.innerHTML = '<div class="ledger-row"><span class="l muted">'
-      + ui.esc(e.message || 'Cannot price a sale right now.') + '</span></div>';
-  }
-
-  function rows(list) {
-    return list.map(function (r) {
-      if (!r[0]) return '<div class="ledger-divider"></div>';
-      var neg = r[1] < 0;
-      return '<div class="ledger-row k-' + (r[2] || 'info') + '">'
-        + '<span class="l">' + ui.esc(r[0]) + '</span>'
-        + '<span class="a">' + (neg ? '\u2212' : '') + ui.fmtPaise(Math.abs(r[1] || 0)) + '</span>'
-        + (r[3] ? '<span class="note">' + ui.esc(r[3]) + '</span>' : '')
-        + '</div>';
-    }).join('');
   }
 }
 
@@ -418,7 +342,7 @@ async function refresh() {
   paintPaused();
   ui.paintNavTicker(st.snap);
   ui.paintServerFeed(st.snap);
-  await Promise.all([loadOrders(), paintWhatIf()]);
+  await loadOrders();
 }
 
 (async function () {
@@ -439,7 +363,6 @@ async function refresh() {
   loadOrders();
   loadActivity();
   loadWatchlist();
-  paintWhatIf();
 
   ui.on('[data-copy-ref]', 'click', function (e) {
     var link = location.origin + '/signup.html?ref=' + (st.user.referralCode || '');

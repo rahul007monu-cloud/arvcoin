@@ -88,31 +88,15 @@
     </div>
   </div>
 
-  <!-- ================================================================ P&L -->
-  <div class="grid g-4" data-reveal-group style="margin-bottom:var(--sp-4)">
-    <div class="card card-tight card-lift" data-reveal><div class="stat">
-      <span class="stat-k">ARV price</span>
-      <span class="stat-v" data-price>—</span>
-      <span class="stat-sub"><span class="chip flat" data-change>—</span> 24h</span>
-    </div></div>
-
-    <div class="card card-tight card-lift" data-reveal><div class="stat">
-      <span class="stat-k">Invested</span>
-      <span class="stat-v" data-invested>—</span>
-      <span class="stat-sub">at <span data-avg-cost>—</span> average</span>
-    </div></div>
-
-    <div class="card card-tight card-lift" data-reveal><div class="stat">
-      <span class="stat-k">Unrealised</span>
-      <span class="stat-v" data-unrealised>—</span>
-      <span class="stat-sub"><span class="chip flat" data-unrealised-pct>—</span></span>
-    </div></div>
-
-    <div class="card card-tight card-lift" data-reveal><div class="stat">
-      <span class="stat-k">Realised</span>
-      <span class="stat-v" data-realised>—</span>
-      <span class="stat-sub">from completed sales</span>
-    </div></div>
+  <!-- ============================================ full portfolio pointer -->
+  <div class="card card-tight" data-reveal style="margin-bottom:var(--sp-4)">
+    <div class="row-between row-wrap">
+      <div class="small muted">
+        Invested, unrealised and realised P&amp;L, your average cost and a full
+        exit-after-tax breakdown now live on your Portfolio.
+      </div>
+      <a href="portfolio.html" class="btn btn-ghost btn-sm arrow">View full portfolio</a>
+    </div>
   </div>
 
   <div class="split">
@@ -177,20 +161,6 @@
 
     <!-- ============================================================ side -->
     <div class="stack">
-
-      <!-- what selling everything would net -->
-      <div class="card card-tight" data-reveal>
-        <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
-          <h4 style="font-size:.95rem">If you sold everything now</h4>
-        </div>
-        <div class="ledger-list" data-whatif>
-          <div class="ledger-row"><span class="l muted">—</span></div>
-        </div>
-        <div class="tiny muted" style="margin-top:var(--sp-3)">
-          The 30% plus cess is your own liability at filing, not something withheld
-          here. Only the exit fee, GST and 1% TDS come off the payout.
-        </div>
-      </div>
 
       <!-- market -->
       <div class="card card-flush" data-reveal>
