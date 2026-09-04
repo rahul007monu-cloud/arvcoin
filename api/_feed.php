@@ -894,17 +894,38 @@ function auto_backfill_step(): ?array
         $r = $assetKey !== null ? backfill_asset_tf($assetKey, $tf) : backfill_tf($tf);
         setting_set('auto_backfill_next', auto_backfill_after($next));
         setting_set('auto_backfill_fails', '0');
+        setting_set('auto_backfill_fail_step', '');
         $r['auto'] = true;
         return $r;
     } catch (Throwable $e) {
         // An exchange that will not page history is normal and usually temporary,
-        // so this retries on the next run. But not for ever: after twenty refusals
-        // it stops and says so, rather than hammering a free endpoint all day and
-        // burning the goodwill that makes the fallback sources work at all.
-        $fails = setting_i('auto_backfill_fails', 0) + 1;
+        // so this retries on the next run. But not for ever, and — crucially — the
+        // failure is isolated to the ONE step that failed. The fail counter is
+        // scoped to the current step (recorded in auto_backfill_fail_step): the
+        // moment the step changes the count starts fresh, so a coin/timeframe an
+        // exchange refuses to page (e.g. a weekly a given asset will not serve)
+        // can no longer burn a shared budget and strand every later coin.
+        //
+        // After twenty refusals of the SAME step we SKIP past it to the next step
+        // in the chain rather than stalling the whole chain, so ARV -> ETH -> SOL
+        // -> XRP keeps walking even when one asset/timeframe is permanently
+        // unpageable. Only the final step skipping lands the chain on 'done'; it
+        // never lands on 'stalled'. (An operator who wants a hard stop can still
+        // set auto_backfill to false.)
+        $failStep = (string)setting('auto_backfill_fail_step', '');
+        $fails    = $failStep === $next ? setting_i('auto_backfill_fails', 0) + 1 : 1;
+        setting_set('auto_backfill_fail_step', $next);
         setting_set('auto_backfill_fails', (string)$fails);
         if ($fails >= 20) {
-            setting_set('auto_backfill_next', 'stalled');
+            // Give up on this one step, not the chain: advance and reset so the
+            // next step gets a clean budget.
+            setting_set('auto_backfill_next', auto_backfill_after($next));
+            setting_set('auto_backfill_fails', '0');
+            setting_set('auto_backfill_fail_step', '');
+            cron_record('backfill.auto', 'fail', 'skipped ' . $next . ' after ' . $fails
+                . ' attempts: ' . $e->getMessage());
+            return ['step' => $next, 'skipped' => 'unpageable after ' . $fails . ' attempts',
+                    'failed' => $e->getMessage()];
         }
         cron_record('backfill.auto', 'fail', $e->getMessage());
         return ['step' => $next, 'failed' => $e->getMessage(), 'attempt' => $fails];

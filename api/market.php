@@ -54,8 +54,8 @@ function handle_snapshot(): void
                 ORDER BY ts DESC LIMIT 1');
     $fx  = qval('SELECT usd_inr FROM fx_rates ORDER BY day DESC LIMIT 1');
 
-    $baseUsd = setting_f('base_btc_usd', 47110.33);
-    $baseFx  = setting_f('base_fx_usd_inr', 73.073);
+    $baseUsd = setting_f('base_btc_usd', 277.89);
+    $baseFx  = setting_f('base_fx_usd_inr', 63.50);
     $baseInr = $baseUsd * $baseFx;
     $btcInr  = ($btc && $fx) ? (float)$btc['close'] * (float)$fx : null;
 
@@ -73,7 +73,8 @@ function handle_snapshot(): void
             'fxUsdInr'    => $fx !== null ? (float)$fx : null,
             'btcChangePct'=> $btcInr !== null ? (($btcInr - $baseInr) / $baseInr) * 100 : null,
             'arvChangePct'=> $meta['nav'] !== null ? ((($meta['nav'] - $base) / $base) * 100) : null,
-            'formula'     => 'ARV = ₹1 × ( BTC now ÷ BTC at launch ), both in rupees',
+            'formula'     => 'ARV = ₹' . rtrim(rtrim(number_format($base, 2, '.', ''), '0'), '.')
+                             . ' × ( BTC now ÷ BTC at launch ), both in rupees',
         ],
         'feed'   => feed_health(),
     ]);

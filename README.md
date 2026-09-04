@@ -14,11 +14,13 @@ No build step, no framework, no node_modules in production.
 ## The whole product, in one formula
 
 ```
-ARV(t) = ₹1.00 × ( BTC(t) × FX(t) ) / ( BTC(launch) × FX(launch) )
+ARV(t) = ₹1.78 × ( BTC(t) × FX(t) ) / ( BTC(launch) × FX(launch) )
 ```
 
-Bitcoin doubles in rupee terms, ARV is ₹2. Bitcoin falls 8%, ARV is ₹0.92.
-Nothing else moves it.
+The ₹1.78 anchor is the base price at the 2015 launch; multiplied by Bitcoin's
+rupee gain since then it lands today's ARV near ₹1000. The multiple is all that
+moves it: if Bitcoin doubles in rupee terms from here, ARV doubles too; if
+Bitcoin falls 8%, ARV falls 8%. Nothing else moves it.
 
 The launch reference is stored in the `settings` table and never revised:
 

@@ -856,6 +856,32 @@ function arv_migrations(PDO $pdo): array
                        . ' / (CAST(? AS DECIMAL(30,10)) / (CAST(? AS DECIMAL(30,10)) * CAST(? AS DECIMAL(30,10)))))';
                 $fArgs = [$newBaseInr, $newBaseUsd, $newBaseFx, $oldBaseInr, $oldBaseUsd, $oldBaseFx];
 
+                // The ledger is the book of record and the admin reconcile view
+                // asserts Σ wallets.arv_units == Σ ledger.arv_delta_units. Dividing
+                // the wallet units by F without touching the (append-only) ledger
+                // would leave that check permanently unbalanced by the whole
+                // rescale, not the sub-1e-8 truncation noise. So BEFORE rescaling,
+                // post one compensating 'adjustment' entry per holder recording the
+                // exact unit change the rescale is about to make:
+                //     delta = new_total - old_total = old_total/F - old_total
+                // computed in SQL against the DECIMAL columns (no PHP float, and the
+                // append-only INSERT is the sanctioned way to correct the ledger).
+                // The delta is stored to DECIMAL(28,8), the same precision as the
+                // wallet columns, so the post-rescale wallet sum and the ledger sum
+                // agree to the last representable digit.
+                $ledgerAdj = $pdo->prepare(
+                    "INSERT INTO ledger (user_id, kind, inr_delta_paise, arv_delta_units, nav, ref, note, fy)
+                     SELECT user_id, 'adjustment', 0,
+                            (ROUND(arv_units / {$fExpr}, 8) + ROUND(arv_locked_units / {$fExpr}, 8))
+                                - (arv_units + arv_locked_units),
+                            NULL, 'rescale_v8',
+                            'Index rescaled to the 2015 / 1.78 rupee anchor: unit count divided by F, holding value and paise cost basis unchanged.',
+                            ''
+                       FROM wallets
+                      WHERE (arv_units + arv_locked_units) <> 0"
+                );
+                $ledgerAdj->execute(array_merge($fArgs, $fArgs));
+
                 // Divide the unit COUNTS by F (value preserved, cost basis paise
                 // untouched). All divisions happen inside MySQL on the DECIMAL
                 // columns.
@@ -874,8 +900,37 @@ function arv_migrations(PDO $pdo): array
                 );
                 $l->execute(array_merge($fArgs, $fArgs, $fArgs));
 
+                // Dust coherence. Dividing a DECIMAL(28,8) unit count by F ≈ 347
+                // truncates at 8 decimals, so any holding below ~3.5e-6 old units
+                // floors to exactly 0 units. Cost basis in paise is deliberately
+                // untouched, which for such a holding would leave a positive
+                // invested_paise / cost_paise with zero units — value = units×nav = 0
+                // while invested > 0, so avgCostNav (invested ÷ units) and unrealised
+                // P&L become incoherent (a phantom -100% position). The residual is
+                // genuine dust (worth a small fraction of a paise at any NAV), so we
+                // collapse it to a clean zero: when units floor to 0 we also zero the
+                // matching cost basis. The ledger adjustment above already accounts
+                // for the unit change; the paise here never moved a real balance.
+                //
+                // Lots first: a lot with no remaining units carries no live cost
+                // basis (consume_lots only ever reads units_remaining > 0), so its
+                // cost_paise is set to 0 once it has floored out.
+                $pdo->prepare(
+                    'UPDATE lots SET cost_paise = 0 WHERE units_remaining = 0 AND cost_paise <> 0'
+                )->execute();
+
+                // Wallets: when a holder has floored to zero total units, drop the
+                // stranded invested_paise so invested is 0 alongside 0 units. Any
+                // realised P&L already booked stays as-is.
+                $pdo->prepare(
+                    'UPDATE wallets SET invested_paise = 0
+                      WHERE (arv_units + arv_locked_units) = 0 AND invested_paise <> 0'
+                )->execute();
+
                 $pdo->commit();
-                $done[] = 'index: rescaled anchor to 2015/₹1.78 and divided holding units by F (value + paise cost basis preserved)';
+                $done[] = 'index: rescaled anchor to 2015/₹1.78, divided holding units by F, '
+                        . 'posted per-holder ledger adjustments, and zeroed dust cost basis '
+                        . '(value + paise cost basis preserved for non-dust holdings)';
             } catch (Throwable $e) {
                 if ($pdo->inTransaction()) {
                     $pdo->rollBack();

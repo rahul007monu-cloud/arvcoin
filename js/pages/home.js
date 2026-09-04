@@ -151,7 +151,8 @@ async function loadChart() {
       return { time: Math.floor(k.t / 1000), value: k.c };
     }));
 
-    // The launch level, so the whole five years reads against ₹1.
+    // The launch level, so the whole history reads against the launch anchor
+    // (now ₹1.78, drawn from CFG.INDEX.arvBaseInr rather than a hard-coded ₹1).
     series.createPriceLine({
       price: CFG.INDEX.arvBaseInr,
       color: 'rgba(185,190,201,.35)',
