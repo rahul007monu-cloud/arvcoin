@@ -738,3 +738,79 @@ export async function boot(opts) {
 }
 
 export { reveal };
+
+/* ------------------------------------------------------------------- PWA -----
+
+   The real "Install app" experience (not iOS "Add to Home Screen"): register the
+   service worker on EVERY page so the whole origin is controlled, capture
+   Chrome/Edge/Android's beforeinstallprompt, and surface a visible, dismissible
+   install banner (plus lighting up any [data-install] button a page renders).
+   Runs on import, so it is active on every page that loads a page module.
+*/
+(function initPwa() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+  // Installability needs a controlling service worker with a fetch handler.
+  // Same 'sw.js' (root scope); a repeat register() for the same scope is a no-op.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+
+  // Already installed / launched from the home screen: nothing to offer.
+  var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+                || window.navigator.standalone === true;
+  if (standalone) return;
+
+  var deferred = null;
+
+  function banner() {
+    var existing = document.querySelector('[data-pwa-install]');
+    if (existing) return existing;
+    var bar = document.createElement('div');
+    bar.className = 'pwa-install';
+    bar.setAttribute('data-pwa-install', '');
+    bar.hidden = true;
+    bar.innerHTML =
+      '<span class="pwa-ic"><span class="brand-mark">A</span></span>'
+      + '<div class="pwa-tx"><b>Install ARV Coin</b>'
+      + '<span>Add the app to your device \u2014 full screen, one tap to open.</span></div>'
+      + '<button class="btn btn-primary btn-sm" data-pwa-go>Install</button>'
+      + '<button class="pwa-x" data-pwa-dismiss aria-label="Not now">\u00d7</button>';
+    document.body.appendChild(bar);
+    bar.querySelector('[data-pwa-go]').addEventListener('click', install);
+    bar.querySelector('[data-pwa-dismiss]').addEventListener('click', function () {
+      bar.hidden = true;
+      try { sessionStorage.setItem('arv.pwa.dismissed', '1'); } catch (_) {}
+    });
+    return bar;
+  }
+
+  function showInstall() {
+    try { if (sessionStorage.getItem('arv.pwa.dismissed') === '1') return; } catch (_) {}
+    banner().hidden = false;
+    var b = document.querySelector('[data-install]');
+    if (b) { b.hidden = false; b.onclick = install; }
+  }
+
+  async function install() {
+    if (!deferred) return;
+    var evt = deferred; deferred = null;
+    var bar = document.querySelector('[data-pwa-install]'); if (bar) bar.hidden = true;
+    var b = document.querySelector('[data-install]'); if (b) b.hidden = true;
+    try { evt.prompt(); await evt.userChoice; } catch (_) {}
+  }
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();        // suppress the mini-infobar; show our own affordance
+    deferred = e;
+    showInstall();
+  });
+
+  window.addEventListener('appinstalled', function () {
+    deferred = null;
+    var bar = document.querySelector('[data-pwa-install]'); if (bar) bar.hidden = true;
+    try { toast('ARV Coin installed.', 'ok'); } catch (_) {}
+  });
+})();
