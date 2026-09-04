@@ -1503,3 +1503,76 @@ table.data tfoot td {
 @media (max-width: 880px) {
   .pwa-install { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 }
+
+
+/* ---------------------------------------------------------- support assistant --
+
+   A floating chat that answers ARV questions. Sits bottom-right, above the
+   bottom tab bar; the panel opens over the page. Silver-on-black to match. */
+.asst-fab {
+  position: fixed; z-index: 210;
+  right: 18px; bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  width: 52px; height: 52px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: linear-gradient(180deg, #eef0f4, #b9bec9);
+  color: #14141b; border: 0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform .15s var(--ease), box-shadow .15s var(--ease);
+}
+.asst-fab:hover { transform: translateY(-2px); box-shadow: 0 14px 38px rgba(0, 0, 0, 0.6); }
+.asst-fab.on { transform: scale(.96); }
+
+.asst-panel {
+  position: fixed; z-index: 210;
+  right: 18px; bottom: calc(146px + env(safe-area-inset-bottom, 0px));
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(70vh, 560px);
+  display: flex; flex-direction: column;
+  background: #101017; border: 1px solid var(--line-2);
+  border-radius: 16px; overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+.asst-panel[hidden] { display: none; }
+.asst-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+.asst-title { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--tx-1); font-size: .92rem; }
+.asst-x { background: none; border: 0; color: var(--tx-2); font-size: 20px; line-height: 1; cursor: pointer; }
+.asst-x:hover { color: var(--tx-1); }
+
+.asst-log { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.asst-msg {
+  max-width: 85%; padding: 9px 12px; border-radius: 13px;
+  font-size: .86rem; line-height: 1.45; white-space: normal; word-wrap: break-word;
+}
+.asst-msg.bot { align-self: flex-start; background: #1b1b24; color: var(--tx-1); border-bottom-left-radius: 4px; }
+.asst-msg.me { align-self: flex-end; background: #2a2a36; color: #fff; border-bottom-right-radius: 4px; }
+.asst-msg a { color: #dfe2e9; text-decoration: underline; }
+.asst-typing { color: var(--tx-3); letter-spacing: .15em; }
+
+.asst-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.asst-chip {
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line-2);
+  color: var(--tx-2); border-radius: 999px; padding: 6px 11px;
+  font-size: .78rem; cursor: pointer; transition: color .15s var(--ease), border-color .15s var(--ease);
+}
+.asst-chip:hover { color: var(--tx-1); border-color: var(--line-3); }
+
+.asst-input { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
+.asst-input input {
+  flex: 1; min-width: 0; background: #07070a; border: 1px solid var(--line-2);
+  border-radius: 10px; color: var(--tx-1); padding: 9px 11px; font-size: .86rem;
+}
+.asst-input input:focus { outline: none; border-color: var(--line-3); }
+
+/* On phones the panel is roomier and clears the tab bar. */
+@media (max-width: 560px) {
+  .asst-panel {
+    right: 12px; left: 12px; width: auto;
+    bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+    max-height: 64vh;
+  }
+}

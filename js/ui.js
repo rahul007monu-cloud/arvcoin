@@ -814,3 +814,147 @@ export { reveal };
     try { toast('ARV Coin installed.', 'ok'); } catch (_) {}
   });
 })();
+
+/* ------------------------------------------------------------- assistant -----
+
+   A floating support assistant on every page. It answers questions about ARV
+   from a built-in knowledge base (works with no API key) and, if the operator
+   has configured a Gemini key, from Gemini grounded on the same facts. Read-only
+   — it never places orders or touches an account.
+*/
+(function initAssistant() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+  var history = [];       // {role:'user'|'assistant', text}
+  var built = false;
+  var busy = false;
+
+  function icon() {
+    return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"'
+      + ' stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z"/></svg>';
+  }
+
+  function build() {
+    if (built) return;
+    built = true;
+
+    var btn = document.createElement('button');
+    btn.className = 'asst-fab';
+    btn.setAttribute('data-asst-toggle', '');
+    btn.setAttribute('aria-label', 'Ask about ARV');
+    btn.innerHTML = icon();
+
+    var panel = document.createElement('div');
+    panel.className = 'asst-panel';
+    panel.setAttribute('data-asst-panel', '');
+    panel.hidden = true;
+    panel.innerHTML =
+      '<div class="asst-head">'
+        + '<span class="asst-title"><span class="live-dot"></span> Ask ARV</span>'
+        + '<button class="asst-x" data-asst-close aria-label="Close">\u00d7</button>'
+      + '</div>'
+      + '<div class="asst-log" data-asst-log></div>'
+      + '<form class="asst-input" data-asst-form>'
+        + '<input type="text" data-asst-text autocomplete="off" '
+          + 'placeholder="How do I buy? What are the fees?" maxlength="500" aria-label="Your question">'
+        + '<button class="btn btn-primary btn-sm" type="submit" data-asst-send>Send</button>'
+      + '</form>';
+
+    document.body.appendChild(btn);
+    document.body.appendChild(panel);
+
+    btn.addEventListener('click', function () { toggle(); });
+    panel.querySelector('[data-asst-close]').addEventListener('click', function () { toggle(false); });
+    panel.querySelector('[data-asst-form]').addEventListener('submit', function (e) {
+      e.preventDefault();
+      send();
+    });
+
+    // A friendly opener with a few example chips.
+    add('assistant',
+      'Hi! I can answer questions about ARV \u2014 how it works, buying and selling, '
+      + 'fees, tax, deposits and withdrawals. What would you like to know?');
+    chips(['How does ARV work?', 'What are the fees?', 'How is tax calculated?', 'How do I deposit?']);
+  }
+
+  function toggle(force) {
+    var panel = document.querySelector('[data-asst-panel]');
+    var btn = document.querySelector('[data-asst-toggle]');
+    var open = force === undefined ? panel.hidden : force;
+    panel.hidden = !open;
+    if (btn) btn.classList.toggle('on', open);
+    if (open) {
+      var t = panel.querySelector('[data-asst-text]');
+      if (t) setTimeout(function () { t.focus(); }, 30);
+    }
+  }
+
+  function log() { return document.querySelector('[data-asst-log]'); }
+
+  function add(role, text) {
+    var el2 = document.createElement('div');
+    el2.className = 'asst-msg ' + (role === 'user' ? 'me' : 'bot');
+    var safe = esc(text).replace(/\n/g, '<br>')
+      .replace(/info@ARVcoin\.com/gi, '<a href="mailto:info@ARVcoin.com">info@ARVcoin.com</a>');
+    el2.innerHTML = safe;
+    log().appendChild(el2);
+    log().scrollTop = log().scrollHeight;
+    return el2;
+  }
+
+  function chips(items) {
+    var wrap = document.createElement('div');
+    wrap.className = 'asst-chips';
+    wrap.innerHTML = items.map(function (q) {
+      return '<button type="button" class="asst-chip">' + esc(q) + '</button>';
+    }).join('');
+    wrap.querySelectorAll('.asst-chip').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var t = document.querySelector('[data-asst-text]');
+        if (t) t.value = b.textContent;
+        send();
+      });
+    });
+    log().appendChild(wrap);
+    log().scrollTop = log().scrollHeight;
+  }
+
+  async function send() {
+    if (busy) return;
+    var input = document.querySelector('[data-asst-text]');
+    var q = (input.value || '').trim();
+    if (!q) return;
+
+    // Remove any starter chips once a conversation begins.
+    var oldChips = log().querySelector('.asst-chips');
+    if (oldChips) oldChips.remove();
+
+    input.value = '';
+    add('user', q);
+    history.push({ role: 'user', text: q });
+
+    busy = true;
+    var typing = add('assistant', '\u2026');
+    typing.classList.add('asst-typing');
+
+    try {
+      var r = await api.assistant(q, history.slice(-6));
+      typing.remove();
+      var ans = (r && r.answer) ? r.answer : 'Sorry, I could not find an answer. Email info@ARVcoin.com and a human will help.';
+      add('assistant', ans);
+      history.push({ role: 'assistant', text: ans });
+    } catch (e) {
+      typing.remove();
+      add('assistant', 'I could not reach the assistant just now. Please try again, or email info@ARVcoin.com.');
+    } finally {
+      busy = false;
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', build);
+  } else {
+    build();
+  }
+})();

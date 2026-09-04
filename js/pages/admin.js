@@ -348,7 +348,13 @@ var EDITABLE = [
   ['login_otp_always', 'Always email a code at login', 'bool',
    'On, and every sign-in needs a code, ignoring the trust window below.'],
   ['trust_hours', 'Trust a device for (hours)', 'number',
-   'After one code, that device is not asked again for this long. 24 by default. Sign-out ends it.']
+   'After one code, that device is not asked again for this long. 24 by default. Sign-out ends it.'],
+
+  // Support assistant.
+  ['assistant_enabled', 'Support assistant on', 'bool',
+   'The floating help chat. On by default; it answers from a built-in ARV knowledge base even with no key below.'],
+  ['gemini_api_key', 'Gemini API key (optional)', 'text',
+   'Paste a Google Gemini API key to power the assistant with AI answers. Leave blank to use the built-in knowledge base only. Stored server-side, never shown to customers.']
 ];
 
 async function loadSettings() {

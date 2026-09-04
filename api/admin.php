@@ -677,6 +677,9 @@ function handle_save_setting(): void
         'trust_hours',
         'tds_pct', 'tds_pct_no_pan', 'vda_gain_pct', 'cess_pct',
         'tds_threshold_paise', 'tds_threshold_specified_paise',
+        // Support assistant: on/off, and an optional Gemini API key. With no key
+        // the assistant still answers from its built-in knowledge base.
+        'assistant_enabled', 'gemini_api_key',
     ];
 
     if (!in_array($key, $writable, true)) {
