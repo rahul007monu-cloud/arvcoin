@@ -8,11 +8,33 @@
 
 import * as ui from '../ui.js';
 import * as api from '../api.js';
+import * as feed from '../feed.js';
 import { reveal } from '../ui.js';
 
 var CFG = globalThis.ARV_CONFIG;
 
 var st = { snap: null, chart: null, series: null, candles: [], last: null };
+
+/**
+ * BTC->ARV scale for the whole series. ARV = base × (BTC_now_INR ÷ BTC_launch_INR),
+ * so per candle ARV = BTC_usd × (base × fx ÷ BTC_launch_INR) — the same identity
+ * the live price uses. Falls back to config anchors before the snapshot arrives.
+ */
+function arvScale() {
+  var idx = st.snap && st.snap.index;
+  if (idx && idx.base && idx.baseBtcInr > 0 && idx.fxUsdInr != null) {
+    return idx.base * idx.fxUsdInr / idx.baseBtcInr;
+  }
+  var baseBtcInr = CFG.INDEX.baseUsd.BTC * CFG.INDEX.baseFxUsdInr;
+  var fx = (idx && idx.fxUsdInr) || (CFG.FEED.fx && CFG.FEED.fx.fallbackRate) || 90;
+  return baseBtcInr > 0 ? (CFG.INDEX.arvBaseInr * fx) / baseBtcInr : 0;
+}
+
+function applyScale(rows, s) {
+  return rows.map(function (k) {
+    return { t: k.t, o: k.o * s, h: k.h * s, l: k.l * s, c: k.c * s, v: k.v };
+  });
+}
 
 /* ------------------------------------------------------------------ static -- */
 
@@ -115,10 +137,11 @@ async function loadChart() {
   if (!host || !globalThis.LightweightCharts) return;
 
   try {
-    // The full history. Five years of daily is the point of this chart — it shows
-    // the 2022 drawdown, not just the pleasant stretch.
-    var r = await api.candles('1D', null, 2600);
-    st.candles = r.candles || [];
+    // The full history, fetched CLIENT-SIDE from the exchange (feed.history) and
+    // scaled BTC->ARV — the same reliable path the trade chart uses, so it never
+    // depends on server backfill. Daily since 2017 shows the 2022 drawdown too.
+    var raw = await feed.history('BTC', '1D', 2600);
+    st.candles = applyScale(raw, arvScale());
     if (!st.candles.length) return;
 
     var L = globalThis.LightweightCharts;

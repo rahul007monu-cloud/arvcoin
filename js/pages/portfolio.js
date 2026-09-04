@@ -212,17 +212,39 @@ function buildRangeTabs() {
   });
 }
 
+/**
+ * BTC->ARV scale for the whole series (same identity as liveArvPrice/index_price).
+ * Falls back to config anchors before the snapshot arrives.
+ */
+function arvScale() {
+  var idx = st.snap && st.snap.index;
+  if (idx && idx.base && idx.baseBtcInr > 0 && idx.fxUsdInr != null) {
+    return idx.base * idx.fxUsdInr / idx.baseBtcInr;
+  }
+  var baseBtcInr = CFG.INDEX.baseUsd.BTC * CFG.INDEX.baseFxUsdInr;
+  var fx = (idx && idx.fxUsdInr) || (CFG.FEED.fx && CFG.FEED.fx.fallbackRate) || 90;
+  return baseBtcInr > 0 ? (CFG.INDEX.arvBaseInr * fx) / baseBtcInr : 0;
+}
+
+function applyScale(rows, s) {
+  return rows.map(function (k) {
+    return { t: k.t, o: k.o * s, h: k.h * s, l: k.l * s, c: k.c * s, v: k.v };
+  });
+}
+
 async function loadChart() {
   var host = ui.el('[data-chart]');
   if (!host || !globalThis.LightweightCharts || !st.range) return;
 
   try {
-    var r = await api.candles(st.range.tf, st.range.days, CFG.CHARTS.maxCandles);
-    st.candles = r.candles || [];
+    // Candles CLIENT-SIDE from the exchange (feed.history), scaled BTC->ARV — the
+    // reliable path the trade chart uses, with no dependency on server backfill.
+    var raw = await feed.history('BTC', st.range.tf, CFG.CHARTS.maxCandles);
+    st.candles = applyScale(raw, arvScale());
 
     ui.setText('[data-candle-count]', st.candles.length
       ? st.candles.length + ' candles \u00b7 ' + st.range.tf
-      : 'no candles for this range');
+      : 'chart unavailable \u2014 could not reach a market data source');
 
     if (!st.candles.length) return;
 
@@ -356,12 +378,12 @@ function wireLiveFeed() {
   st.unsubTick = feed.onTick(function () { onLiveTick(); });
 }
 
-/** Re-sync the live bar to the authoritative server candle on each poll. */
+/** Re-sync the live bar from the exchange (client-side) on each poll. */
 async function resyncLiveBar() {
   if (!st.series || !st.range) return;
   try {
-    var r = await api.candles(st.range.tf, st.range.days, 2);
-    var rows = r.candles || [];
+    var raw = await feed.history('BTC', st.range.tf, 3);
+    var rows = applyScale(raw, arvScale());
     var last = rows[rows.length - 1];
     if (!last) return;
     if (!st.liveBar || last.t >= st.liveBar.t) {
