@@ -1,0 +1,14 @@
+{
+  "task_id": "task-arv-price-history-charts-portfolio",
+  "task_description": "Two-part change to ARV Coin. PART 1 (B option): add a separate Portfolio page (portfolio.html) with total value, cash-vs-ARV split, performance chart with avg-cost line, P&L cards and the 'if you sold everything now' breakdown, and slim the Wallet (dashboard.html) to cash + units + quick actions + orders + activity. PART 2: (a) rescale ARV to ~1000 rupees today while still tracking BTC proportionally; (b) extend history toward 10-15 years as deep as real BTC data exists, keeping tiered granularity and honestly surfacing that minute-level 10y+ tick data is not attainable from free sources; (c) fix chart UX so every timeframe/range renders a full continuous series, default to the 1-minute chart, and make charts update tick-by-tick in real time from the BTC live feed; (d) add BTC/ETH/SOL/XRP as clickable assets whose charts also render tick-by-tick. Money invariants (integer paise, units*1e8, append-only ledger, index-price fills, issuance cannot move price, stale feed pauses trading) must be preserved; the base rescale requires a guarded units migration for existing installs.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "n/a",
+    "docker_build": "skipped",
+    "summary": "No build step in this project. `php -l` passes on all api/*.php and root *.php with no syntax errors. `node --check` (run with `env -u NODE_OPTIONS`) passes on all js/*.js, js/pages/*.js and arv-config.js. Config sanity check confirms: arvBaseInr 1.78, launch 2015-07-20, computed NAV today ~= Rs.998.64 (near the Rs.1000 target), defaultTimeframe '1m', ranges paired to populated windows, WATCHLIST includes XRP. The project has NO automated test suite (test_quality n/a). Highest-risk change (FEAT-004 units migration in arv_migrations) reviewed by reading the code: idempotent (units_rescaled_v8 flag), transactional, cost basis in paise immutable, unit counts and lots.nav rescaled by F computed in SQL DECIMAL (no float on money path), only migrates when settings equal the known old defaults, ledger untouched, candle series re-queued for rebuild. No Docker (Hostinger shared hosting, no Dockerfile). DEFERRED: nothing DB/exchange-backed (migration execution, backfill reaching 2015, ingest, matching, live WebSocket tick streaming) can be run in the sandbox (no MySQL, no mail, no exchange network) - all such checks are recorded per-feature in findings and must be validated on a live install."
+  }
+}

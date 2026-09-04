@@ -143,6 +143,7 @@ var NAV = [
   { href: 'index.html',        label: 'Overview' },
   { href: 'trade.html',        label: 'Trade' },
   { href: 'dashboard.html',    label: 'Wallet',    auth: true },
+  { href: 'portfolio.html',    label: 'Portfolio', auth: true },
   { href: 'deposit.html',      label: 'Deposit',   auth: true },
   { href: 'withdraw.html',     label: 'Withdraw',  auth: true },
   { href: 'transactions.html', label: 'History',   auth: true },
@@ -239,6 +240,7 @@ export function mountFooter() {
       + '</ul></div>'
       + '<div><h5>Account</h5><ul>'
         + '<li><a href="dashboard.html">Wallet</a></li>'
+        + '<li><a href="portfolio.html">Portfolio</a></li>'
         + '<li><a href="transactions.html">History</a></li>'
         + '<li><a href="tax.html">Tax statement</a></li>'
         + '<li><a href="profile.html">Profile &amp; KYC</a></li>'

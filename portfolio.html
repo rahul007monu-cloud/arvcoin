@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portfolio — ARV Coin</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#07070a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js" defer></script>
+</head>
+<body>
+
+<div data-nav></div>
+
+<main class="page wrap" style="padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
+
+  <!-- ============================================================ greeting -->
+  <div class="row-between row-wrap" style="margin-bottom:var(--sp-5)">
+    <div>
+      <h1 class="serif" style="font-size:1.8rem;margin-bottom:2px">
+        <span data-greeting>Portfolio</span>
+      </h1>
+      <div class="small muted" data-sub>Everything you hold, and what it would net today</div>
+    </div>
+    <div class="row row-wrap">
+      <a href="dashboard.html" class="btn btn-ghost">Wallet</a>
+      <a href="trade.html" class="btn btn-primary">Trade</a>
+    </div>
+  </div>
+
+  <!-- ========================================================= gate notices -->
+  <div class="note-box warn hidden" style="margin-bottom:var(--sp-4)" data-paused-notice>
+    <strong>Trading is paused.</strong>
+    <span data-paused-reason></span> Your balances are unaffected.
+  </div>
+
+  <!-- ====================================================== total + split -->
+  <div class="card" data-reveal="weighty" style="margin-bottom:var(--sp-4)">
+    <div class="stat-k" style="margin-bottom:var(--sp-2)">Total portfolio value</div>
+    <div class="stat-v stat-v-lg" data-total>—</div>
+    <div class="small muted" style="margin-top:6px">
+      Cash plus the current value of your ARV holding.
+    </div>
+
+    <div class="wallet-split" style="margin-top:var(--sp-4)">
+
+      <!-- cash -->
+      <div>
+        <div class="stat-k" style="margin-bottom:var(--sp-2)">Rupee balance</div>
+        <div class="stat-v" data-cash>—</div>
+        <div class="small muted" style="margin-top:6px">
+          <span class="chip flat" data-cash-pct>—</span> of portfolio
+          <span class="wallet-locked hidden" data-cash-locked></span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- ARV -->
+      <div>
+        <div class="stat-k" style="margin-bottom:var(--sp-2)">ARV holding</div>
+        <div class="stat-v" data-arv-value>—</div>
+        <div class="small muted" style="margin-top:6px">
+          <span class="chip flat" data-arv-pct>—</span> of portfolio
+          &middot; <span data-units>—</span> units
+          <span class="wallet-locked hidden" data-units-locked></span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="split">
+
+    <div class="stack">
+
+      <!-- ========================================================= P&L -->
+      <div class="grid g-4" data-reveal-group>
+        <div class="card card-tight card-lift" data-reveal><div class="stat">
+          <span class="stat-k">Invested</span>
+          <span class="stat-v" data-invested>—</span>
+          <span class="stat-sub">at <span data-avg-cost>—</span> average</span>
+        </div></div>
+
+        <div class="card card-tight card-lift" data-reveal><div class="stat">
+          <span class="stat-k">Unrealised</span>
+          <span class="stat-v" data-unrealised>—</span>
+          <span class="stat-sub"><span class="chip flat" data-unrealised-pct>—</span></span>
+        </div></div>
+
+        <div class="card card-tight card-lift" data-reveal><div class="stat">
+          <span class="stat-k">Realised</span>
+          <span class="stat-v" data-realised>—</span>
+          <span class="stat-sub">from completed sales</span>
+        </div></div>
+
+        <div class="card card-tight card-lift" data-reveal><div class="stat">
+          <span class="stat-k">Exit after tax</span>
+          <span class="stat-v" data-exit-net>—</span>
+          <span class="stat-sub">balance at filing if you sold all</span>
+        </div></div>
+      </div>
+
+      <!-- ============================================================ chart -->
+      <div class="chart-shell" data-reveal>
+        <div class="chart-bar">
+          <div>
+            <strong>ARV / INR</strong>
+            <div class="tiny muted" data-cost-line-note>Your average cost is marked on the chart</div>
+          </div>
+          <div class="tabs" data-range-tabs></div>
+        </div>
+        <div class="chart-canvas" data-chart></div>
+        <div class="chart-legend">
+          <div class="legend-item" data-feed-status><span class="live-dot off"></span>connecting…</div>
+          <div class="spacer"></div>
+          <div class="legend-item" data-candle-count></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================ side -->
+    <div class="stack">
+
+      <!-- what selling everything would net -->
+      <div class="card card-tight" data-reveal>
+        <div class="card-head" style="padding-bottom:var(--sp-3);margin-bottom:var(--sp-3)">
+          <h4 style="font-size:.95rem">If you sold everything now</h4>
+        </div>
+        <div class="ledger-list" data-whatif>
+          <div class="ledger-row"><span class="l muted">—</span></div>
+        </div>
+        <div class="tiny muted" style="margin-top:var(--sp-3)">
+          The 30% plus cess is your own liability at filing, not something withheld
+          here. Only the exit fee, GST and 1% TDS come off the payout.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<div data-footer></div>
+<script type="module" src="js/pages/portfolio.js"></script>
+</body>
+</html>

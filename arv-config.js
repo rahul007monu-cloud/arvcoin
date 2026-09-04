@@ -57,6 +57,13 @@
         binance: 'SOLUSDT', okx: 'SOL-USDT', coinbase: 'SOL-USD',
         kraken: 'SOLUSD', coingecko: 'solana'
       }
+    },
+    {
+      key: 'XRP', name: 'XRP', colour: '#7f8593',
+      symbols: {
+        binance: 'XRPUSDT', okx: 'XRP-USDT', coinbase: 'XRP-USD',
+        kraken: 'XRPUSD', coingecko: 'ripple'
+      }
     }
   ];
 
@@ -68,10 +75,29 @@
   //   BTC/USD open of the 2021-09-01 00:00 UTC daily candle = 47110.33  (Coinbase)
   //   USD/INR reference for that date                        = 73.073   (Frankfurter)
   //
-  // A five-year history is the point of that date. An index with a few months
-  // behind it tells a reader nothing — five years covers a full cycle, including
-  // the 2022 drawdown, so the chart shows what holding this actually feels like
-  // rather than only the pleasant stretch.
+  // A roughly ten-year history is the point of that date. The launch anchor is
+  // 2015-07-20 — the day Coinbase listed BTC-USD and the earliest date a free
+  // exchange API (Coinbase, then OKX) reliably serves daily Bitcoin candles. An
+  // index with a few years behind it covers a couple of full cycles; ten years
+  // covers the 2017 run, the 2018 winter, the 2021 top, the 2022 drawdown and
+  // the 2024-25 recovery, so the chart shows what holding this actually feels
+  // like rather than only the pleasant stretch.
+  //
+  // HONEST DATA LIMIT — read before "improving" this. Free exchange APIs serve
+  // *daily* Bitcoin only back to ~2015, and NO free source serves *minute* data
+  // ten years deep (five years of 1m alone is ~2.6M rows). So the deep history
+  // is genuinely daily/weekly, and the minute/tick-by-tick view only exists for
+  // the recent window. The chart is tiered on purpose; we do not synthesise fake
+  // candles to paper over the gap. See README.md ("A note on history depth").
+  //
+  // Both anchor figures are real, published observations for 2015-07-20 and are
+  // never revised, because the whole index hangs off them: BTC/USD daily open
+  // ≈ $277.89, USD/INR ≈ 63.50 that day.
+  //
+  // arvBaseInr is chosen together with the launch so that today's price sits
+  // near ₹1000 rather than a couple of rupees. With a 2015 launch the
+  // now/launch multiple is large (~560x for BTC≈$110k, USD/INR≈90), so the base
+  // is small: 1000 / 560 ≈ 1.78. See the NAV arithmetic in README/SETUP.
   //
   // Quoted in rupees because deposits are rupees and the treasury holds Bitcoin.
   // That makes ARV's printed change equal what the money actually did, currency
@@ -80,11 +106,11 @@
   //
   var INDEX = {
     quote: 'INR',
-    arvBaseInr: 1.0,
-    launchIso: '2021-09-01T00:00:00Z',
-    launchMs: Date.UTC(2021, 8, 1, 0, 0, 0),
-    baseUsd: { BTC: 47110.33 },
-    baseFxUsdInr: 73.073,
+    arvBaseInr: 1.78,
+    launchIso: '2015-07-20T00:00:00Z',
+    launchMs: Date.UTC(2015, 6, 20, 0, 0, 0),
+    baseUsd: { BTC: 277.89 },
+    baseFxUsdInr: 63.50,
     rebalance: 'drift',
     priceDecimals: 4,
     unitDecimals: 8
@@ -334,28 +360,36 @@
   //
   var CHARTS = {
     timeframes: ['1m', '5m', '15m', '1h', '4h', '1D', '1W'],
-    defaultTimeframe: '15m',
-    // What the "All" range on the overview chart opens at. Daily over five years
-    // reads well; anything finer is noise at that width.
-    allTimeframe: '1D',
+    // Open on the minute chart, the way CoinDCX and Delta do. A trader lands on
+    // the live candle first and zooms out to a range if they want the history.
+    defaultTimeframe: '1m',
+    // What the "All" range on the overview chart opens at. Weekly over the full
+    // history reads well; anything finer is noise at that width.
+    allTimeframe: '1W',
     defaultType: 'candles',
-    backfill: { '1m': 7, '1h': 90, '4h': 730, '1D': null, '1W': null },
+    // Every tf a range can request needs a backfill depth, or that range renders
+    // near-empty. 5m and 15m are now backfilled so 1D and 1W are populated.
+    backfill: { '1m': 7, '5m': 30, '15m': 90, '1h': 365, '4h': 730, '1D': null, '1W': null },
     // Five years of daily is ~1,830 bars, so the old 1,500 cap would have
     // silently truncated the earliest months of history.
     maxCandles: 2600,
     showVolume: true,
     showEntryLine: true,
-    // Ranges offered on the chart toolbar, in days. null = since launch.
+    // Ranges offered on the chart toolbar, in days. null = since launch. Each
+    // window is paired with a tf that keeps the bar count readable: a day of
+    // minutes, a week of 15m, a month of hours, a quarter of 4h, then daily out
+    // to five years and weekly for everything. No range is left near-empty and
+    // none crams years of daily bars into a one-day view.
     ranges: [
-      { label: '1D',  days: 1,    tf: '5m'  },
-      { label: '1W',  days: 7,    tf: '1h'  },
+      { label: '1D',  days: 1,    tf: '1m'  },
+      { label: '1W',  days: 7,    tf: '15m' },
       { label: '1M',  days: 30,   tf: '1h'  },
       { label: '3M',  days: 90,   tf: '4h'  },
       { label: '1Y',  days: 365,  tf: '1D'  },
       { label: '5Y',  days: 1825, tf: '1D'  },
-      { label: 'All', days: null, tf: '1D'  }
+      { label: 'All', days: null, tf: '1W'  }
     ],
-    defaultRange: '1Y'
+    defaultRange: '1W'
   };
 
   // ---------------------------------------------------------------------------

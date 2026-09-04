@@ -30,8 +30,12 @@ declare(strict_types=1);
  */
 // Bumped whenever a migration or one-time repair is added, since the catch-up is
 // gated on it. 7 re-queues the weekly backfill on installs that finished before
-// 1W joined the chain.
-const ARV_SCHEMA_VERSION = 7;
+// 1W joined the chain. 8 rescales the index to ~₹1000 and moves the launch anchor
+// back to 2015-07-20: it migrates the four anchor settings (only if still on the
+// old defaults), rescales existing holding UNIT COUNTS by the NAV factor F so
+// value and paise cost basis are preserved, and re-queues the full backfill so
+// arv_candles are rebuilt for the new base and deeper launch.
+const ARV_SCHEMA_VERSION = 8;
 
 function arv_schema(): array
 {
@@ -572,14 +576,20 @@ function arv_triggers(): array
 function arv_default_settings(): array
 {
     return [
-        // Launch is five years back so the chart carries a full cycle, including
-        // the 2022 drawdown. Both figures are real observations for that date —
-        // BTC/USD open from Coinbase, USD/INR from Frankfurter — and neither is
-        // ever revised, because the whole index hangs off them.
-        'arv_base_inr'          => '1.0',
-        'launch_at'             => '2021-09-01 00:00:00',
-        'base_btc_usd'          => '47110.33',
-        'base_fx_usd_inr'       => '73.073',
+        // Launch is ~ten years back (2015-07-20, Coinbase's BTC-USD listing day
+        // and the earliest date a free exchange API reliably serves daily BTC
+        // candles) so the chart carries several full cycles. Both figures are
+        // real, published observations for that date — BTC/USD daily open ≈ $277.89,
+        // USD/INR ≈ 63.50 — and neither is ever revised, because the whole index
+        // hangs off them. arv_base_inr is chosen with the launch so today's price
+        // sits near ₹1000: NAV_today = base * (btcNowInr / (base_btc_usd*base_fx)).
+        // With btcNow≈$110k and fx≈90 the now/launch multiple is ~561, so
+        // 1.78 * 561 ≈ 999. Deep history is daily/weekly only; no free source
+        // serves minute data this far back (see README, "A note on history depth").
+        'arv_base_inr'          => '1.78',
+        'launch_at'             => '2015-07-20 00:00:00',
+        'base_btc_usd'          => '277.89',
+        'base_fx_usd_inr'       => '63.50',
         'quote'                 => 'INR',
 
         'entry_fee_pct'         => '0.5',
@@ -620,7 +630,9 @@ function arv_default_settings(): array
         'price_max_age_seconds' => '600',
 
         // The chart builds itself over the first few cron runs after an install,
-        // one timeframe at a time: daily, then hourly, then minute, then 'done'.
+        // one timeframe at a time: daily, weekly, hourly, 15m, 5m, then minute,
+        // then 'done'. The deep daily/weekly series reaches back to launch (~2015);
+        // the sub-hour series only cover the recent window a free API will page.
         // Nobody should have to press a button to get history the launch date
         // already determines.
         'auto_backfill'         => '1',
@@ -762,6 +774,184 @@ function arv_migrations(PDO $pdo): array
         setting_set('auto_backfill_next', '1W');
         setting_set('auto_backfill_fails', '0');
         $done[] = 'backfill: re-queued 1W (weekly history was missing)';
+    }
+
+    // ---------------------------------------------------------------------
+    // Schema 8: rescale the index to ~₹1000 and deepen the launch to 2015.
+    //
+    // Two things move together and both are money-critical, so this is written
+    // very defensively:
+    //
+    //   (a) the four anchor settings — arv_base_inr, launch_at, base_btc_usd,
+    //       base_fx_usd_inr — move from the old 2021/₹1 anchor to the new
+    //       2015/₹1.78 anchor. Only migrated when they still hold the exact old
+    //       defaults, so an operator who tuned them by hand is never clobbered.
+    //
+    //   (b) NAV = base * (btcNow*fxNow) / (baseUsd*baseFx). Changing the anchor
+    //       multiplies today's NAV by a constant factor F that does NOT depend on
+    //       the current market (the btcNow*fxNow term cancels):
+    //
+    //           F = newNav/oldNav
+    //             = (newBase / (newBaseUsd*newBaseFx)) / (oldBase / (oldBaseUsd*oldBaseFx))
+    //
+    //       Existing holdings were issued at the OLD (low) NAV, so wallets hold
+    //       many units. If we only moved the anchor, value = units * newNav would
+    //       balloon by F and unrealised P&L (derived from invested_paise vs value)
+    //       would be nonsense. Cost basis in paise is IMMUTABLE, so instead we
+    //       divide the unit COUNTS by F and multiply lots.nav by F. Then
+    //       units_new * newNav == units_old * oldNav: holding value and paise cost
+    //       basis are preserved, only the printed unit count and per-unit price
+    //       change. The append-only, trigger-protected ledger is NOT touched — its
+    //       historical paise movements stay historically accurate.
+    //
+    // Guarded by its own settings flag so it runs exactly once even though the
+    // rest of this function is re-entrant, and wrapped in a transaction. The unit
+    // division is done in SQL against the DECIMAL(28,8)/DECIMAL(20,8) columns, so
+    // no PHP float ever touches a stored unit count.
+    $rescaleFlag = 'units_rescaled_v8';
+    if (!setting_b($rescaleFlag, false)) {
+        // Old defaults this migration knows how to move. If any anchor has been
+        // customised we still record the flag (so we never try again) but leave
+        // both the settings and the units alone — we cannot know F safely.
+        $oldBaseInr = '1.0';
+        $oldLaunch  = '2021-09-01 00:00:00';
+        $oldBaseUsd = '47110.33';
+        $oldBaseFx  = '73.073';
+
+        $curBaseInr = (string)setting('arv_base_inr', '');
+        $curLaunch  = (string)setting('launch_at', '');
+        $curBaseUsd = (string)setting('base_btc_usd', '');
+        $curBaseFx  = (string)setting('base_fx_usd_inr', '');
+
+        $onOldDefaults =
+            $curBaseInr === $oldBaseInr &&
+            $curLaunch  === $oldLaunch  &&
+            $curBaseUsd === $oldBaseUsd &&
+            $curBaseFx  === $oldBaseFx;
+
+        if ($onOldDefaults) {
+            // New anchor (kept in lock-step with arv_default_settings() above).
+            $newBaseInr = '1.78';
+            $newLaunch  = '2015-07-20 00:00:00';
+            $newBaseUsd = '277.89';
+            $newBaseFx  = '63.50';
+
+            // F = newNav/oldNav. Computed once, in a single DECIMAL expression, so
+            // the rescale factor is exact to the DB's precision rather than a PHP
+            // float. F ≈ 1.78 * (47110.33*73.073) / (277.89*63.50) ≈ 347.2.
+            $pdo->beginTransaction();
+            try {
+                // Move the four anchor settings (correct column names skey/svalue).
+                $up = $pdo->prepare('UPDATE settings SET svalue = ? WHERE skey = ?');
+                $up->execute([$newBaseInr, 'arv_base_inr']);
+                $up->execute([$newLaunch,  'launch_at']);
+                $up->execute([$newBaseUsd, 'base_btc_usd']);
+                $up->execute([$newBaseFx,  'base_fx_usd_inr']);
+
+                // F as a SQL DECIMAL. Bind the anchor numbers as strings and let
+                // MySQL do the arithmetic in DECIMAL, so no float round-trip.
+                //   F = (newBaseInr / (newBaseUsd*newBaseFx))
+                //       / (oldBaseInr / (oldBaseUsd*oldBaseFx))
+                $fExpr = '((CAST(? AS DECIMAL(30,10)) / (CAST(? AS DECIMAL(30,10)) * CAST(? AS DECIMAL(30,10))))'
+                       . ' / (CAST(? AS DECIMAL(30,10)) / (CAST(? AS DECIMAL(30,10)) * CAST(? AS DECIMAL(30,10)))))';
+                $fArgs = [$newBaseInr, $newBaseUsd, $newBaseFx, $oldBaseInr, $oldBaseUsd, $oldBaseFx];
+
+                // The ledger is the book of record and the admin reconcile view
+                // asserts Σ wallets.arv_units == Σ ledger.arv_delta_units. Dividing
+                // the wallet units by F without touching the (append-only) ledger
+                // would leave that check permanently unbalanced by the whole
+                // rescale, not the sub-1e-8 truncation noise. So BEFORE rescaling,
+                // post one compensating 'adjustment' entry per holder recording the
+                // exact unit change the rescale is about to make:
+                //     delta = new_total - old_total = old_total/F - old_total
+                // computed in SQL against the DECIMAL columns (no PHP float, and the
+                // append-only INSERT is the sanctioned way to correct the ledger).
+                // The delta is stored to DECIMAL(28,8), the same precision as the
+                // wallet columns, so the post-rescale wallet sum and the ledger sum
+                // agree to the last representable digit.
+                $ledgerAdj = $pdo->prepare(
+                    "INSERT INTO ledger (user_id, kind, inr_delta_paise, arv_delta_units, nav, ref, note, fy)
+                     SELECT user_id, 'adjustment', 0,
+                            (ROUND(arv_units / {$fExpr}, 8) + ROUND(arv_locked_units / {$fExpr}, 8))
+                                - (arv_units + arv_locked_units),
+                            NULL, 'rescale_v8',
+                            'Index rescaled to the 2015 / 1.78 rupee anchor: unit count divided by F, holding value and paise cost basis unchanged.',
+                            ''
+                       FROM wallets
+                      WHERE (arv_units + arv_locked_units) <> 0"
+                );
+                $ledgerAdj->execute(array_merge($fArgs, $fArgs));
+
+                // Divide the unit COUNTS by F (value preserved, cost basis paise
+                // untouched). All divisions happen inside MySQL on the DECIMAL
+                // columns.
+                $w = $pdo->prepare(
+                    "UPDATE wallets SET arv_units = arv_units / {$fExpr},
+                                        arv_locked_units = arv_locked_units / {$fExpr}"
+                );
+                $w->execute(array_merge($fArgs, $fArgs));
+
+                // lots: divide unit counts by F, multiply per-lot nav by F. cost_paise
+                // is left exactly as it was.
+                $l = $pdo->prepare(
+                    "UPDATE lots SET units = units / {$fExpr},
+                                     units_remaining = units_remaining / {$fExpr},
+                                     nav = nav * {$fExpr}"
+                );
+                $l->execute(array_merge($fArgs, $fArgs, $fArgs));
+
+                // Dust coherence. Dividing a DECIMAL(28,8) unit count by F ≈ 347
+                // truncates at 8 decimals, so any holding below ~3.5e-6 old units
+                // floors to exactly 0 units. Cost basis in paise is deliberately
+                // untouched, which for such a holding would leave a positive
+                // invested_paise / cost_paise with zero units — value = units×nav = 0
+                // while invested > 0, so avgCostNav (invested ÷ units) and unrealised
+                // P&L become incoherent (a phantom -100% position). The residual is
+                // genuine dust (worth a small fraction of a paise at any NAV), so we
+                // collapse it to a clean zero: when units floor to 0 we also zero the
+                // matching cost basis. The ledger adjustment above already accounts
+                // for the unit change; the paise here never moved a real balance.
+                //
+                // Lots first: a lot with no remaining units carries no live cost
+                // basis (consume_lots only ever reads units_remaining > 0), so its
+                // cost_paise is set to 0 once it has floored out.
+                $pdo->prepare(
+                    'UPDATE lots SET cost_paise = 0 WHERE units_remaining = 0 AND cost_paise <> 0'
+                )->execute();
+
+                // Wallets: when a holder has floored to zero total units, drop the
+                // stranded invested_paise so invested is 0 alongside 0 units. Any
+                // realised P&L already booked stays as-is.
+                $pdo->prepare(
+                    'UPDATE wallets SET invested_paise = 0
+                      WHERE (arv_units + arv_locked_units) = 0 AND invested_paise <> 0'
+                )->execute();
+
+                $pdo->commit();
+                $done[] = 'index: rescaled anchor to 2015/₹1.78, divided holding units by F, '
+                        . 'posted per-holder ledger adjustments, and zeroed dust cost basis '
+                        . '(value + paise cost basis preserved for non-dust holdings)';
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                throw $e;
+            }
+
+            // Rebuild the candle series for the new base + deeper launch. Option B:
+            // re-queue the full backfill from '1D' and clear the fail counter. The
+            // backfill writes with ON DUPLICATE KEY UPDATE, so old rows (computed
+            // with the old base and clamped at 2021) are overwritten with new-base
+            // values and the deeper 2015 history is filled in on subsequent runs.
+            setting_set('auto_backfill_next', '1D');
+            setting_set('auto_backfill_fails', '0');
+            $done[] = 'backfill: re-queued full rebuild for new base + 2015 launch';
+        } else {
+            $done[] = 'index: anchor settings were customised — skipped rescale, left settings and units untouched';
+        }
+
+        // Record the flag regardless, so the rescale can never run twice.
+        setting_set($rescaleFlag, '1');
     }
 
     if ($done) {

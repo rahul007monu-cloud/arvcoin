@@ -1,6 +1,6 @@
 # ARV Coin
 
-**One unit, ₹1 at launch, tracking Bitcoin one for one in rupees.**
+**One unit, ₹1.78 at the 2015 launch, tracking Bitcoin one for one in rupees.**
 
 Deposit by UPI, buy ARV, watch it move with Bitcoin minute by minute, sell back to
 your bank. Fees, GST, FIFO cost basis and Indian VDA tax are computed and itemised
@@ -14,26 +14,52 @@ No build step, no framework, no node_modules in production.
 ## The whole product, in one formula
 
 ```
-ARV(t) = ₹1.00 × ( BTC(t) × FX(t) ) / ( BTC(launch) × FX(launch) )
+ARV(t) = ₹1.78 × ( BTC(t) × FX(t) ) / ( BTC(launch) × FX(launch) )
 ```
 
-Bitcoin doubles in rupee terms, ARV is ₹2. Bitcoin falls 8%, ARV is ₹0.92.
-Nothing else moves it.
+The ₹1.78 anchor is the base price at the 2015 launch; multiplied by Bitcoin's
+rupee gain since then it lands today's ARV near ₹1000. The multiple is all that
+moves it: if Bitcoin doubles in rupee terms from here, ARV doubles too; if
+Bitcoin falls 8%, ARV falls 8%. Nothing else moves it.
 
 The launch reference is stored in the `settings` table and never revised:
 
 | | |
 |---|---|
-| Launch | 1 September 2021, 00:00 UTC |
-| Bitcoin then | **$47,110.33** (Coinbase daily open) |
-| USD/INR then | **₹73.073** (Frankfurter) |
-| Bitcoin then, in ₹ | **₹34,42,493** |
-| ARV then | **₹1.0000** |
+| Launch | 20 July 2015, 00:00 UTC |
+| Bitcoin then | **$277.89** (Coinbase BTC-USD daily open) |
+| USD/INR then | **₹63.50** |
+| Bitcoin then, in ₹ | **₹17,646** |
+| ARV then | **₹1.7800** |
 
-Five years back, so the chart carries a full cycle rather than a flattering
-slice — including the 2022 drawdown, where ARV fell to **₹0.3665**, 88.7% below
-its October 2025 peak of ₹3.2571. A launch date that hid that would be a
-marketing decision dressed up as a technical one.
+About ten years back, so the chart carries several full cycles rather than a
+flattering slice — the 2017 run, the 2018 winter, the 2021 top, the 2022
+drawdown and the 2024–25 recovery. 20 July 2015 is the day Coinbase listed
+BTC-USD and the earliest date a free exchange API reliably serves daily Bitcoin
+candles, so it is as far back as the history can honestly reach.
+
+The base was chosen with the launch so today's price sits near **₹1000** rather
+than a couple of rupees. NAV = base × (BTC_now_in_₹ ÷ BTC_launch_in_₹). With
+Bitcoin around $110,000 and USD/INR around 90, BTC_now_in_₹ ≈ ₹99,00,000 and the
+now/launch multiple is ≈ 99,00,000 ÷ 17,646 ≈ **561**, so NAV_today ≈ 1.78 × 561
+≈ **₹999**.
+
+#### A note on history depth
+
+Free exchange APIs (Coinbase, OKX) serve **daily** Bitcoin candles back to
+roughly 2015, but **no free source serves minute-level data ten years deep** —
+five years of one-minute candles alone is about 2.6 million rows. So the history
+is tiered, honestly:
+
+- **Deep history (multi-year)** is **daily and weekly**, reaching back to the
+  2015 launch.
+- **Recent history** is **minute, 5-minute, 15-minute and hourly** — the
+  tick-by-tick view that updates live from the Bitcoin feed — for as far back as
+  a free API will page it (days to weeks).
+
+We do **not** synthesise fake minute candles for periods where no real data
+exists. A chart that claimed minute-level detail from 2015 would be inventing
+numbers.
 
 ### Three properties that follow from the formula
 

@@ -1,0 +1,45 @@
+{
+  "id": "FEAT-001",
+  "type": "chore",
+  "description": "Establish a verifiable baseline for this no-build PHP+JS project so later features can be checked without a live DB. There is no build/test infra, so this feature only confirms the syntax-check tooling works and records the current chart/config facts that later features depend on. Independent of all other features (must run first only because it validates the tooling used by every later verification step).",
+  "status": "completed",
+  "steps": [
+    "Confirm PHP CLI is available and lints cleanly: run `for f in api/*.php *.php; do php -l \"$f\"; done` from the repo root (/projects/sandbox/arvcoin) and confirm every file reports 'No syntax errors detected'. Record any pre-existing failures verbatim in this feature's findings.",
+    "Confirm node can parse the frontend modules: run `for f in js/*.js js/pages/*.js arv-config.js; do node --check \"$f\"; done` and record results. Note in findings that node --check validates syntax only and does not resolve ES imports.",
+    "Confirm arv-config.js loads as an object: run `node -e \"globalThis.window={};require('./arv-config.js');var c=globalThis.ARV_CONFIG;console.log('base',c.INDEX.arvBaseInr,'launch',c.INDEX.launchIso,'defaultTf',c.CHARTS.defaultTimeframe,'ranges',JSON.stringify(c.CHARTS.ranges),'backfill',JSON.stringify(c.CHARTS.backfill))\"` and record the printed current values in findings (these are the before-state that FEAT-003 and FEAT-004 change).",
+    "Do NOT install MySQL or attempt to run install.php, cron.php, or any DB-backed endpoint. Record in findings that runtime verification is impossible in this sandbox (no MySQL, no mail) and must be deferred to a live environment."
+  ],
+  "acceptance_criteria": [
+    "Every existing api/*.php and root *.php file passes `php -l` with 'No syntax errors detected' (or any pre-existing failure is documented in findings).",
+    "Every js/*.js and js/pages/*.js and arv-config.js passes `node --check`.",
+    "arv-config.js loads via node and prints its current INDEX/CHARTS values, which are recorded in findings as the baseline."
+  ],
+  "verification": [
+    "Run `for f in api/*.php *.php; do php -l \"$f\"; done` and confirm no unexpected syntax errors.",
+    "Run `for f in js/*.js js/pages/*.js arv-config.js; do node --check \"$f\"; done` and confirm no parse errors."
+  ],
+  "blocked_reason": null,
+  "findings": {
+    "php_lint": "PASS. Ran `for f in api/*.php *.php; do php -l \"$f\"; done` with PHP 8.4 CLI from repo root. All 17 files reported 'No syntax errors detected': api/account.php, api/admin.php, api/auth.php, api/_boot.php, api/cron.php, api/deposit.php, api/_feed.php, api/_google.php, api/kyc.php, api/market.php, api/_match.php, api/_money.php, api/orders.php, api/referral.php, api/_schema.php, api/withdraw.php, install.php. No pre-existing failures. (Note: root globs `*.php` matched only install.php; the other root files are .html/.js.)",
+    "node_check": "PASS for all frontend modules. Ran `node --check` on js/*.js (api, feed, qr, reveal, ui), js/pages/*.js (admin, auth, dashboard, deposit, home, legal, profile, referral, tax, trade, transactions, withdraw), and arv-config.js. All parsed with no syntax errors. node --check validates syntax only and does NOT resolve ES imports, so import graph correctness is not covered by this check.",
+    "node_env_workaround": "The sandbox sets NODE_OPTIONS='--require /opt/amazon/kiro-agent/proxy-bootstrap.js', but that bootstrap file does not exist, so a bare `node` invocation aborts with MODULE_NOT_FOUND before running. Workaround used for all node commands: prefix with `env -u NODE_OPTIONS`. Later features running node must do the same (e.g. `env -u NODE_OPTIONS node --check <file>`).",
+    "arv_config_baseline": {
+      "note": "Current before-state values loaded via `env -u NODE_OPTIONS node -e \"globalThis.window={};require('./arv-config.js');...\"`. These are the values FEAT-003/FEAT-004 are expected to change; compare against these.",
+      "INDEX.arvBaseInr": 1,
+      "INDEX.launchIso": "2021-09-01T00:00:00Z",
+      "CHARTS.defaultTimeframe": "15m",
+      "CHARTS.ranges": [
+        {"label": "1D", "days": 1, "tf": "5m"},
+        {"label": "1W", "days": 7, "tf": "1h"},
+        {"label": "1M", "days": 30, "tf": "1h"},
+        {"label": "3M", "days": 90, "tf": "4h"},
+        {"label": "1Y", "days": 365, "tf": "1D"},
+        {"label": "5Y", "days": 1825, "tf": "1D"},
+        {"label": "All", "days": null, "tf": "1D"}
+      ],
+      "CHARTS.backfill": {"1m": 7, "1h": 90, "4h": 730, "1D": null, "1W": null}
+    },
+    "runtime_verification": "IMPOSSIBLE in this sandbox. No MySQL server and no mail server are available, so install.php, cron.php, DB migrations, price ingest/backfill, order matching, and any DB-backed endpoint cannot be executed. Per instructions, none were run. All runtime/DB/exchange-API behaviour must be deferred to a live environment and verified there.",
+    "code_changes": "None. This is a baseline/tooling-validation chore; no source files were modified. Only this feature's task-state file was updated."
+  }
+}

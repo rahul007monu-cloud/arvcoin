@@ -12,14 +12,28 @@
 
 import * as ui from '../ui.js';
 import * as api from '../api.js';
+import * as feed from '../feed.js';
+import { TF_MINUTES } from '../feed.js';
 
 var CFG = globalThis.ARV_CONFIG;
+
+// The assets the chart can show. 'ARV' is the index itself (INR, from
+// arv_candles); the rest are the tracked coins (USD, from asset_candles) and are
+// display-only — selecting one never touches the order form or the money path.
+var CHART_ASSETS = [
+  { key: 'ARV', label: 'ARV' },
+  { key: 'BTC', label: 'BTC' },
+  { key: 'ETH', label: 'ETH' },
+  { key: 'SOL', label: 'SOL' },
+  { key: 'XRP', label: 'XRP' }
+];
 
 var st = {
   user: null,
   snap: null,
   side: 'buy',
   otype: 'market',
+  asset: 'ARV',
   tf: CFG.CHARTS.defaultTimeframe,
   ctype: 'candles',
   chart: null,
@@ -29,7 +43,12 @@ var st = {
   hovering: false,
   quote: null,
   quoteTimer: null,
-  feed: null
+  feed: null,
+  // The last bar as {t(ms), o, h, l, c} kept in sync with the live feed so a tick
+  // can extend it or roll a new one without touching the rest of the series.
+  liveBar: null,
+  unsubTick: null,
+  feedStarted: false
 };
 
 /* ------------------------------------------------------------------ ticker -- */
@@ -71,13 +90,58 @@ function paintOhlc(k) {
   if (!host || !k) return;
   var up = k.c >= k.o;
   host.innerHTML =
-    '<span>O <b>' + ui.fmtPrice(k.o) + '</b></span>'
-    + '<span>H <b>' + ui.fmtPrice(k.h) + '</b></span>'
-    + '<span>L <b>' + ui.fmtPrice(k.l) + '</b></span>'
-    + '<span>C <b class="' + (up ? 'up' : 'down') + '">' + ui.fmtPrice(k.c) + '</b></span>';
+    '<span>O <b>' + fmtAssetPrice(k.o) + '</b></span>'
+    + '<span>H <b>' + fmtAssetPrice(k.h) + '</b></span>'
+    + '<span>L <b>' + fmtAssetPrice(k.l) + '</b></span>'
+    + '<span>C <b class="' + (up ? 'up' : 'down') + '">' + fmtAssetPrice(k.c) + '</b></span>';
 }
 
 /* ------------------------------------------------------------------- chart -- */
+
+/** True when the chart is showing a tracked coin (USD) rather than the ARV index (INR). */
+function isCoinAsset() {
+  return st.asset !== 'ARV';
+}
+
+/** Decimals for the current asset's axis: ARV rupees vs USD coin prices. */
+function assetPriceDecimals() {
+  return isCoinAsset() ? 2 : CFG.INDEX.priceDecimals;
+}
+
+/** Format a price for the OHLC readout: rupees for ARV, dollars for a coin. */
+function fmtAssetPrice(v) {
+  if (v == null || !isFinite(v)) return '\u2014';
+  if (isCoinAsset()) return '$' + Number(v).toLocaleString(CFG.UI.locale, {
+    minimumFractionDigits: 2, maximumFractionDigits: assetPriceDecimals()
+  });
+  return ui.fmtPrice(v);
+}
+
+function buildAssetTabs() {
+  var host = ui.el('[data-asset-tabs]');
+  if (!host) return;
+  host.innerHTML = CHART_ASSETS.map(function (a) {
+    return '<button class="tab' + (a.key === st.asset ? ' on' : '') + '" data-asset="'
+      + a.key + '">' + a.label + '</button>';
+  }).join('');
+
+  ui.els('[data-asset-tabs] .tab').forEach(function (b) {
+    b.addEventListener('click', function () {
+      if (b.dataset.asset === st.asset) return;
+      ui.els('[data-asset-tabs] .tab').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      st.asset = b.dataset.asset;
+      // Tear the live tick subscription down before the series is discarded, so
+      // an in-flight tick never writes to a dead chart.
+      if (st.unsubTick) { try { st.unsubTick(); } catch (_) {} st.unsubTick = null; }
+      st.chart = null;
+      st.series = null;
+      st.liveBar = null;
+      ui.el('[data-chart]').innerHTML = '';
+      loadChart();
+    });
+  });
+}
 
 function buildTfTabs() {
   var host = ui.el('[data-tf-tabs]');
@@ -111,7 +175,10 @@ function buildTfTabs() {
 
 /** Days of history worth pulling for a timeframe. */
 function daysFor(tf) {
-  return { '1m': 7, '5m': 14, '15m': 30, '1h': 90, '4h': 365, '1D': null, '1W': null }[tf];
+  // Windows mirror CFG.CHARTS.ranges so a tab pulls the same depth its range
+  // would: a week of minutes for the default 1m view, then progressively longer
+  // windows as the candle widens.
+  return { '1m': 7, '5m': 30, '15m': 90, '1h': 365, '4h': 730, '1D': null, '1W': null }[tf];
 }
 
 async function loadChart() {
@@ -119,11 +186,15 @@ async function loadChart() {
   if (!host || !globalThis.LightweightCharts) return;
 
   try {
-    var r = await api.candles(st.tf, daysFor(st.tf), CFG.CHARTS.maxCandles);
+    var coin = isCoinAsset();
+    var r = coin
+      ? await api.assetCandles(st.asset, st.tf, daysFor(st.tf), CFG.CHARTS.maxCandles)
+      : await api.candles(st.tf, daysFor(st.tf), CFG.CHARTS.maxCandles);
     st.candles = r.candles || [];
 
+    var label = coin ? st.asset + ' \u00b7 USD \u00b7 ' : '';
     ui.setText('[data-candle-count]', st.candles.length
-      ? st.candles.length + ' candles \u00b7 ' + ui.fmtDate(st.candles[0].t) + ' to now'
+      ? label + st.candles.length + ' candles \u00b7 ' + ui.fmtDate(st.candles[0].t) + ' to now'
       : (r.hint || 'no candles for this timeframe'));
 
     if (!st.candles.length) return;
@@ -149,16 +220,19 @@ async function loadChart() {
                                labelBackgroundColor: '#24242e' } },
       localization: {
         locale: CFG.UI.locale,
-        priceFormatter: function (p) { return p.toFixed(CFG.INDEX.priceDecimals); }
+        priceFormatter: function (p) { return p.toFixed(assetPriceDecimals()); }
       }
     });
+
+    var dp = assetPriceDecimals();
+    var minMove = coin ? 0.01 : 0.0001;
 
     if (st.ctype === 'candles') {
       st.series = st.chart.addCandlestickSeries({
         upColor: '#3ecf8e', downColor: '#f0616d',
         borderVisible: false,
         wickUpColor: '#3ecf8e', wickDownColor: '#f0616d',
-        priceFormat: { type: 'price', precision: CFG.INDEX.priceDecimals, minMove: 0.0001 }
+        priceFormat: { type: 'price', precision: dp, minMove: minMove }
       });
       st.series.setData(st.candles.map(function (k) {
         return { time: Math.floor(k.t / 1000), open: k.o, high: k.h, low: k.l, close: k.c };
@@ -183,30 +257,38 @@ async function loadChart() {
         topColor: 'rgba(223,226,233,.18)',
         bottomColor: 'rgba(223,226,233,.01)',
         lineWidth: 2,
-        priceFormat: { type: 'price', precision: CFG.INDEX.priceDecimals, minMove: 0.0001 }
+        priceFormat: { type: 'price', precision: dp, minMove: minMove }
       });
       st.series.setData(st.candles.map(function (k) {
         return { time: Math.floor(k.t / 1000), value: k.c };
       }));
     }
 
-    // The launch level, so the whole series reads against ₹1.
-    st.series.createPriceLine({
-      price: CFG.INDEX.arvBaseInr,
-      color: 'rgba(185,190,201,.3)',
-      lineStyle: L.LineStyle.Dashed, lineWidth: 1,
-      axisLabelVisible: true, title: '\u20b91'
-    });
-
-    // The user's own cost, when they hold something.
-    var w = st.user && st.user.wallet;
-    if (w && w.avgCostNav > 0) {
+    // The launch level and the user's cost only make sense for ARV — a coin chart
+    // is a plain USD price with no index anchor and nothing the user holds.
+    if (!coin) {
+      // The launch level, so the whole series reads against the launch anchor
+      // (now ₹1.78, not the old ₹1). Title is derived from the same figure the
+      // line is drawn at so the label can never drift from the price again.
+      var baseInr = CFG.INDEX.arvBaseInr;
+      var baseLabel = '\u20b9' + (Number.isInteger(baseInr) ? baseInr : String(baseInr));
       st.series.createPriceLine({
-        price: w.avgCostNav,
-        color: 'rgba(224,176,85,.75)',
+        price: baseInr,
+        color: 'rgba(185,190,201,.3)',
         lineStyle: L.LineStyle.Dashed, lineWidth: 1,
-        axisLabelVisible: true, title: 'your cost'
+        axisLabelVisible: true, title: baseLabel
       });
+
+      // The user's own cost, when they hold something.
+      var w = st.user && st.user.wallet;
+      if (w && w.avgCostNav > 0) {
+        st.series.createPriceLine({
+          price: w.avgCostNav,
+          color: 'rgba(224,176,85,.75)',
+          lineStyle: L.LineStyle.Dashed, lineWidth: 1,
+          axisLabelVisible: true, title: 'your cost'
+        });
+      }
     }
 
     st.chart.subscribeCrosshairMove(function (param) {
@@ -237,9 +319,127 @@ async function loadChart() {
         if (wd > 0 && st.chart) st.chart.applyOptions({ width: wd });
       }).observe(host);
     }
+
+    // Seed the live bar from the last server candle so the first tick extends it
+    // rather than starting from nothing, then subscribe to the trade feed.
+    var last = st.candles[st.candles.length - 1];
+    st.liveBar = last
+      ? { t: last.t, o: last.o, h: last.h, l: last.l, c: last.c }
+      : null;
+    wireLiveFeed();
   } catch (e) {
     ui.setText('[data-candle-count]', 'chart unavailable');
   }
+}
+
+/* -------------------------------------------------------------- live candle -- */
+
+/** Seconds spanned by one candle of the current timeframe. */
+function tfSeconds() {
+  return (TF_MINUTES[st.tf] || 1) * 60;
+}
+
+/**
+ * Live ARV price from the BTC feed.
+ *
+ * Mirrors api/_money.php index_price(): ARV = base × (BTC_now_in_INR ÷
+ * BTC_launch_in_INR). btcNowInr is the live USD price times the current fx, and
+ * baseBtcInr is BTC-at-launch in rupees, both taken from the snapshot's `index`.
+ * Returns null when any input is missing, so the caller leaves the chart alone.
+ */
+function liveArvPrice() {
+  var idx = st.snap && st.snap.index;
+  if (!idx || !idx.base || !idx.baseBtcInr || idx.fxUsdInr == null) return null;
+  var btcUsd = feed.priceUsd('BTC');
+  if (btcUsd == null || !isFinite(btcUsd)) return null;
+  var btcNowInr = btcUsd * idx.fxUsdInr;
+  var price = idx.base * (btcNowInr / idx.baseBtcInr);
+  return isFinite(price) && price > 0 ? price : null;
+}
+
+/**
+ * The live price for whatever asset the chart is showing.
+ *
+ * ARV is the BTC->INR index (liveArvPrice); a coin is its raw USD last trade
+ * straight from the feed — the same feed, the same tick, no conversion, because
+ * the coin chart is quoted in dollars. feed.priceUsd(key) works for every
+ * selected asset because handleTrade() sets state.prices for ALL assets, and XRP
+ * now streams too since it is in the WATCHLIST.
+ */
+function livePrice() {
+  if (isCoinAsset()) {
+    var p = feed.priceUsd(st.asset);
+    return (p != null && isFinite(p) && p > 0) ? p : null;
+  }
+  return liveArvPrice();
+}
+
+/**
+ * Grow the chart tick by tick.
+ *
+ * Only ever the last bar is touched: a tick in the current tf bucket mutates its
+ * high/low/close, and a tick that crosses into the next bucket appends a fresh
+ * one. The whole series is never rebuilt. The 30s snapshot poll stays the
+ * correcting backstop that re-syncs the last bar to the authoritative server
+ * candle. lightweight-charts' series.update() with the same or a greater time is
+ * an in-place last-bar update, which is exactly this behaviour.
+ */
+function onLiveTick() {
+  if (!st.series || !st.chart) return;
+  var price = livePrice();
+  if (price == null) return;
+
+  var secs = tfSeconds();
+  var nowSec = Math.floor(Date.now() / 1000);
+  var bucketSec = Math.floor(nowSec / secs) * secs;
+
+  var bar = st.liveBar;
+  var lastBucketSec = bar ? Math.floor((bar.t / 1000) / secs) * secs : null;
+
+  if (bar && lastBucketSec === bucketSec) {
+    // Same candle: extend it.
+    bar.c = price;
+    if (price > bar.h) bar.h = price;
+    if (price < bar.l) bar.l = price;
+  } else {
+    // New bucket (or first tick): open a fresh candle at the live price. Its open
+    // is the previous close when there is one, so the series stays continuous.
+    var open = bar ? bar.c : price;
+    bar = { t: bucketSec * 1000, o: open, h: Math.max(open, price), l: Math.min(open, price), c: price };
+    st.liveBar = bar;
+  }
+
+  if (st.ctype === 'candles') {
+    st.series.update({ time: bucketSec, open: bar.o, high: bar.h, low: bar.l, close: bar.c });
+  } else {
+    st.series.update({ time: bucketSec, value: bar.c });
+  }
+
+  // Keep the OHLC readout live too, unless the user is inspecting an older bar.
+  if (!st.hovering) paintOhlc(bar);
+}
+
+/**
+ * Wire the trade feed into the current chart.
+ *
+ * Idempotent per loadChart(): any previous subscription is dropped first so a tf
+ * switch does not stack listeners. Guarded so a chart with no feed (or an
+ * unreachable one) still shows the historical server candles.
+ */
+function wireLiveFeed() {
+  if (st.unsubTick) { try { st.unsubTick(); } catch (_) {} st.unsubTick = null; }
+  if (!st.series) return;
+
+  if (!st.feedStarted) {
+    st.feedStarted = true;
+    // Fire-and-forget: if the feed cannot reach any exchange the chart simply
+    // stays on its historical candles, which is the required fallback.
+    feed.start().catch(function () {});
+  }
+
+  // feed.onTick is already coalesced to CFG.FEED.renderThrottleMs, so no extra
+  // throttling is needed here.
+  st.unsubTick = feed.onTick(function () { onLiveTick(); });
 }
 
 /* -------------------------------------------------------------------- form -- */
@@ -581,6 +781,7 @@ function sideConfigLight() {
 
 (async function () {
   ui.setText('[data-fallback]', String(CFG.MARKET.sellFallbackMinutes));
+  buildAssetTabs();
   buildTfTabs();
 
   await ui.boot({ feed: false });
@@ -636,5 +837,37 @@ function sideConfigLight() {
     st.snap = await api.snapshot();
     paintTicker();
     ui.paintServerFeed(st.snap);
+    resyncLiveBar();
   }, 30000);
 })();
+
+/**
+ * Re-sync the live bar to the authoritative server candle.
+ *
+ * The tick-by-tick updates are a display convenience; the server's stored candle
+ * is the source of truth. Every snapshot poll we pull the latest bar for the
+ * current tf and adopt it, so any drift the live ticks introduced is corrected.
+ * If the fetch fails the live bar is left as-is and the chart keeps growing.
+ */
+async function resyncLiveBar() {
+  if (!st.series) return;
+  try {
+    var r = isCoinAsset()
+      ? await api.assetCandles(st.asset, st.tf, daysFor(st.tf), 2)
+      : await api.candles(st.tf, daysFor(st.tf), 2);
+    var rows = r.candles || [];
+    var last = rows[rows.length - 1];
+    if (!last) return;
+    // Only adopt the server bar if it is at or ahead of what we are showing, so a
+    // slower server candle never rolls the chart backwards.
+    if (!st.liveBar || last.t >= st.liveBar.t) {
+      st.liveBar = { t: last.t, o: last.o, h: last.h, l: last.l, c: last.c };
+      var time = Math.floor(last.t / 1000);
+      if (st.ctype === 'candles') {
+        st.series.update({ time: time, open: last.o, high: last.h, low: last.l, close: last.c });
+      } else {
+        st.series.update({ time: time, value: last.c });
+      }
+    }
+  } catch (_) {}
+}

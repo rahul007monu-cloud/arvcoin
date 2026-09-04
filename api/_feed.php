@@ -28,6 +28,27 @@ require_once __DIR__ . '/_match.php';
 require_once __DIR__ . '/_schema.php';
 
 
+/**
+ * The zero-weight watchlist assets, stored in asset_candles for the dashboard
+ * and the per-asset charts but never entering the index or the money path.
+ *
+ * BTC is deliberately absent: it is ingested and backfilled by its own dedicated
+ * path (it is the one weighted basket asset, and the ARV index is computed from
+ * it), so it is already written to asset_candles separately. This mirrors the
+ * client's ARV_CONFIG.WATCHLIST (ETH, SOL, XRP) — display-only, weight 0.
+ */
+function watchlist_keys(): array
+{
+    return ['ETH', 'SOL', 'XRP'];
+}
+
+/** Every asset that has its own asset_candles series: the basket plus the watchlist. */
+function asset_keys(): array
+{
+    return array_merge(['BTC'], watchlist_keys());
+}
+
+
 function ingest_prices(): array
 {
     $fx  = fetch_fx();
@@ -90,7 +111,7 @@ function ingest_prices(): array
                                  volume=VALUES(volume), source=VALUES(source)'
     );
 
-    foreach (['ETH', 'SOL'] as $key) {
+    foreach (watchlist_keys() as $key) {
         $w = fetch_candles_1m($key);
         if (!$w['candles']) {
             $watch[$key] = 'unavailable';
@@ -103,15 +124,19 @@ function ingest_prices(): array
     }
 
     $rolled = rollup_all();
+    // Keep the watchlist coins' larger timeframes current too, so their per-asset
+    // charts have 5m/15m/1h/4h/1D/1W bars and not just raw 1m. USD-only, weight 0.
+    $rolledAssets = rollup_assets();
     cron_record('ingest', 'ok', sprintf('%d candles from %s, ARV %.4f', $written, $btc['source'], $latest ?? 0));
 
     return [
-        'source'    => $btc['source'],
-        'fx'        => $fx,
-        'candles'   => $written,
-        'arvPrice'  => $latest,
-        'watchlist' => $watch,
-        'rolledUp'  => $rolled,
+        'source'        => $btc['source'],
+        'fx'            => $fx,
+        'candles'       => $written,
+        'arvPrice'      => $latest,
+        'watchlist'     => $watch,
+        'rolledUp'      => $rolled,
+        'rolledUpAssets'=> $rolledAssets,
     ];
 }
 
@@ -120,24 +145,32 @@ function ingest_prices(): array
 /**
  * Build history back to launch.
  *
- * Tiered on purpose — daily since launch, hourly for a quarter, minute for a
- * week. Five years of minute candles would be 2.6 million rows that no API will
- * serve and no chart needs.
+ * Tiered on purpose — daily/weekly all the way to launch (~2015, roughly ten
+ * years), hourly for a quarter, 15m/5m for the recent weeks, minute for a week.
+ * Ten years of minute candles would be millions of rows that no free API will
+ * serve and no chart needs; deep history is honestly daily/weekly, and the
+ * minute/tick view exists only for the recent window (see README).
  *
  * Requests are paced. Hammering a free endpoint earns a 429 and a half-finished
  * series, which is worse than taking two minutes.
  */
 function backfill_tf(string $tf = '1D', int $days = 0): array
 {
-    $allowed = ['1m' => 7, '1h' => 90, '4h' => 730, '1D' => 0, '1W' => 0];
+    // Depth per timeframe, in days. 1D/1W = 0 means "all the way to launch"
+    // (now ~2015, roughly ten years of daily/weekly). The sub-hour frames only
+    // cover the recent window a free API will actually page: five years of 1m is
+    // ~2.6M rows nobody serves, so minute/tick history is recent-only by design.
+    $allowed = ['5m' => 30, '15m' => 90, '1m' => 7, '1h' => 90, '4h' => 730, '1D' => 0, '1W' => 0];
     if (!isset($allowed[$tf])) {
-        throw new RuntimeException('tf must be one of 1m, 1h, 4h, 1D, 1W');
+        throw new RuntimeException('tf must be one of 5m, 15m, 1m, 1h, 4h, 1D, 1W');
     }
     if ($days <= 0) {
         $days = $allowed[$tf];
     }
 
-    $launch = strtotime((string)setting('launch_at', '2021-09-01 00:00:00'));
+    // The clamp below and this window both hang off launch_at, which is now the
+    // 2015-07-20 anchor, so daily/weekly history pages back roughly ten years.
+    $launch = strtotime((string)setting('launch_at', '2015-07-20 00:00:00'));
     $from   = $days > 0 ? max($launch, time() - $days * 86400) : $launch;
 
     $curve = fetch_fx_curve($from, time());
@@ -186,6 +219,139 @@ function backfill_tf(string $tf = '1D', int $days = 0): array
 }
 
 
+/**
+ * Build per-asset history for a watchlist coin, in USD, into asset_candles.
+ *
+ * The USD twin of backfill_tf(): same tiering and the same honest-history limit
+ * (daily/weekly deep, minute recent — no fabricated candles), but it writes raw
+ * USD candles keyed by asset_key rather than the INR-converted index. These
+ * assets carry weight 0, so there is no fx conversion and no arv_candles write;
+ * the chart shows the coin in dollars exactly as the exchange reports it.
+ *
+ * BTC is excluded on purpose: its asset_candles are produced by the dedicated
+ * ingest/backfill path, so backfilling it here would duplicate that work.
+ */
+function backfill_asset_tf(string $assetKey, string $tf = '1D', int $days = 0): array
+{
+    if (!in_array($assetKey, watchlist_keys(), true)) {
+        throw new RuntimeException('backfill_asset_tf is for watchlist assets only (ETH, SOL, XRP).');
+    }
+
+    $allowed = ['5m' => 30, '15m' => 90, '1m' => 7, '1h' => 90, '4h' => 730, '1D' => 0, '1W' => 0];
+    if (!isset($allowed[$tf])) {
+        throw new RuntimeException('tf must be one of 5m, 15m, 1m, 1h, 4h, 1D, 1W');
+    }
+    if ($days <= 0) {
+        $days = $allowed[$tf];
+    }
+
+    // Coins have no launch anchor of their own — the clamp exists so the chart
+    // never shows a bar older than the requested window.
+    $launch = strtotime((string)setting('launch_at', '2015-07-20 00:00:00'));
+    $from   = $days > 0 ? max($launch, time() - $days * 86400) : $launch;
+
+    $res = fetch_candles_range($assetKey, $tf, $from);
+    if (!$res['candles']) {
+        throw new RuntimeException('No exchange could page ' . $tf . ' history for ' . $assetKey
+            . '. Tried: ' . implode(', ', $res['tried']));
+    }
+
+    $ins = db()->prepare(
+        'INSERT INTO asset_candles (asset_key, tf, ts, open, high, low, close, volume, source)
+         VALUES (?, ?, FROM_UNIXTIME(?), ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE open=VALUES(open), high=VALUES(high), low=VALUES(low),
+                                 close=VALUES(close), volume=VALUES(volume), source=VALUES(source)'
+    );
+
+    $written = 0;
+    $first = $last = null;
+    foreach ($res['candles'] as $k) {
+        $sec = (int)($k['t'] / 1000);
+        if ($sec < $launch) {
+            continue;
+        }
+        $ins->execute([$assetKey, $tf, $sec, $k['o'], $k['h'], $k['l'], $k['c'], $k['v'], $res['source']]);
+        $first = $first ?? $k['c'];
+        $last  = $k['c'];
+        $written++;
+    }
+
+    cron_record('backfill.asset.' . $assetKey . '.' . $tf, 'ok',
+        $written . ' candles from ' . $res['source']);
+
+    return [
+        'asset' => $assetKey, 'tf' => $tf, 'source' => $res['source'], 'written' => $written,
+        'firstClose' => $first, 'lastClose' => $last, 'from' => gmdate('c', $from),
+    ];
+}
+
+
+/**
+ * Recompute the in-progress larger-timeframe bucket for each watchlist asset from
+ * its 1m candles, in USD, into asset_candles.
+ *
+ * The USD, per-asset twin of rollup_all(): only the current bucket of each frame
+ * is rewritten, because completed buckets are already correct. BTC is rolled up
+ * by the dedicated path (its asset_candles are maintained alongside arv_candles),
+ * so it is not re-rolled here.
+ */
+function rollup_assets(): array
+{
+    $sizes = ['5m' => 300, '15m' => 900, '1h' => 3600, '4h' => 14400, '1D' => 86400];
+    $done = [];
+
+    foreach (watchlist_keys() as $key) {
+        $done[$key] = [];
+        foreach ($sizes as $tf => $secs) {
+            $bucket = intdiv(time(), $secs) * $secs;
+            $agg = q1(
+                'SELECT MIN(ts) AS first_ts, MAX(ts) AS last_ts,
+                        MAX(high) AS h, MIN(low) AS l, SUM(volume) AS v
+                   FROM asset_candles
+                  WHERE asset_key = ? AND tf = "1m" AND ts >= FROM_UNIXTIME(?)',
+                [$key, $bucket]
+            );
+            if (!$agg || $agg['first_ts'] === null) {
+                $done[$key][$tf] = false;
+                continue;
+            }
+            $o = qval('SELECT open FROM asset_candles WHERE asset_key=? AND tf="1m" AND ts=?',
+                [$key, $agg['first_ts']]);
+            $c = qval('SELECT close FROM asset_candles WHERE asset_key=? AND tf="1m" AND ts=?',
+                [$key, $agg['last_ts']]);
+
+            q('INSERT INTO asset_candles (asset_key, tf, ts, open, high, low, close, volume, source)
+               VALUES (?, ?, FROM_UNIXTIME(?), ?, ?, ?, ?, ?, "rollup")
+               ON DUPLICATE KEY UPDATE open=VALUES(open), high=VALUES(high), low=VALUES(low),
+                                       close=VALUES(close), volume=VALUES(volume)',
+              [$key, $tf, $bucket, $o, $agg['h'], $agg['l'], $c, $agg['v'] ?? 0]);
+            $done[$key][$tf] = true;
+        }
+
+        // Weekly aligns to Monday, matching the ARV rollup.
+        $monday = strtotime('monday this week', time());
+        $agg = q1('SELECT MIN(ts) AS first_ts, MAX(ts) AS last_ts, MAX(high) AS h,
+                          MIN(low) AS l, SUM(volume) AS v
+                     FROM asset_candles WHERE asset_key = ? AND tf = "1D" AND ts >= FROM_UNIXTIME(?)',
+            [$key, $monday]);
+        if ($agg && $agg['first_ts'] !== null) {
+            $o = qval('SELECT open FROM asset_candles WHERE asset_key=? AND tf="1D" AND ts=?',
+                [$key, $agg['first_ts']]);
+            $c = qval('SELECT close FROM asset_candles WHERE asset_key=? AND tf="1D" AND ts=?',
+                [$key, $agg['last_ts']]);
+            q('INSERT INTO asset_candles (asset_key, tf, ts, open, high, low, close, volume, source)
+               VALUES (?, "1W", FROM_UNIXTIME(?), ?, ?, ?, ?, ?, "rollup")
+               ON DUPLICATE KEY UPDATE open=VALUES(open), high=VALUES(high), low=VALUES(low),
+                                       close=VALUES(close), volume=VALUES(volume)',
+              [$key, $monday, $o, $agg['h'], $agg['l'], $c, $agg['v'] ?? 0]);
+            $done[$key]['1W'] = true;
+        }
+    }
+
+    return $done;
+}
+
+
 /* ============================================================ fetching ==== */
 
 function http_get(string $url, int $timeout = 12): ?string
@@ -229,6 +395,8 @@ function symbol_for(string $source, string $key): string
 
 function okx_bar(string $tf): string
 {
+    // OKX uppercases the hour/day/week bars but keeps minute bars lowercase
+    // (5m, 15m, 1m), which the default passthrough already returns correctly.
     return match ($tf) {
         '1h' => '1H', '4h' => '4H', '1D' => '1D', '1W' => '1W',
         default => $tf,
@@ -701,46 +869,107 @@ function auto_backfill_step(): ?array
         return null;
     }
 
-    $have = (int)(qval('SELECT COUNT(*) FROM arv_candles WHERE tf = ?', [$next]) ?? 0);
-    if ($have >= auto_backfill_floor($next)) {
+    // A step is either an ARV timeframe ("1D") or a per-asset one ("ETH:1D").
+    // The asset steps run after the ARV chain finishes, giving each watchlist
+    // coin the same tiered USD history in asset_candles.
+    $assetKey = null;
+    $tf = $next;
+    if (strpos($next, ':') !== false) {
+        [$assetKey, $tf] = explode(':', $next, 2);
+    }
+
+    $have = $assetKey !== null
+        ? (int)(qval('SELECT COUNT(*) FROM asset_candles WHERE asset_key = ? AND tf = ?', [$assetKey, $tf]) ?? 0)
+        : (int)(qval('SELECT COUNT(*) FROM arv_candles WHERE tf = ?', [$tf]) ?? 0);
+    if ($have >= auto_backfill_floor($tf)) {
         setting_set('auto_backfill_next', auto_backfill_after($next));
-        return ['tf' => $next, 'skipped' => 'already holds ' . $have . ' candles'];
+        return ['step' => $next, 'skipped' => 'already holds ' . $have . ' candles'];
     }
 
     if (!feed_lock('backfill')) {
-        return ['tf' => $next, 'skipped' => 'another worker is backfilling'];
+        return ['step' => $next, 'skipped' => 'another worker is backfilling'];
     }
 
     try {
-        $r = backfill_tf($next);
+        $r = $assetKey !== null ? backfill_asset_tf($assetKey, $tf) : backfill_tf($tf);
         setting_set('auto_backfill_next', auto_backfill_after($next));
         setting_set('auto_backfill_fails', '0');
+        setting_set('auto_backfill_fail_step', '');
         $r['auto'] = true;
         return $r;
     } catch (Throwable $e) {
         // An exchange that will not page history is normal and usually temporary,
-        // so this retries on the next run. But not for ever: after twenty refusals
-        // it stops and says so, rather than hammering a free endpoint all day and
-        // burning the goodwill that makes the fallback sources work at all.
-        $fails = setting_i('auto_backfill_fails', 0) + 1;
+        // so this retries on the next run. But not for ever, and — crucially — the
+        // failure is isolated to the ONE step that failed. The fail counter is
+        // scoped to the current step (recorded in auto_backfill_fail_step): the
+        // moment the step changes the count starts fresh, so a coin/timeframe an
+        // exchange refuses to page (e.g. a weekly a given asset will not serve)
+        // can no longer burn a shared budget and strand every later coin.
+        //
+        // After twenty refusals of the SAME step we SKIP past it to the next step
+        // in the chain rather than stalling the whole chain, so ARV -> ETH -> SOL
+        // -> XRP keeps walking even when one asset/timeframe is permanently
+        // unpageable. Only the final step skipping lands the chain on 'done'; it
+        // never lands on 'stalled'. (An operator who wants a hard stop can still
+        // set auto_backfill to false.)
+        $failStep = (string)setting('auto_backfill_fail_step', '');
+        $fails    = $failStep === $next ? setting_i('auto_backfill_fails', 0) + 1 : 1;
+        setting_set('auto_backfill_fail_step', $next);
         setting_set('auto_backfill_fails', (string)$fails);
         if ($fails >= 20) {
-            setting_set('auto_backfill_next', 'stalled');
+            // Give up on this one step, not the chain: advance and reset so the
+            // next step gets a clean budget.
+            setting_set('auto_backfill_next', auto_backfill_after($next));
+            setting_set('auto_backfill_fails', '0');
+            setting_set('auto_backfill_fail_step', '');
+            cron_record('backfill.auto', 'fail', 'skipped ' . $next . ' after ' . $fails
+                . ' attempts: ' . $e->getMessage());
+            return ['step' => $next, 'skipped' => 'unpageable after ' . $fails . ' attempts',
+                    'failed' => $e->getMessage()];
         }
         cron_record('backfill.auto', 'fail', $e->getMessage());
-        return ['tf' => $next, 'failed' => $e->getMessage(), 'attempt' => $fails];
+        return ['step' => $next, 'failed' => $e->getMessage(), 'attempt' => $fails];
     } finally {
         feed_unlock('backfill');
     }
 }
 
-function auto_backfill_after(string $tf): string
+function auto_backfill_after(string $step): string
 {
-    // 1W was missing from this chain, so the weekly series — the one the longest
-    // "5 years at a glance" view is drawn from — never got its history and showed a
-    // single candle. It is built right after 1D (and derives from daily data, so it
-    // is cheap), before the shorter recent windows.
-    return ['1D' => '1W', '1W' => '1h', '1h' => '1m', '1m' => 'done'][$tf] ?? 'done';
+    // Deep history first, then progressively finer recent windows:
+    //   1D -> 1W -> 1h -> 15m -> 5m -> 1m
+    // 1W derives from daily data so it is cheap and comes right after 1D. The
+    // sub-hour frames (15m, 5m, 1m) only cover the recent window a free API will
+    // page — the chart's tick-by-tick view lives there — so they come last.
+    $tfChain = [
+        '1D' => '1W', '1W' => '1h', '1h' => '15m',
+        '15m' => '5m', '5m' => '1m', '1m' => null,
+    ];
+
+    // Assets are backfilled after the ARV chain, each running the same tf chain.
+    // Order: ARV -> ETH -> SOL -> XRP -> done.
+    $assets  = watchlist_keys();
+    $assetKey = null;
+    $tf = $step;
+    if (strpos($step, ':') !== false) {
+        [$assetKey, $tf] = explode(':', $step, 2);
+    }
+
+    $nextTf = array_key_exists($tf, $tfChain) ? $tfChain[$tf] : null;
+    if ($nextTf !== null) {
+        return $assetKey !== null ? ($assetKey . ':' . $nextTf) : $nextTf;
+    }
+
+    // This tf chain is complete. Move to the first tf of the next asset.
+    if ($assetKey === null) {
+        // ARV chain just finished — start the first watchlist asset.
+        return $assets ? ($assets[0] . ':1D') : 'done';
+    }
+    $idx = array_search($assetKey, $assets, true);
+    if ($idx !== false && $idx + 1 < count($assets)) {
+        return $assets[$idx + 1] . ':1D';
+    }
+    return 'done';
 }
 
 /**
@@ -752,13 +981,19 @@ function auto_backfill_after(string $tf): string
  */
 function auto_backfill_floor(string $tf): int
 {
-    $launch = strtotime((string)setting('launch_at', '2021-09-01 00:00:00'));
+    $launch = strtotime((string)setting('launch_at', '2015-07-20 00:00:00'));
     $days   = max(1, (int)floor((time() - $launch) / 86400));
 
     switch ($tf) {
         case '1D': return (int)($days * 0.9);
         case '1W': return (int)(($days / 7) * 0.9);
         case '1h': return 1500;
+        // Recent-window frames. backfill_tf() pages 15m for ~90 days
+        // (~90*96=8640 rows) and 5m for ~30 days (~30*288=8640 rows); the floor is
+        // a "is it empty or filled?" check, deliberately well under the ideal so a
+        // gap in an exchange's history does not wedge the chain.
+        case '15m': return 3000;
+        case '5m':  return 3000;
         case '1m': return 5000;
         default:   return 1;
     }

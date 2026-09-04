@@ -1,18 +1,20 @@
 /**
- * Wallet.
+ * Portfolio.
  *
- * The panel that shapes this page is "if you sold everything now". A dashboard
- * that shows a large green unrealised gain and nothing else teaches the wrong
- * expectation: on virtual digital assets 31.2% of that gain is owed the moment it
- * is realised, fees come off the top, and losses elsewhere cannot reduce it. So
- * the tax consequence sits beside the gain rather than being discovered in July.
+ * The Wallet answers "what do I hold"; this page answers "what is it worth, and
+ * what would I keep if I left". Total value = cash + the live value of the ARV
+ * holding, split by how much of the portfolio each side is. The performance
+ * chart carries the user's own average-cost line, the P&L cards frame the gain
+ * against its tax, and "if you sold everything now" prices a full exit against
+ * the live NAV. Nothing here needs an endpoint the Wallet does not already use:
+ * it reads api.me() (the wallet object) and api.snapshot(), and prices an exit
+ * with api.quoteSell() exactly as the Wallet did.
  */
 
 import * as ui from '../ui.js';
 import * as api from '../api.js';
 import * as feed from '../feed.js';
 import { TF_MINUTES } from '../feed.js';
-import { reveal } from '../ui.js';
 
 var CFG = globalThis.ARV_CONFIG;
 
@@ -29,49 +31,49 @@ var st = {
   feedStarted: false
 };
 
-/* ------------------------------------------------------------------- wallet -- */
+/* ---------------------------------------------------------------- portfolio -- */
 
-function paintWallet() {
+function paintPortfolio() {
   var u = st.user;
   if (!u) return;
   var w = u.wallet;
 
   ui.setText('[data-greeting]',
-    (u.fullName ? u.fullName.split(' ')[0] : 'Welcome') + (u.fullName ? '\u2019s wallet' : ''));
+    (u.fullName ? u.fullName.split(' ')[0] + '\u2019s portfolio' : 'Portfolio'));
 
   if (!w) return;
 
-  ui.setText('[data-inr]', ui.fmtPaise(w.inrPaise));
-  if (w.inrLockedPaise > 0) {
-    var l = ui.el('[data-inr-locked]');
-    l.classList.remove('hidden');
-    l.textContent = ui.fmtPaise(w.inrLockedPaise) + ' held in open orders';
-  }
+  // Cash is the free balance plus anything held in open orders; ARV value is the
+  // live valuation of the whole holding. Together they are the portfolio.
+  var cashPaise = (w.inrPaise || 0) + (w.inrLockedPaise || 0);
+  var arvPaise = w.valuePaise || 0;
+  var totalPaise = cashPaise + arvPaise;
 
-  ui.setText('[data-units]', ui.fmtUnits(w.arvUnits, 4));
-  ui.setText('[data-value]', ui.fmtPaise(w.valuePaise));
+  ui.setText('[data-total]', ui.fmtPaise(totalPaise));
+  ui.setText('[data-cash]', ui.fmtPaise(cashPaise));
+  ui.setText('[data-arv-value]', ui.fmtPaise(arvPaise));
+  ui.setText('[data-units]', ui.fmtUnits(w.arvTotalUnits, 4));
+
+  var cashPct = totalPaise > 0 ? (cashPaise / totalPaise) * 100 : 0;
+  var arvPct = totalPaise > 0 ? (arvPaise / totalPaise) * 100 : 0;
+  ui.setText('[data-cash-pct]', ui.fmtPct(cashPct, 1));
+  ui.setText('[data-arv-pct]', ui.fmtPct(arvPct, 1));
+
+  if (w.inrLockedPaise > 0) {
+    var cl = ui.el('[data-cash-locked]');
+    if (cl) { cl.classList.remove('hidden'); cl.textContent = '\u00b7 ' + ui.fmtPaise(w.inrLockedPaise) + ' in open orders'; }
+  }
   if (parseFloat(w.arvLockedUnits) > 0) {
     var lu = ui.el('[data-units-locked]');
-    lu.classList.remove('hidden');
-    lu.textContent = '\u00b7 ' + ui.fmtUnits(w.arvLockedUnits, 4) + ' in open orders';
+    if (lu) { lu.classList.remove('hidden'); lu.textContent = '\u00b7 ' + ui.fmtUnits(w.arvLockedUnits, 4) + ' in open orders'; }
   }
 
-  // Full P&L (invested, unrealised, realised, avg cost) and the exit breakdown
-  // now live on portfolio.html; the Wallet stays focused on cash and units.
-
-  // Referral
-  ui.setText('[data-ref-code]', u.referralCode || '\u2014');
-  ui.setText('[data-ref-pct]', CFG.REFERRAL.commissionPct + '%');
-  if (u.tier) {
-    var t = ui.el('[data-tier]');
-    t.hidden = false;
-    t.textContent = u.tier;
-  }
-
-  // Gates
-  if (u.kyc && u.kyc.status !== 'verified') {
-    ui.el('[data-kyc-notice]').classList.remove('hidden');
-  }
+  // P&L cards.
+  ui.setText('[data-invested]', ui.fmtPaise(w.investedPaise));
+  ui.setText('[data-avg-cost]', w.avgCostNav > 0 ? ui.fmtPrice(w.avgCostNav) : '\u2014');
+  ui.paintSigned('[data-unrealised]', w.unrealisedPaise, { base: 'stat-v' });
+  ui.paintChange('[data-unrealised-pct]', w.unrealisedPct);
+  ui.paintSigned('[data-realised]', w.realisedPaise, { base: 'stat-v' });
 }
 
 function paintPaused() {
@@ -84,6 +86,80 @@ function paintPaused() {
   box.classList.toggle('hidden', !paused);
   if (paused) {
     ui.setText('[data-paused-reason]', (f && f.note) || 'The price feed is not current.');
+  }
+}
+
+/* ------------------------------------------------------------------ what-if -- */
+
+/**
+ * The full cost of exiting, computed from the live price.
+ *
+ * Uses the same percentages the server charges. It is an estimate only because
+ * the price moves between here and a fill \u2014 which the note says rather than
+ * implying a guarantee. Also feeds the "Exit after tax" card.
+ */
+async function paintWhatIf() {
+  var host = ui.el('[data-whatif]');
+  var w = st.user && st.user.wallet;
+  var units = w ? parseFloat(w.arvTotalUnits) : 0;
+
+  if (!units) {
+    if (host) {
+      host.innerHTML = '<div class="ledger-row"><span class="l muted">'
+        + 'You hold no units yet. <a href="trade.html">Buy ARV</a></span></div>';
+    }
+    ui.setText('[data-exit-net]', '\u2014');
+    return;
+  }
+
+  try {
+    // Ask the server: it applies the user's own tier fees, their PAN status and
+    // their financial-year TDS position, none of which the browser should guess.
+    var r = await api.quoteSell(parseFloat(w.arvUnits) || units);
+    var q = r.quote;
+
+    ui.setText('[data-exit-net]', ui.fmtPaise(q.balanceTaxPaise));
+
+    if (!host) return;
+
+    host.innerHTML = rows([
+      ['Gross value', q.grossPaise, 'gross'],
+      ['Exit fee + GST', -(q.feePaise + q.gstPaise), 'charge'],
+      ['TDS withheld' + (q.tds && q.tds.applies ? ' (' + q.tds.ratePct + '%)' : ''),
+       -q.tdsPaise, 'tds', q.tds ? q.tds.reason : null],
+      ['Credited to rupees', q.netPayoutPaise, 'net'],
+      [null],
+      ['Cost of acquisition', q.costBasisPaise, 'info'],
+      [q.pnlPaise >= 0 ? 'Realised gain' : 'Realised loss', q.pnlPaise, 'pnl'],
+      ['Tax at ' + q.effectiveTaxPct.toFixed(1) + '%', q.totalTaxPaise, 'liability',
+       'Not withheld \u2014 payable by you when you file'],
+      ['Balance at filing', q.balanceTaxPaise, 'liability-total']
+    ]);
+
+    if (q.lossNotSetOff) {
+      host.insertAdjacentHTML('beforeend',
+        '<div class="ledger-row k-warning"><span class="note">This loss could not be set '
+        + 'off against other gains or carried forward \u2014 section 115BBH permits neither.'
+        + '</span></div>');
+    }
+  } catch (e) {
+    ui.setText('[data-exit-net]', '\u2014');
+    if (host) {
+      host.innerHTML = '<div class="ledger-row"><span class="l muted">'
+        + ui.esc(e.message || 'Cannot price a sale right now.') + '</span></div>';
+    }
+  }
+
+  function rows(list) {
+    return list.map(function (r) {
+      if (!r[0]) return '<div class="ledger-divider"></div>';
+      var neg = r[1] < 0;
+      return '<div class="ledger-row k-' + (r[2] || 'info') + '">'
+        + '<span class="l">' + ui.esc(r[0]) + '</span>'
+        + '<span class="a">' + (neg ? '\u2212' : '') + ui.fmtPaise(Math.abs(r[1] || 0)) + '</span>'
+        + (r[3] ? '<span class="note">' + ui.esc(r[3]) + '</span>' : '')
+        + '</div>';
+    }).join('');
   }
 }
 
@@ -269,163 +345,7 @@ async function resyncLiveBar() {
   } catch (_) {}
 }
 
-/* ------------------------------------------------------------------- orders -- */
-
-function statusBadge(s) {
-  var map = { filled: 'ok', partial: 'info', open: 'warn', triggered: 'warn',
-              cancelled: '', expired: '', paid: 'ok', confirmed: 'ok',
-              requested: 'warn', submitted: 'warn', rejected: 'bad' };
-  return '<span class="badge ' + (map[s] || '') + '">' + ui.esc(s.replace(/_/g, ' ')) + '</span>';
-}
-
-async function loadOrders() {
-  var host = ui.el('[data-orders]');
-  if (!host) return;
-
-  try {
-    var r = await api.myOrders('open');
-    var rows = r.orders || [];
-
-    if (!rows.length) {
-      host.innerHTML = '<tr><td colspan="7"><div class="empty">'
-        + 'No open orders. <a href="trade.html">Place one</a></div></td></tr>';
-      return;
-    }
-
-    host.innerHTML = rows.map(function (o) {
-      var fb = o.fallbackInMinutes != null && o.side === 'sell'
-        ? '<div class="tiny muted">treasury buys in ' + o.fallbackInMinutes + 'm</div>'
-        : '';
-      return '<tr>'
-        + '<td class="mono tiny">' + ui.esc(o.ref) + '</td>'
-        + '<td><span class="badge ' + (o.side === 'buy' ? 'ok' : 'warn') + '">'
-          + o.side + '</span></td>'
-        + '<td class="tiny">' + o.type + (o.triggerNav ? '' : '') + '</td>'
-        + '<td class="num">' + ui.fmtUnits(o.remainingUnits, 4) + fb + '</td>'
-        + '<td class="num">' + (o.triggerNav ? ui.fmtPrice(o.triggerNav) : 'index') + '</td>'
-        + '<td>' + statusBadge(o.status) + '</td>'
-        + '<td class="right"><button class="btn btn-sm btn-ghost" data-cancel="'
-          + o.id + '">Cancel</button></td>'
-        + '</tr>';
-    }).join('');
-
-    ui.els('[data-cancel]').forEach(function (b) {
-      b.addEventListener('click', async function () {
-        ui.busy(b, true, '\u2026');
-        try {
-          var res = await api.cancelOrder(Number(b.dataset.cancel));
-          ui.toast(res.message || 'Cancelled.', 'ok');
-          await refresh();
-        } catch (e) {
-          ui.toastError(e);
-          ui.busy(b, false);
-        }
-      });
-    });
-  } catch (e) {
-    host.innerHTML = '<tr><td colspan="7" class="empty">Could not load orders.</td></tr>';
-  }
-}
-
-/* ----------------------------------------------------------------- activity -- */
-
-async function loadActivity() {
-  var host = ui.el('[data-activity]');
-  if (!host) return;
-
-  try {
-    // Deposits, withdrawals and fills, merged into one readable list.
-    var results = await Promise.all([
-      api.myDeposits().catch(function () { return { deposits: [] }; }),
-      api.myWithdrawals().catch(function () { return { withdrawals: [] }; }),
-      api.myOrders('all').catch(function () { return { orders: [] }; })
-    ]);
-
-    var items = [];
-    (results[0].deposits || []).forEach(function (d) {
-      items.push({ at: d.createdAt, what: 'Deposit', badge: 'info',
-                   units: null, price: null, amount: d.amountPaise, status: d.status });
-    });
-    (results[1].withdrawals || []).forEach(function (w) {
-      items.push({ at: w.createdAt, what: 'Withdrawal', badge: 'warn',
-                   units: null, price: null, amount: -w.amountPaise, status: w.status });
-    });
-    (results[2].orders || []).filter(function (o) {
-      return parseFloat(o.filledUnits) > 0;
-    }).forEach(function (o) {
-      items.push({ at: o.createdAt, what: o.side === 'buy' ? 'Bought ARV' : 'Sold ARV',
-                   badge: o.side === 'buy' ? 'ok' : 'warn',
-                   units: o.filledUnits, price: null,
-                   amount: o.side === 'buy' ? -o.filledPaise : o.filledPaise,
-                   status: o.status });
-    });
-
-    items.sort(function (a, b) {
-      return Date.parse(String(b.at).replace(' ', 'T')) - Date.parse(String(a.at).replace(' ', 'T'));
-    });
-
-    if (!items.length) {
-      host.innerHTML = '<tr><td colspan="5"><div class="empty">'
-        + '<div class="icon">\u25c7</div>Nothing yet.<br>'
-        + '<a href="deposit.html">Add funds</a> to get started.</div></td></tr>';
-      return;
-    }
-
-    host.innerHTML = items.slice(0, 10).map(function (i) {
-      return '<tr>'
-        + '<td class="tiny nowrap">' + ui.ago(i.at) + '</td>'
-        + '<td><span class="badge ' + i.badge + '">' + i.what + '</span> '
-          + statusBadge(i.status) + '</td>'
-        + '<td class="num">' + (i.units ? ui.fmtUnits(i.units, 4) : '\u2014') + '</td>'
-        + '<td class="num">' + (i.price ? ui.fmtPrice(i.price) : '\u2014') + '</td>'
-        + '<td class="num ' + (i.amount >= 0 ? 'up' : '') + '">'
-          + (i.amount >= 0 ? '+' : '\u2212') + ui.fmtPaise(Math.abs(i.amount)) + '</td>'
-        + '</tr>';
-    }).join('');
-  } catch (e) {
-    host.innerHTML = '<tr><td colspan="5" class="empty">Could not load activity.</td></tr>';
-  }
-}
-
-/* ---------------------------------------------------------------- watchlist -- */
-
-async function loadWatchlist() {
-  var host = ui.el('[data-watchlist]');
-  if (!host) return;
-  try {
-    var w = await api.watchlist();
-    host.innerHTML = (w.assets || []).map(function (a, i) {
-      var d = ui.direction(a.change24h);
-      return '<div class="asset-row railed ' + a.key.toLowerCase() + '" data-reveal="soft" style="--i:' + i + '">'
-        + '<span class="coin ' + a.key.toLowerCase() + '"><span>' + a.key + '</span></span>'
-        + '<div class="asset-name"><div class="t">' + ui.esc(a.name) + '</div>'
-          + '<div class="s">' + (a.inIndex ? 'in the index' : '0% weight') + '</div></div>'
-        + '<div class="right"><div class="num strong">'
-          + (a.priceUsd != null
-              ? '$' + a.priceUsd.toLocaleString('en-US', { maximumFractionDigits: a.priceUsd < 10 ? 2 : 0 })
-              : '\u2014')
-          + '</div><div class="chip ' + d + '" style="margin-top:3px">'
-          + ui.fmtPct(a.change24h) + '</div></div>'
-        + '</div>';
-    }).join('');
-    host.setAttribute('data-reveal-group', 'tight');
-    reveal.observe(host);
-  } catch (_) {
-    host.innerHTML = '<div class="empty tiny">Market data unavailable.</div>';
-  }
-}
-
 /* -------------------------------------------------------------------- boot -- */
-
-async function refresh() {
-  st.user = await api.me(true);
-  st.snap = await api.snapshot().catch(function () { return null; });
-  paintWallet();
-  paintPaused();
-  ui.paintNavTicker(st.snap);
-  ui.paintServerFeed(st.snap);
-  await loadOrders();
-}
 
 (async function () {
   buildRangeTabs();
@@ -436,31 +356,23 @@ async function refresh() {
   st.user = user;
 
   st.snap = await api.snapshot().catch(function () { return null; });
-  paintWallet();
+  paintPortfolio();
   paintPaused();
   ui.paintNavTicker(st.snap);
   ui.paintServerFeed(st.snap);
 
   await loadChart();
-  loadOrders();
-  loadActivity();
-  loadWatchlist();
-
-  ui.on('[data-copy-ref]', 'click', function (e) {
-    var link = location.origin + '/signup.html?ref=' + (st.user.referralCode || '');
-    navigator.clipboard.writeText(link)
-      .then(function () { ui.toast('Referral link copied.', 'ok', 2500); })
-      .catch(function () { ui.toast('Could not copy \u2014 select it manually.', 'warn'); });
-  });
+  paintWhatIf();
 
   // The index is recomputed once a minute, so polling matches that.
   api.poll(async function () {
     st.snap = await api.snapshot();
     st.user = await api.me(true);
-    paintWallet();
+    paintPortfolio();
     paintPaused();
     ui.paintNavTicker(st.snap);
     ui.paintServerFeed(st.snap);
+    paintWhatIf();
     resyncLiveBar();
   }, 30000);
 })();

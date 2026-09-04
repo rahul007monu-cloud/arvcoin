@@ -135,9 +135,9 @@ function arv_nav_meta(): array
  */
 function index_price(float $btcUsd, float $fxUsdInr): float
 {
-    $base    = setting_f('arv_base_inr', 1.0);
-    $baseUsd = setting_f('base_btc_usd', 47110.33);
-    $baseFx  = setting_f('base_fx_usd_inr', 73.073);
+    $base    = setting_f('arv_base_inr', 1.78);
+    $baseUsd = setting_f('base_btc_usd', 277.89);
+    $baseFx  = setting_f('base_fx_usd_inr', 63.50);
     $quote   = (string)setting('quote', 'INR');
 
     if ($baseUsd <= 0) {
