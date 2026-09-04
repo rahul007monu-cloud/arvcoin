@@ -162,7 +162,7 @@
     matchAtIndexPrice: true,
     buyFillsFromTreasury: true,        // buys never wait
     sellFallbackToTreasury: true,      // no seller ever gets trapped
-    sellFallbackMinutes: 60,
+    sellFallbackMinutes: 5,
     orderExpiryHours: 168,             // resting orders expire after a week
     allowPartialFills: true,
     minOrderPaise: 10000,              // ₹100
