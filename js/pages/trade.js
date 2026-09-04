@@ -12,6 +12,8 @@
 
 import * as ui from '../ui.js';
 import * as api from '../api.js';
+import * as feed from '../feed.js';
+import { TF_MINUTES } from '../feed.js';
 
 var CFG = globalThis.ARV_CONFIG;
 
@@ -29,7 +31,12 @@ var st = {
   hovering: false,
   quote: null,
   quoteTimer: null,
-  feed: null
+  feed: null,
+  // The last bar as {t(ms), o, h, l, c} kept in sync with the live feed so a tick
+  // can extend it or roll a new one without touching the rest of the series.
+  liveBar: null,
+  unsubTick: null,
+  feedStarted: false
 };
 
 /* ------------------------------------------------------------------ ticker -- */
@@ -111,7 +118,10 @@ function buildTfTabs() {
 
 /** Days of history worth pulling for a timeframe. */
 function daysFor(tf) {
-  return { '1m': 7, '5m': 14, '15m': 30, '1h': 90, '4h': 365, '1D': null, '1W': null }[tf];
+  // Windows mirror CFG.CHARTS.ranges so a tab pulls the same depth its range
+  // would: a week of minutes for the default 1m view, then progressively longer
+  // windows as the candle widens.
+  return { '1m': 7, '5m': 30, '15m': 90, '1h': 365, '4h': 730, '1D': null, '1W': null }[tf];
 }
 
 async function loadChart() {
@@ -237,9 +247,110 @@ async function loadChart() {
         if (wd > 0 && st.chart) st.chart.applyOptions({ width: wd });
       }).observe(host);
     }
+
+    // Seed the live bar from the last server candle so the first tick extends it
+    // rather than starting from nothing, then subscribe to the trade feed.
+    var last = st.candles[st.candles.length - 1];
+    st.liveBar = last
+      ? { t: last.t, o: last.o, h: last.h, l: last.l, c: last.c }
+      : null;
+    wireLiveFeed();
   } catch (e) {
     ui.setText('[data-candle-count]', 'chart unavailable');
   }
+}
+
+/* -------------------------------------------------------------- live candle -- */
+
+/** Seconds spanned by one candle of the current timeframe. */
+function tfSeconds() {
+  return (TF_MINUTES[st.tf] || 1) * 60;
+}
+
+/**
+ * Live ARV price from the BTC feed.
+ *
+ * Mirrors api/_money.php index_price(): ARV = base × (BTC_now_in_INR ÷
+ * BTC_launch_in_INR). btcNowInr is the live USD price times the current fx, and
+ * baseBtcInr is BTC-at-launch in rupees, both taken from the snapshot's `index`.
+ * Returns null when any input is missing, so the caller leaves the chart alone.
+ */
+function liveArvPrice() {
+  var idx = st.snap && st.snap.index;
+  if (!idx || !idx.base || !idx.baseBtcInr || idx.fxUsdInr == null) return null;
+  var btcUsd = feed.priceUsd('BTC');
+  if (btcUsd == null || !isFinite(btcUsd)) return null;
+  var btcNowInr = btcUsd * idx.fxUsdInr;
+  var price = idx.base * (btcNowInr / idx.baseBtcInr);
+  return isFinite(price) && price > 0 ? price : null;
+}
+
+/**
+ * Grow the chart tick by tick.
+ *
+ * Only ever the last bar is touched: a tick in the current tf bucket mutates its
+ * high/low/close, and a tick that crosses into the next bucket appends a fresh
+ * one. The whole series is never rebuilt. The 30s snapshot poll stays the
+ * correcting backstop that re-syncs the last bar to the authoritative server
+ * candle. lightweight-charts' series.update() with the same or a greater time is
+ * an in-place last-bar update, which is exactly this behaviour.
+ */
+function onLiveTick() {
+  if (!st.series || !st.chart) return;
+  var price = liveArvPrice();
+  if (price == null) return;
+
+  var secs = tfSeconds();
+  var nowSec = Math.floor(Date.now() / 1000);
+  var bucketSec = Math.floor(nowSec / secs) * secs;
+
+  var bar = st.liveBar;
+  var lastBucketSec = bar ? Math.floor((bar.t / 1000) / secs) * secs : null;
+
+  if (bar && lastBucketSec === bucketSec) {
+    // Same candle: extend it.
+    bar.c = price;
+    if (price > bar.h) bar.h = price;
+    if (price < bar.l) bar.l = price;
+  } else {
+    // New bucket (or first tick): open a fresh candle at the live price. Its open
+    // is the previous close when there is one, so the series stays continuous.
+    var open = bar ? bar.c : price;
+    bar = { t: bucketSec * 1000, o: open, h: Math.max(open, price), l: Math.min(open, price), c: price };
+    st.liveBar = bar;
+  }
+
+  if (st.ctype === 'candles') {
+    st.series.update({ time: bucketSec, open: bar.o, high: bar.h, low: bar.l, close: bar.c });
+  } else {
+    st.series.update({ time: bucketSec, value: bar.c });
+  }
+
+  // Keep the OHLC readout live too, unless the user is inspecting an older bar.
+  if (!st.hovering) paintOhlc(bar);
+}
+
+/**
+ * Wire the trade feed into the current chart.
+ *
+ * Idempotent per loadChart(): any previous subscription is dropped first so a tf
+ * switch does not stack listeners. Guarded so a chart with no feed (or an
+ * unreachable one) still shows the historical server candles.
+ */
+function wireLiveFeed() {
+  if (st.unsubTick) { try { st.unsubTick(); } catch (_) {} st.unsubTick = null; }
+  if (!st.series) return;
+
+  if (!st.feedStarted) {
+    st.feedStarted = true;
+    // Fire-and-forget: if the feed cannot reach any exchange the chart simply
+    // stays on its historical candles, which is the required fallback.
+    feed.start().catch(function () {});
+  }
+
+  // feed.onTick is already coalesced to CFG.FEED.renderThrottleMs, so no extra
+  // throttling is needed here.
+  st.unsubTick = feed.onTick(function () { onLiveTick(); });
 }
 
 /* -------------------------------------------------------------------- form -- */
@@ -636,5 +747,35 @@ function sideConfigLight() {
     st.snap = await api.snapshot();
     paintTicker();
     ui.paintServerFeed(st.snap);
+    resyncLiveBar();
   }, 30000);
 })();
+
+/**
+ * Re-sync the live bar to the authoritative server candle.
+ *
+ * The tick-by-tick updates are a display convenience; the server's stored candle
+ * is the source of truth. Every snapshot poll we pull the latest bar for the
+ * current tf and adopt it, so any drift the live ticks introduced is corrected.
+ * If the fetch fails the live bar is left as-is and the chart keeps growing.
+ */
+async function resyncLiveBar() {
+  if (!st.series) return;
+  try {
+    var r = await api.candles(st.tf, daysFor(st.tf), 2);
+    var rows = r.candles || [];
+    var last = rows[rows.length - 1];
+    if (!last) return;
+    // Only adopt the server bar if it is at or ahead of what we are showing, so a
+    // slower server candle never rolls the chart backwards.
+    if (!st.liveBar || last.t >= st.liveBar.t) {
+      st.liveBar = { t: last.t, o: last.o, h: last.h, l: last.l, c: last.c };
+      var time = Math.floor(last.t / 1000);
+      if (st.ctype === 'candles') {
+        st.series.update({ time: time, open: last.o, high: last.h, low: last.l, close: last.c });
+      } else {
+        st.series.update({ time: time, value: last.c });
+      }
+    }
+  } catch (_) {}
+}

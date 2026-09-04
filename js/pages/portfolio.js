@@ -13,6 +13,8 @@
 
 import * as ui from '../ui.js';
 import * as api from '../api.js';
+import * as feed from '../feed.js';
+import { TF_MINUTES } from '../feed.js';
 
 var CFG = globalThis.ARV_CONFIG;
 
@@ -23,7 +25,10 @@ var st = {
   chart: null,
   series: null,
   costLine: null,
-  candles: []
+  candles: [],
+  liveBar: null,
+  unsubTick: null,
+  feedStarted: false
 };
 
 /* ---------------------------------------------------------------- portfolio -- */
@@ -258,9 +263,86 @@ async function loadChart() {
     }
 
     st.chart.timeScale().fitContent();
+
+    // Seed the live bar from the last server candle, then wire the trade feed so
+    // the ARV area chart grows tick-by-tick like the Bitcoin chart.
+    var last = st.candles[st.candles.length - 1];
+    st.liveBar = last
+      ? { t: last.t, o: last.o, h: last.h, l: last.l, c: last.c }
+      : null;
+    wireLiveFeed();
   } catch (e) {
     ui.setText('[data-candle-count]', 'chart unavailable');
   }
+}
+
+/* -------------------------------------------------------------- live candle -- */
+
+/** Seconds spanned by one candle of the current range's timeframe. */
+function tfSeconds() {
+  return (TF_MINUTES[st.range && st.range.tf] || 1) * 60;
+}
+
+/**
+ * Live ARV price from the BTC feed, using the same identity as the server's
+ * index_price(): ARV = base × (BTC_now_in_INR ÷ BTC_launch_in_INR). Returns null
+ * when any input is missing so the caller leaves the chart untouched.
+ */
+function liveArvPrice() {
+  var idx = st.snap && st.snap.index;
+  if (!idx || !idx.base || !idx.baseBtcInr || idx.fxUsdInr == null) return null;
+  var btcUsd = feed.priceUsd('BTC');
+  if (btcUsd == null || !isFinite(btcUsd)) return null;
+  var price = idx.base * ((btcUsd * idx.fxUsdInr) / idx.baseBtcInr);
+  return isFinite(price) && price > 0 ? price : null;
+}
+
+/** Grow the area chart's last point tick by tick; never rebuild the series. */
+function onLiveTick() {
+  if (!st.series || !st.chart) return;
+  var price = liveArvPrice();
+  if (price == null) return;
+
+  var secs = tfSeconds();
+  var bucketSec = Math.floor(Math.floor(Date.now() / 1000) / secs) * secs;
+  var bar = st.liveBar;
+  var lastBucketSec = bar ? Math.floor((bar.t / 1000) / secs) * secs : null;
+
+  if (bar && lastBucketSec === bucketSec) {
+    bar.c = price;
+  } else {
+    st.liveBar = bar = { t: bucketSec * 1000, o: bar ? bar.c : price, h: price, l: price, c: price };
+  }
+  st.series.update({ time: bucketSec, value: bar.c });
+}
+
+/**
+ * Subscribe the ARV chart to the trade feed. Idempotent, and guarded so an
+ * unreachable feed leaves the historical server candles on screen.
+ */
+function wireLiveFeed() {
+  if (st.unsubTick) { try { st.unsubTick(); } catch (_) {} st.unsubTick = null; }
+  if (!st.series) return;
+  if (!st.feedStarted) {
+    st.feedStarted = true;
+    feed.start().catch(function () {});
+  }
+  st.unsubTick = feed.onTick(function () { onLiveTick(); });
+}
+
+/** Re-sync the live bar to the authoritative server candle on each poll. */
+async function resyncLiveBar() {
+  if (!st.series || !st.range) return;
+  try {
+    var r = await api.candles(st.range.tf, st.range.days, 2);
+    var rows = r.candles || [];
+    var last = rows[rows.length - 1];
+    if (!last) return;
+    if (!st.liveBar || last.t >= st.liveBar.t) {
+      st.liveBar = { t: last.t, o: last.o, h: last.h, l: last.l, c: last.c };
+      st.series.update({ time: Math.floor(last.t / 1000), value: last.c });
+    }
+  } catch (_) {}
 }
 
 /* -------------------------------------------------------------------- boot -- */
@@ -291,5 +373,6 @@ async function loadChart() {
     ui.paintNavTicker(st.snap);
     ui.paintServerFeed(st.snap);
     paintWhatIf();
+    resyncLiveBar();
   }, 30000);
 })();

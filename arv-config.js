@@ -334,28 +334,36 @@
   //
   var CHARTS = {
     timeframes: ['1m', '5m', '15m', '1h', '4h', '1D', '1W'],
-    defaultTimeframe: '15m',
-    // What the "All" range on the overview chart opens at. Daily over five years
-    // reads well; anything finer is noise at that width.
-    allTimeframe: '1D',
+    // Open on the minute chart, the way CoinDCX and Delta do. A trader lands on
+    // the live candle first and zooms out to a range if they want the history.
+    defaultTimeframe: '1m',
+    // What the "All" range on the overview chart opens at. Weekly over the full
+    // history reads well; anything finer is noise at that width.
+    allTimeframe: '1W',
     defaultType: 'candles',
-    backfill: { '1m': 7, '1h': 90, '4h': 730, '1D': null, '1W': null },
+    // Every tf a range can request needs a backfill depth, or that range renders
+    // near-empty. 5m and 15m are now backfilled so 1D and 1W are populated.
+    backfill: { '1m': 7, '5m': 30, '15m': 90, '1h': 365, '4h': 730, '1D': null, '1W': null },
     // Five years of daily is ~1,830 bars, so the old 1,500 cap would have
     // silently truncated the earliest months of history.
     maxCandles: 2600,
     showVolume: true,
     showEntryLine: true,
-    // Ranges offered on the chart toolbar, in days. null = since launch.
+    // Ranges offered on the chart toolbar, in days. null = since launch. Each
+    // window is paired with a tf that keeps the bar count readable: a day of
+    // minutes, a week of 15m, a month of hours, a quarter of 4h, then daily out
+    // to five years and weekly for everything. No range is left near-empty and
+    // none crams years of daily bars into a one-day view.
     ranges: [
-      { label: '1D',  days: 1,    tf: '5m'  },
-      { label: '1W',  days: 7,    tf: '1h'  },
+      { label: '1D',  days: 1,    tf: '1m'  },
+      { label: '1W',  days: 7,    tf: '15m' },
       { label: '1M',  days: 30,   tf: '1h'  },
       { label: '3M',  days: 90,   tf: '4h'  },
       { label: '1Y',  days: 365,  tf: '1D'  },
       { label: '5Y',  days: 1825, tf: '1D'  },
-      { label: 'All', days: null, tf: '1D'  }
+      { label: 'All', days: null, tf: '1W'  }
     ],
-    defaultRange: '1Y'
+    defaultRange: '1W'
   };
 
   // ---------------------------------------------------------------------------
