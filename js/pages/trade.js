@@ -17,9 +17,10 @@ import { TF_MINUTES } from '../feed.js';
 
 var CFG = globalThis.ARV_CONFIG;
 
-// The assets the chart can show. 'ARV' is the index itself (INR, from
-// arv_candles); the rest are the tracked coins (USD, from asset_candles) and are
-// display-only — selecting one never touches the order form or the money path.
+// The assets the chart can show. 'ARV' is the index itself (INR — the server
+// derives its candles from BTC's asset_candles, scaled by the index formula);
+// the rest are the tracked coins (USD, from asset_candles) and are display-only
+// — selecting one never touches the order form or the money path.
 var CHART_ASSETS = [
   { key: 'ARV', label: 'ARV' },
   { key: 'BTC', label: 'BTC' },

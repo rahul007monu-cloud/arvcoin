@@ -153,6 +153,42 @@ function feed_health(): array
 
 /* ============================================================ candles ===== */
 
+/**
+ * ARV candles — DERIVED from BTC's asset_candles, not read from arv_candles.
+ *
+ * ---------------------------------------------------------------------------
+ * Why derived rather than stored
+ * ---------------------------------------------------------------------------
+ * ARV is BTC scaled by a constant. The index is defined (see index_price() in
+ * _money.php) as
+ *
+ *     ARV = arv_base_inr × ( BTC_now_in_INR ÷ BTC_launch_in_INR )
+ *
+ * so every ARV candle is literally its BTC candle multiplied by
+ *
+ *     scale(t) = arv_base_inr × fx(t) ÷ ( base_btc_usd × base_fx_usd_inr )
+ *
+ * — the SAME shape as BTC, only a different Y-axis. Maintaining a separate
+ * arv_candles series for display meant the chart depended on that table being
+ * backfilled/rolled up/never-wiped, and it broke repeatedly (an empty arv_candles
+ * → an empty ARV chart) while the coin charts, which read the reliably-backfilled
+ * asset_candles, stayed full.
+ *
+ * So the ARV chart is now built on the fly from BTC's asset_candles: the exact
+ * same rows that power the BTC coin tab, scaled per candle by that day's fx. The
+ * result is dot-for-dot the BTC chart, INR-scaled, at every timeframe, and it is
+ * always as complete as the coin charts with zero dependency on
+ * arv_candles/backfill/wipe/chain.
+ *
+ * The money path is untouched: arv_candles is still written by ingest and remains
+ * the source for arv_nav()/arv_nav_meta() (pricing, orders) and window_stats().
+ * This endpoint is chart display only.
+ *
+ * The response shape is identical to before (t in ms, o/h/l/c, v), so the
+ * frontend needs no change — and the live-updating last bar (js/feed.js →
+ * trade.js liveArvPrice()) uses the identical scale/fx formula, so the derived
+ * history joins the live edge with no seam.
+ */
 function handle_candles(): void
 {
     require_method('GET');
@@ -166,41 +202,83 @@ function handle_candles(): void
         json_fail(422, 'Unknown timeframe.');
     }
 
+    // ARV did not exist before launch, so — exactly like the old arv_candles read
+    // and like backfill_tf() — the window is clamped to launch and no candle from
+    // before it is ever returned.
     $launch = strtotime((string)setting('launch_at', '2015-07-20 00:00:00'));
     $from   = $days !== null ? max($launch, time() - $days * 86400) : $launch;
 
+    // The BTC candles the ARV chart is scaled from. Same query shape, timeframe
+    // allowlist, window and limit as handle_asset_candles(); asset_candles is the
+    // reliably-backfilled series that also powers the coin charts.
     $rows = q(
         'SELECT UNIX_TIMESTAMP(ts) AS t, open, high, low, close, volume
-           FROM arv_candles
-          WHERE tf = ? AND ts >= FROM_UNIXTIME(?)
+           FROM asset_candles
+          WHERE asset_key = "BTC" AND tf = ? AND ts >= FROM_UNIXTIME(?)
           ORDER BY ts ASC
           LIMIT ?',
         [$tf, $from, $limit]
     )->fetchAll();
 
-    // An empty series is usually "backfill has not run", which is worth saying
-    // rather than rendering a blank chart.
+    // An empty series means BTC history has not been backfilled for this
+    // timeframe yet (a fresh install still building it), not that anything is
+    // broken — say so rather than rendering a blank chart.
     if (!$rows) {
         json_ok([
             'tf' => $tf, 'candles' => [], 'count' => 0,
-            'hint' => 'No candles stored for this timeframe yet. An operator needs to run the '
-                    . 'history backfill from the Operations page.',
+            'hint' => 'No BTC candles stored for this timeframe yet. The history backfill is '
+                    . 'still building; the ARV chart derives from BTC and fills in as it does.',
         ]);
+    }
+
+    // Anchor settings, read once. These are the SAME values index_price() uses,
+    // and the same ones handle_snapshot()/window_stats() report, so the chart, the
+    // header price and the since-launch % are all consistent by construction.
+    $baseInr   = setting_f('arv_base_inr', 21.08);
+    $baseUsd   = setting_f('base_btc_usd', 277.89);
+    $baseFx    = setting_f('base_fx_usd_inr', 63.50);
+    $quote     = (string)setting('quote', 'INR');
+    $baseQuote = $quote === 'INR' ? ($baseUsd * $baseFx) : $baseUsd;   // BTC at launch, in the quote currency
+
+    // Per-day USD/INR curve, forward-filled by fx_at() — historical candles are
+    // valued at their own day's rate, mirroring backfill_tf()/index_price(). Read
+    // from fx_rates (no network) so this public endpoint never blocks on an
+    // upstream API. In the INR quote a candle's scale is
+    //   scale = arv_base_inr × fx(day) ÷ (base_btc_usd × base_fx_usd_inr)
+    // and ARV_o/h/l/c = BTC_o/h/l/c × scale — exactly index_price() per candle.
+    $curve = ($quote === 'INR') ? fx_curve_from_db() : [];
+    // Fallbacks so a missing/empty fx history degrades gracefully rather than
+    // emptying the chart: the latest stored rate, then the launch anchor rate.
+    $fxFallback = $quote === 'INR'
+        ? (float)(qval('SELECT usd_inr FROM fx_rates ORDER BY day DESC LIMIT 1') ?? $baseFx)
+        : 1.0;
+
+    $candles = [];
+    foreach ($rows as $r) {
+        $ms = (int)$r['t'] * 1000;
+        if ($quote === 'INR') {
+            $fx    = $curve ? fx_at($curve, $ms) : $fxFallback;
+            $scale = $baseQuote > 0 ? ($baseInr * $fx) / $baseQuote : 0.0;
+        } else {
+            $scale = $baseQuote > 0 ? $baseInr / $baseQuote : 0.0;
+        }
+        $candles[] = [
+            't' => (int)$r['t'] * 1000,
+            'o' => (float)$r['open']  * $scale,
+            'h' => (float)$r['high']  * $scale,
+            'l' => (float)$r['low']   * $scale,
+            'c' => (float)$r['close'] * $scale,
+            'v' => (float)$r['volume'],
+        ];
     }
 
     json_ok([
         'tf'      => $tf,
-        'count'   => count($rows),
+        'count'   => count($candles),
         'from'    => gmdate('c', (int)$rows[0]['t']),
         'to'      => gmdate('c', (int)$rows[count($rows) - 1]['t']),
-        'candles' => array_map(static fn($r) => [
-            't' => (int)$r['t'] * 1000,
-            'o' => (float)$r['open'],
-            'h' => (float)$r['high'],
-            'l' => (float)$r['low'],
-            'c' => (float)$r['close'],
-            'v' => (float)$r['volume'],
-        ], $rows),
+        'derivedFrom' => 'BTC',
+        'candles' => $candles,
     ]);
 }
 
