@@ -228,11 +228,13 @@ async function loadWatchlist() {
 
   var rows = [];
 
-  // ARV first — it is the product; the coins beneath it are context.
+  // ARV first — it is the product; the coins beneath it are context. Every row
+  // links to its chart on the trade page (ARV, or ?asset=KEY for a coin).
   var snap = st.snap;
   if (snap && snap.price && snap.price.nav != null) {
     rows.push({
       key: 'ARV', name: 'ARV Coin', cls: 'arv',
+      href: 'trade.html',
       price: ui.fmtDual(snap.price.nav),
       sub: 'Index unit · tracks Bitcoin',
       change: snap.stats ? snap.stats.change24hPct : null,
@@ -248,6 +250,7 @@ async function loadWatchlist() {
         key: a.key,
         name: a.name,
         cls: a.key.toLowerCase(),
+        href: 'trade.html?asset=' + encodeURIComponent(a.key),
         price: a.priceUsd != null
           ? '$' + a.priceUsd.toLocaleString('en-US', { maximumFractionDigits: a.priceUsd < 10 ? 2 : 0 })
           : '\u2014',
@@ -264,16 +267,27 @@ async function loadWatchlist() {
     return;
   }
 
+  // Give every coin its own sparkline like ARV has, fetched client-side from the
+  // exchange (feed.history) — the same reliable source the charts use.
+  await Promise.all(rows.map(async function (r) {
+    if (r.spark || r.key === 'ARV') return;
+    try {
+      var c = await feed.history(r.key, '1D', 60);
+      if (c && c.length > 1) r.spark = c.map(function (k) { return k.c; });
+    } catch (_) {}
+  }));
+
   host.innerHTML = rows.map(function (r, i) {
     var d = ui.direction(r.change);
-    return '<div class="asset-row railed ' + r.cls + '" data-reveal="soft" style="--i:' + i + '">'
+    return '<a class="asset-row railed ' + r.cls + '" href="' + r.href + '" data-reveal="soft"'
+      + ' style="--i:' + i + ';text-decoration:none;color:inherit">'
       + '<span class="coin ' + r.cls + '"><span>' + ui.esc(r.key) + '</span></span>'
       + '<div class="asset-name"><div class="t">' + ui.esc(r.name) + '</div>'
         + '<div class="s">' + ui.esc(r.sub) + '</div></div>'
       + (r.spark ? sparkline(r.spark, d !== 'down') : '<span></span>')
       + '<div class="right"><div class="num strong">' + r.price + '</div>'
         + '<div class="chip ' + d + '" style="margin-top:3px">' + ui.fmtPct(r.change) + '</div></div>'
-      + '</div>';
+      + '</a>';
   }).join('');
 
   host.setAttribute('data-reveal-group', 'tight');
