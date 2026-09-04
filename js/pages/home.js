@@ -339,10 +339,7 @@ function paintExamples() {
   var tds = Math.round(sGross * t.tdsPct / 100);
   var cost = net;
   var pnl = sGross - cost;
-  var tax = Math.round(Math.max(0, pnl) * t.vdaGainPct / 100);
-  var cess = Math.round(tax * t.cessPct / 100);
   var payout = sGross - sFee - sGst - tds;
-  var balance = Math.max(0, (tax + cess) - tds);
 
   ui.setHtml('[data-sell-example]', rows([
     ['Gross sale value', sGross, 'gross'],
@@ -353,11 +350,7 @@ function paintExamples() {
     ['Credited to your balance', payout, 'net'],
     [null],
     ['Cost of acquisition', cost, 'info'],
-    ['Realised gain', pnl, 'pnl'],
-    ['Tax at ' + t.vdaGainPct + '% + ' + t.cessPct + '% cess', tax + cess, 'liability',
-     'Not withheld — payable by you when you file'],
-    ['Less TDS already withheld', -tds, 'liability'],
-    ['Balance tax at filing', balance, 'liability-total']
+    ['Realised gain', pnl, 'pnl']
   ]));
 
   function rows(list) {

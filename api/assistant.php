@@ -163,13 +163,12 @@ function assistant_kb(array $f): array
         ],
         [
             'keys'  => ['tax', 'taxes', 'tds', 'vda', 'capital gain', '30%', 'cess', 'pan'],
-            'title' => 'Tax on gains',
-            'answer' => "ARV follows India's Virtual Digital Asset rules. Gains are taxed at {$f['vdaGainPct']}% "
-                . "plus {$f['cessPct']}% cess (s.115BBH). {$f['tdsPct']}% TDS is withheld on every sale "
-                . "(s.194S) and credited against your liability — it becomes {$f['tdsNoPanPct']}% if no PAN "
-                . "is on file. Cost basis is FIFO, and losses cannot be set off against other income or "
-                . "carried forward. Every sale shows the exact tax breakdown. This is general information, "
-                . "not tax advice — check with your accountant for your own situation.",
+            'title' => 'Tax & TDS',
+            'answer' => "On every sale, {$f['tdsPct']}% TDS is withheld (s.194S) and credited against your "
+                . "tax — it is {$f['tdsNoPanPct']}% if no PAN is on file. Any gains may also be taxable "
+                . "under India's Virtual Digital Asset rules, which you settle when you file; your Tax "
+                . "statement page totals everything for the year with a FIFO cost basis. This is general "
+                . "information, not tax advice — please check with your accountant for your own situation.",
         ],
         [
             'keys'  => ['otp', 'login', 'sign in', 'code', 'trusted device', 'verify', 'two factor', '2fa'],
