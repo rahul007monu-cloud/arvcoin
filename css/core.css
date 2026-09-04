@@ -294,10 +294,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: var(--sp-5) 0; }
   font-size: .68rem; text-transform: uppercase; letter-spacing: .09em; color: var(--tx-3);
 }
 
-/* Help lives in the collapsible menu; on desktop the links row shows inline and
-   the Help entry is redundant with the footer, so it only surfaces once the
-   menu becomes the mobile "More" overflow (see the 880px block). */
-.nav-help { display: none; }
+/* Help sits inline in the desktop links row (so support is visible in the web
+   view, not only in the footer) and also appears in the mobile "More" overflow
+   once the links row collapses (see the 880px block). */
+.nav-help { display: inline; }
 
 /* ------------------------------------------------------ bottom tab bar ----- */
 
