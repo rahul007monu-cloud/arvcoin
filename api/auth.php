@@ -156,15 +156,20 @@ function handle_verify(): void
     $code    = preg_replace('/\D/', '', input_str('code'));
     $purpose = input_str('purpose', 'signup');
 
-    // Trusting this device is now the default, and the box is the way out of it
-    // rather than the way in.
+    // Trusting this device is now the default, and the shared-computer box is the
+    // one and only way out of it.
     //
-    // `trustDevice` is still honoured when it is explicitly false, because a
-    // service worker can serve a cached copy of the old JavaScript for a while
-    // after a deploy — and in that window somebody who deliberately unticked
-    // "remember me" on a public machine would otherwise be trusted anyway.
-    $shared = (bool)input('sharedDevice', false)
-           || input('trustDevice', null) === false;
+    // It used to also treat `trustDevice === false` as an opt-out, meaning to
+    // honour a deliberate choice from a browser still running the old cached
+    // JavaScript after a deploy. That was wrong, and it is the cause of the
+    // "a code every single time" complaint. The old script sent
+    // `trustDevice: !!checkbox` from an *unchecked* "remember me" box, so a normal
+    // sign-in from that stale bundle sent `trustDevice: false` with no intent
+    // behind it at all. That silently forced $shared true, so the trust cookie was
+    // never set and every login asked again. An unticked opt-in box is not a
+    // shared-device declaration. Only the explicit `sharedDevice` flag from the
+    // current form waives trust now.
+    $shared = (bool)input('sharedDevice', false);
 
     if (!in_array($purpose, ['signup', 'login'], true)) {
         json_fail(422, 'Unknown verification purpose.');
@@ -795,14 +800,16 @@ function issue_otp(int $userId, string $purpose, string $email): bool
  * its own — losing it costs one extra email, nothing more.
  *
  * Set automatically after any successful code entry, and lasting `trust_hours`
- * (24 by default). The previous behaviour asked for a code on every single login
- * unless the person had ticked a box, which meant the commonest case — same phone,
- * several times a day — was an email each time. A code that arrives that often
- * stops being read and starts being copied out of a notification reflexively,
- * which is the state of mind every OTP phishing attempt depends on.
+ * (720, i.e. 30 days, by default). The previous behaviour asked for a code on
+ * every single login unless the person had ticked a box, which meant the
+ * commonest case (same phone, several times a day) was an email each time. A code
+ * that arrives that often stops being read and starts being copied out of a
+ * notification reflexively, which is the state of mind every OTP phishing attempt
+ * depends on.
  *
- * The window is short on purpose. Thirty days of silent trust on a device nobody
- * re-checked is a different proposition to a day of it.
+ * The window is bounded on purpose. A month of silent trust on a device nobody
+ * re-checked is a different proposition to indefinite trust, and `trust_hours`
+ * lets an operator shorten it.
  */
 function set_trusted_device(int $userId): void
 {
