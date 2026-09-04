@@ -32,6 +32,61 @@ export function fmtPrice(rupees, decimals) {
   });
 }
 
+/* ------------------------------------------------------- USD companion ==== */
+
+/**
+ * The live USD/INR rate, threaded in from the server snapshot.
+ *
+ * USD is a DISPLAY-ONLY figure: it multiplies whatever rupee NAV is already on
+ * screen and never touches the money path (orders, ledger, cost basis, fills,
+ * tax are all integer paise/₹). One module-level holder, set from the same
+ * snapshot every page already paints, keeps the rate identical everywhere.
+ */
+var currentUsdInr = null;
+
+/** Update the shared rate from a snapshot's index.fxUsdInr. Ignores junk. */
+export function setUsdInr(rate) {
+  if (rate != null && isFinite(rate) && rate > 0) currentUsdInr = Number(rate);
+}
+
+/** The rate in force, falling back to the configured launch-era fallback. */
+function usdInr() {
+  if (currentUsdInr != null) return currentUsdInr;
+  var fb = CFG.FEED && CFG.FEED.fx && CFG.FEED.fx.fallbackRate;
+  return (fb && isFinite(fb) && fb > 0) ? fb : null;
+}
+
+/**
+ * A rupee figure expressed in dollars at the live rate.
+ *
+ * Degrades to an em-dash on a null/NaN input or a missing rate — it must never
+ * render 'NaN' or '$Infinity' on screen.
+ */
+export function fmtUsd(rupees, decimals) {
+  var r = usdInr();
+  if (rupees == null || !isFinite(rupees) || r == null) return '\u2014';
+  var usd = Number(rupees) / r;
+  if (!isFinite(usd)) return '\u2014';
+  var d = decimals != null ? decimals : 2;
+  return '$' + usd.toLocaleString('en-US', {
+    minimumFractionDigits: d, maximumFractionDigits: d
+  });
+}
+
+/**
+ * A dual ₹/$ string, e.g. '₹9,998.64 ($111.03)'.
+ *
+ * The rupee figure leads (fmtPrice); the dollar figure trails as a muted
+ * secondary in a .price-usd span so it reads as context, not a competing price.
+ * When the dollar value cannot be formed the ₹ figure stands alone.
+ */
+export function fmtDual(rupees, dRs, dUsd) {
+  var rs = fmtPrice(rupees, dRs);
+  var usd = fmtUsd(rupees, dUsd);
+  if (usd === '\u2014') return rs;
+  return rs + ' <span class="price-usd">(' + usd + ')</span>';
+}
+
 export function fmtBig(rupees) {
   if (rupees == null || !isFinite(rupees)) return '\u2014';
   return symbol + Math.round(rupees).toLocaleString(locale);
@@ -372,6 +427,30 @@ export function paintPrice(target, price, key, decimals) {
   lastPainted[k] = price;
 }
 
+/**
+ * Paint a live price with the muted $ companion beside the ₹ figure.
+ *
+ * Same direction flash as paintPrice — the animation lives on the whole node so
+ * the ₹ figure still ticks — but the content is the dual ₹/$ string. Used for
+ * the top nav ticker and any live/current price that should carry USD context.
+ */
+export function paintPriceDual(target, price, key, decimals) {
+  var node = typeof target === 'string' ? el(target) : target;
+  if (!node || price == null) return;
+
+  var k = key || 'default';
+  var prev = lastPainted[k];
+  node.innerHTML = fmtDual(price, decimals);
+
+  if (prev != null && price !== prev) {
+    var cls = price > prev ? 'tick-up' : 'tick-down';
+    node.classList.remove('tick-up', 'tick-down');
+    void node.offsetWidth;
+    node.classList.add(cls);
+  }
+  lastPainted[k] = price;
+}
+
 export function paintChange(target, pct) {
   var node = typeof target === 'string' ? el(target) : target;
   if (!node) return;
@@ -428,8 +507,11 @@ export function paintServerFeed(snapshot) {
 export function paintNavTicker(snapshot) {
   var wrap = el('[data-nav-ticker]');
   if (!wrap || !snapshot || !snapshot.price || snapshot.price.nav == null) return;
+  // Every page that paints the ticker refreshes the shared USD/INR rate from the
+  // same snapshot, so ₹/$ agrees across the whole app.
+  setUsdInr(snapshot.index && snapshot.index.fxUsdInr);
   wrap.hidden = false;
-  paintPrice(el('[data-nav-price]', wrap), snapshot.price.nav, 'nav');
+  paintPriceDual(el('[data-nav-price]', wrap), snapshot.price.nav, 'nav');
   if (snapshot.stats) paintChange(el('[data-nav-change]', wrap), snapshot.stats.change24hPct);
 }
 

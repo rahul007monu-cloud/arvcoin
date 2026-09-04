@@ -167,6 +167,16 @@ hr { border: 0; border-top: 1px solid var(--line); margin: var(--sp-5) 0; }
 
 .up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--flat); }
 .muted { color: var(--tx-2); } .dim { color: var(--tx-3); }
+
+/* The USD companion beside a ₹ figure. A muted secondary: smaller, dimmer and
+   lighter so it reads as context and never competes with the rupee price. */
+.price-usd {
+  color: var(--tx-3);
+  font-weight: 400;
+  font-size: .82em;
+  letter-spacing: -.01em;
+  margin-left: .12em;
+}
 .small { font-size: .85rem; } .tiny { font-size: .76rem; }
 .right { text-align: right; } .center { text-align: center; }
 .nowrap { white-space: nowrap; } .hidden { display: none !important; }

@@ -58,13 +58,14 @@ function paintTicker() {
   var s = st.snap && st.snap.stats;
   if (!p || p.nav == null) return;
 
-  ui.paintPrice('[data-price]', p.nav, 'trade');
+  ui.setUsdInr(st.snap.index && st.snap.index.fxUsdInr);
+  ui.paintPriceDual('[data-price]', p.nav, 'trade');
   ui.paintNavTicker(st.snap);
 
   if (s) {
     ui.paintChange('[data-change]', s.change24hPct);
-    ui.setText('[data-high]', ui.fmtPrice(s.high24h));
-    ui.setText('[data-low]', ui.fmtPrice(s.low24h));
+    ui.setHtml('[data-high]', ui.fmtDual(s.high24h));
+    ui.setHtml('[data-low]', ui.fmtDual(s.low24h));
     var l = ui.el('[data-launch]');
     l.textContent = ui.fmtPct(s.sinceLaunchPct);
     l.className = 'num ' + ui.direction(s.sinceLaunchPct);

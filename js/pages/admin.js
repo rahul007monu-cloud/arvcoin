@@ -27,7 +27,10 @@ function paintOverview(o) {
   ui.setText('[data-q-kyc]', String(q.kyc_pending || 0));
 
   var p = o.price || {};
-  ui.setText('[data-price]', p.nav != null ? ui.fmtPrice(p.nav) : '\u2014');
+  // If the overview carries a live fx rate, thread it in; otherwise fmtUsd falls
+  // back to CFG.FEED.fx.fallbackRate. Current price gets the muted $ companion.
+  ui.setUsdInr((o.index && o.index.fxUsdInr) || p.fxUsdInr);
+  ui.setHtml('[data-price]', p.nav != null ? ui.fmtDual(p.nav) : '\u2014');
   ui.setText('[data-price-age]', p.nav == null
     ? 'feed has never run'
     : (p.stale ? 'stale \u2014 trading paused' : 'updated ' + (p.ageSeconds || 0) + 's ago'));
@@ -67,7 +70,7 @@ function paintRecon(r) {
 
   ui.setHtml('[data-obligation]',
     row('Units outstanding', ui.fmtUnits(ob.unitsOutstanding, 8))
-    + row('ARV price', ob.nav != null ? ui.fmtPrice(ob.nav) : '\u2014')
+    + row('ARV price', ob.nav != null ? ui.fmtDual(ob.nav) : '\u2014')
     + rowKind('Owed to holders', ui.fmtPaise(ob.liabilityPaise || 0), 'gross')
     + '<div class="ledger-divider"></div>'
     + row('Bitcoin price', ob.btcPriceInr != null ? ui.fmtBig(ob.btcPriceInr) : '\u2014')
