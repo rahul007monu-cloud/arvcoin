@@ -35,7 +35,15 @@ declare(strict_types=1);
 // old defaults), rescales existing holding UNIT COUNTS by the NAV factor F so
 // value and paise cost basis are preserved, and re-queues the full backfill so
 // arv_candles are rebuilt for the new base and deeper launch.
-const ARV_SCHEMA_VERSION = 8;
+// 9 is a CORRECTIVE anchor + full candle rebuild: it retargets today's NAV to
+// ~₹10,000 (arv_base_inr 1.78 → 17.83) and FORCE-sets the four anchor settings
+// unconditionally (settings carry no money), then re-queues an UNCONDITIONAL
+// candle rebuild so the mixed-anchor arv_candles left by v8 (old-anchor history
+// that backfill skipped on row count, new-anchor fresh minutes → an end-of-chart
+// spike) are all recomputed to the single current anchor. It does NOT re-run the
+// v8 unit rescale and never touches wallets, lots, or the ledger — only candles,
+// backfill scheduling, and settings.
+const ARV_SCHEMA_VERSION = 9;
 
 function arv_schema(): array
 {
@@ -582,11 +590,13 @@ function arv_default_settings(): array
         // real, published observations for that date — BTC/USD daily open ≈ $277.89,
         // USD/INR ≈ 63.50 — and neither is ever revised, because the whole index
         // hangs off them. arv_base_inr is chosen with the launch so today's price
-        // sits near ₹1000: NAV_today = base * (btcNowInr / (base_btc_usd*base_fx)).
+        // sits near ₹10,000: NAV_today = base * (btcNowInr / (base_btc_usd*base_fx)).
         // With btcNow≈$110k and fx≈90 the now/launch multiple is ~561, so
-        // 1.78 * 561 ≈ 999. Deep history is daily/weekly only; no free source
+        // 17.83 * 561 ≈ 10,000. Because NAV_launch == arv_base_inr, the launch
+        // value honestly reads ~₹17.83 — the real consequence of tracking BTC's
+        // genuine ~560x run. Deep history is daily/weekly only; no free source
         // serves minute data this far back (see README, "A note on history depth").
-        'arv_base_inr'          => '1.78',
+        'arv_base_inr'          => '17.83',
         'launch_at'             => '2015-07-20 00:00:00',
         'base_btc_usd'          => '277.89',
         'base_fx_usd_inr'       => '63.50',
@@ -952,6 +962,70 @@ function arv_migrations(PDO $pdo): array
 
         // Record the flag regardless, so the rescale can never run twice.
         setting_set($rescaleFlag, '1');
+    }
+
+    // ---------------------------------------------------------------------
+    // Schema 9: corrective anchor + full candle rebuild to the ₹10,000 anchor.
+    //
+    // Why this exists. v8 moved the anchor settings and re-queued the backfill
+    // expecting ON DUPLICATE KEY UPDATE to overwrite old candles. But
+    // auto_backfill_step() SKIPS any timeframe whose stored row count already
+    // exceeds its floor (`if ($have >= auto_backfill_floor($tf)) advance`), so a
+    // pre-existing full 1m/1D series (computed on the OLD anchor) was advanced
+    // past WITHOUT recompute, while every fresh ingest minute is computed on the
+    // NEW anchor. The result is a MIXED-ANCHOR series: an old-anchor historical
+    // body meeting new-anchor recent minutes at a vertical right-edge spike, and
+    // a nonsense since-launch % (the ~₹758 / +34027% the user saw).
+    //
+    // The fix here does two things and BOTH are candle/display only:
+    //   (a) FORCE-set the four anchor settings to the new canonical values. This
+    //       is unconditional (unlike v8's "only if on old defaults" guard):
+    //       settings carry no money, and we must repair installs left in ANY
+    //       partial state by v8. Retargets today's NAV to ~₹10,000
+    //       (arv_base_inr 1.78 → 17.83) while keeping the 2015 launch and the
+    //       real BTC/fx anchors, so the chart still traces Bitcoin's true ~560x.
+    //   (b) Re-queue an UNCONDITIONAL full candle rebuild by pointing the
+    //       backfill at '1D' and raising a rebuild flag that auto_backfill_step()
+    //       reads to overwrite ARV candles regardless of row count. Every ARV
+    //       timeframe is then recomputed by index_price() against the current
+    //       anchor → a single continuous, BTC-matched series with no end spike.
+    //
+    // CRITICAL — this block touches ONLY candles + backfill scheduling +
+    // settings. It does NOT re-run the v8 unit rescale and it NEVER writes to
+    // wallets, lots, or the append-only ledger. Unit balances were already
+    // rescaled by v8 (units_rescaled_v8, left untouched here); the money value
+    // of a holding = units * NAV is preserved because we change only the printed
+    // per-unit NAV/candles, not the unit counts. There is no re-division of
+    // units and no ledger entry from this migration.
+    //
+    // Guarded by its own flag so it runs exactly once and is idempotent.
+    $anchorFlag = 'anchor_recomputed_v9';
+    if (!setting_b($anchorFlag, false)) {
+        // (a) Force-set the four canonical anchor settings (kept in lock-step
+        // with arv_default_settings() above). Unconditional: settings hold no
+        // money, so overwriting them is always safe and repairs any partial v8.
+        setting_set('arv_base_inr',    '17.83');
+        setting_set('launch_at',       '2015-07-20 00:00:00');
+        setting_set('base_btc_usd',    '277.89');
+        setting_set('base_fx_usd_inr', '63.50');
+
+        // (b) Re-queue a FULL candle rebuild from the head of the chain and clear
+        // the fail state so the chain can run cleanly.
+        setting_set('auto_backfill_next', '1D');
+        setting_set('auto_backfill_fails', '0');
+        setting_set('auto_backfill_fail_step', '');
+
+        // (c) Rebuild flag read by auto_backfill_step(): while set, ARV
+        // timeframes are recomputed regardless of row count so the stranded
+        // old-anchor candles are actually overwritten. The step clears this flag
+        // once the ARV chain has been fully rebuilt.
+        setting_set('arv_candles_rebuild_v9', '1');
+
+        // (d) One-shot guard so the corrective anchor never runs twice.
+        setting_set($anchorFlag, '1');
+        $done[] = 'index: corrective anchor to 2015/₹17.83 (~₹10,000 today), '
+                . 're-queued UNCONDITIONAL full candle rebuild (candles/settings only; '
+                . 'no unit rescale, no wallet/lot/ledger writes)';
     }
 
     if ($done) {

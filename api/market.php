@@ -44,7 +44,12 @@ function handle_snapshot(): void
 
     $meta   = arv_nav_meta();
     $launch = strtotime((string)setting('launch_at', '2015-07-20 00:00:00'));
-    $base   = setting_f('arv_base_inr', 1.78);
+    // base MUST be the SAME anchor the candles were computed with (index_price()
+    // reads the same setting), or arvChangePct/sinceLaunchPct are nonsense — that
+    // mismatch is what produced the +34027% before the schema-9 rebuild. The
+    // real value comes from settings; the fallback only bites if the row is gone,
+    // so it tracks the current anchor default (17.83).
+    $base   = setting_f('arv_base_inr', 17.83);
 
     $stats = $meta['nav'] !== null ? window_stats((float)$meta['nav']) : null;
 
@@ -83,7 +88,11 @@ function handle_snapshot(): void
 /** 24h and since-launch statistics from stored candles. */
 function window_stats(float $nav): array
 {
-    $base = setting_f('arv_base_inr', 1.0);
+    // base here MUST equal the anchor the candles were computed with (the same
+    // arv_base_inr index_price() uses), so sinceLaunchPct = (nav - base)/base is
+    // internally consistent with the rebuilt single-anchor series. Fallback
+    // tracks the current anchor default (17.83) for the setting-missing case.
+    $base = setting_f('arv_base_inr', 17.83);
 
     $day = q1(
         'SELECT MAX(high) AS h, MIN(low) AS l, SUM(volume) AS v

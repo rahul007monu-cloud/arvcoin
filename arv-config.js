@@ -95,9 +95,15 @@
   // ≈ $277.89, USD/INR ≈ 63.50 that day.
   //
   // arvBaseInr is chosen together with the launch so that today's price sits
-  // near ₹1000 rather than a couple of rupees. With a 2015 launch the
-  // now/launch multiple is large (~560x for BTC≈$110k, USD/INR≈90), so the base
-  // is small: 1000 / 560 ≈ 1.78. See the NAV arithmetic in README/SETUP.
+  // near ₹10,000 today while the chart still traces real Bitcoin's actual
+  // ~560x ten-year shape. With a 2015 launch the now/launch multiple is large
+  // (~561x for BTC≈$110k, USD/INR≈90), so the base is small:
+  // 10000 / 561 ≈ 17.83. Because NAV_launch == arvBaseInr in the index formula,
+  // the launch value honestly reads ~₹17.83 (that is the real consequence of
+  // tracking BTC's genuine ~560x run: launch small, today ~₹10k, and the ATH
+  // scales to BTC's real ATH proportion). Recent minutes are true minute-by-
+  // minute history; the deep 2015→ body is daily/weekly. See NAV arithmetic in
+  // README/SETUP.
   //
   // Quoted in rupees because deposits are rupees and the treasury holds Bitcoin.
   // That makes ARV's printed change equal what the money actually did, currency
@@ -106,7 +112,7 @@
   //
   var INDEX = {
     quote: 'INR',
-    arvBaseInr: 1.78,
+    arvBaseInr: 17.83,
     launchIso: '2015-07-20T00:00:00Z',
     launchMs: Date.UTC(2015, 6, 20, 0, 0, 0),
     baseUsd: { BTC: 277.89 },

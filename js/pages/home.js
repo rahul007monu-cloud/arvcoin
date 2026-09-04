@@ -152,7 +152,7 @@ async function loadChart() {
     }));
 
     // The launch level, so the whole history reads against the launch anchor
-    // (now ₹1.78, drawn from CFG.INDEX.arvBaseInr rather than a hard-coded ₹1).
+    // (now ₹17.83, drawn from CFG.INDEX.arvBaseInr rather than a hard-coded ₹1).
     series.createPriceLine({
       price: CFG.INDEX.arvBaseInr,
       color: 'rgba(185,190,201,.35)',

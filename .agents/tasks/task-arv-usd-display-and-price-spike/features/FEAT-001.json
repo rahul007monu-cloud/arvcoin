@@ -1,0 +1,24 @@
+{
+  "id": "FEAT-001",
+  "type": "chore",
+  "description": "Baseline: confirm a clean tree on the new branch and record the current syntax-check baseline before any change. No behaviour change. Establishes that php -l and node --check pass on all files as they stand on main (post PR #26), so later features can be attributed cleanly.",
+  "status": "completed",
+  "steps": [
+    "Confirm branch is fix-arv-usd-display-and-price-spike (already created by planner) and `git status` is clean.",
+    "Run: for f in api/*.php *.php; do php -l \"$f\"; done  and confirm every file reports 'No syntax errors detected'.",
+    "Run: for f in js/*.js js/pages/*.js arv-config.js; do env -u NODE_OPTIONS node --check \"$f\"; done  and confirm no parse errors.",
+    "Record the current anchor values from arv-config.js INDEX (arvBaseInr, launchMs, baseUsd.BTC, baseFxUsdInr) and from api/_schema.php arv_default_settings() (arv_base_inr, launch_at, base_btc_usd, base_fx_usd_inr) and ARV_SCHEMA_VERSION into findings so the exact starting state is documented.",
+    "Do NOT commit anything for this feature unless there is an incidental fix; it is a baseline record."
+  ],
+  "acceptance_criteria": [
+    "php -l passes on all api/*.php and root *.php (no syntax errors).",
+    "env -u NODE_OPTIONS node --check passes on all js/*.js, js/pages/*.js and arv-config.js.",
+    "findings records the exact current anchor settings and ARV_SCHEMA_VERSION (expected 8)."
+  ],
+  "verification": [
+    "for f in api/*.php *.php; do php -l \"$f\"; done",
+    "for f in js/*.js js/pages/*.js arv-config.js; do env -u NODE_OPTIONS node --check \"$f\"; done"
+  ],
+  "blocked_reason": null,
+  "findings": "BASELINE CLEAN. Branch confirmed: fix-arv-usd-display-and-price-spike. HEAD = 9c942af (Merge PR #26). Working tree has NO code changes; only untracked files are .agents/tasks planning dirs (task-arv-usd-display-and-price-spike/ and two review .md files under task-arv-price-history-charts-portfolio/). No incidental syntax fixes were needed, so nothing was committed for this baseline feature.\n\nSYNTAX CHECKS (all pass):\n- php -l on all api/*.php (16 files: account,admin,auth,_boot,cron,deposit,_feed,_google,kyc,market,_match,_money,orders,referral,_schema,withdraw) => 'No syntax errors detected'. NOTE: the only root-level *.php file is install.php (also passes); there is no other root PHP.\n- env -u NODE_OPTIONS node --check on all js/*.js (api,feed,qr,reveal,ui), js/pages/*.js (admin,auth,dashboard,deposit,home,legal,portfolio,profile,referral,tax,trade,transactions,withdraw) and arv-config.js => all parse OK, no errors.\n\nCURRENT ANCHOR SETTINGS (starting state before FEAT-002 retarget):\n- arv-config.js INDEX (~line 108): arvBaseInr=1.78, launchIso='2015-07-20T00:00:00Z', launchMs=Date.UTC(2015,6,20,0,0,0), baseUsd.BTC=277.89, baseFxUsdInr=63.50, priceDecimals=4, unitDecimals=8, quote='INR'.\n- api/_schema.php arv_default_settings() (~line 589): arv_base_inr='1.78', launch_at='2015-07-20 00:00:00', base_btc_usd='277.89', base_fx_usd_inr='63.50'.\n- api/_schema.php ARV_SCHEMA_VERSION = 8 (const at line 38) — matches expected 8.\n- FEED.fx.fallbackRate reference for USD display work (FEAT-003) noted in context = 94.95.\n\nConfig anchors (arv-config.js) and DB defaults (_schema.php arv_default_settings) are in agreement at 1.78 / 2015-07-20 / 277.89 / 63.50. Baseline established; later features can be attributed cleanly."
+}

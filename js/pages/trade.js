@@ -268,7 +268,7 @@ async function loadChart() {
     // is a plain USD price with no index anchor and nothing the user holds.
     if (!coin) {
       // The launch level, so the whole series reads against the launch anchor
-      // (now ₹1.78, not the old ₹1). Title is derived from the same figure the
+      // (now ₹17.83, not the old ₹1). Title is derived from the same figure the
       // line is drawn at so the label can never drift from the price again.
       var baseInr = CFG.INDEX.arvBaseInr;
       var baseLabel = '\u20b9' + (Number.isInteger(baseInr) ? baseInr : String(baseInr));

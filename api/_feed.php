@@ -878,11 +878,30 @@ function auto_backfill_step(): ?array
         [$assetKey, $tf] = explode(':', $next, 2);
     }
 
+    // Schema-9 corrective rebuild. The row-count skip below is exactly what
+    // stranded the old-anchor ARV candles when v8 re-queued the backfill: a
+    // timeframe already above its floor was advanced past WITHOUT recompute, so
+    // its old-anchor values survived while fresh ingest wrote new-anchor minutes
+    // -> the end-of-chart spike. While arv_candles_rebuild_v9 is set we therefore
+    // do NOT skip on row count for ARV (non-asset) timeframes: every ARV frame is
+    // re-run through backfill_tf() so it is recomputed against the current anchor
+    // via index_price() (ON DUPLICATE KEY UPDATE, candles only, no money). Assets
+    // keep the normal row-count skip. The flag is cleared once the ARV chain has
+    // been fully rebuilt (see below), so this is a one-pass corrective, not a
+    // permanent re-fetch loop.
+    $rebuildArv = ($assetKey === null) && setting_b('arv_candles_rebuild_v9', false);
+
     $have = $assetKey !== null
         ? (int)(qval('SELECT COUNT(*) FROM asset_candles WHERE asset_key = ? AND tf = ?', [$assetKey, $tf]) ?? 0)
         : (int)(qval('SELECT COUNT(*) FROM arv_candles WHERE tf = ?', [$tf]) ?? 0);
-    if ($have >= auto_backfill_floor($tf)) {
-        setting_set('auto_backfill_next', auto_backfill_after($next));
+    if (!$rebuildArv && $have >= auto_backfill_floor($tf)) {
+        $after = auto_backfill_after($next);
+        setting_set('auto_backfill_next', $after);
+        // If skipping this step lands the chain past the ARV frames (into the
+        // asset chain or 'done'), the ARV rebuild is complete — clear the flag.
+        if (setting_b('arv_candles_rebuild_v9', false) && (strpos($after, ':') !== false || $after === 'done')) {
+            setting_set('arv_candles_rebuild_v9', '');
+        }
         return ['step' => $next, 'skipped' => 'already holds ' . $have . ' candles'];
     }
 
@@ -892,9 +911,16 @@ function auto_backfill_step(): ?array
 
     try {
         $r = $assetKey !== null ? backfill_asset_tf($assetKey, $tf) : backfill_tf($tf);
-        setting_set('auto_backfill_next', auto_backfill_after($next));
+        $after = auto_backfill_after($next);
+        setting_set('auto_backfill_next', $after);
         setting_set('auto_backfill_fails', '0');
         setting_set('auto_backfill_fail_step', '');
+        // Schema-9: the moment the ARV chain finishes (the next step is an asset
+        // step "ETH:1D" or 'done'), the full ARV candle rebuild is complete, so
+        // clear the corrective flag and fall back to the normal row-count skip.
+        if (setting_b('arv_candles_rebuild_v9', false) && (strpos($after, ':') !== false || $after === 'done')) {
+            setting_set('arv_candles_rebuild_v9', '');
+        }
         $r['auto'] = true;
         return $r;
     } catch (Throwable $e) {
