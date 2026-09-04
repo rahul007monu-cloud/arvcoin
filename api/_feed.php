@@ -878,6 +878,18 @@ function auto_backfill_step(): ?array
     }
 
     $next = (string)setting('auto_backfill_next', '1D');
+
+    // Self-healing: schema-10 wipes arv_candles and resets the chain to '1D',
+    // but if this function is called after the migration in the same request
+    // (or the migration ran but the chain was already 'done'/'stalled'),
+    // the early-return below would strand the wiped candles forever. Catch it:
+    // if the wipe flag is set but the chain is stalled, force-reset to '1D'.
+    if (setting_b('candles_wiped_v10', false) && in_array($next, ['done', 'stalled'], true)) {
+        setting_set('auto_backfill_next', '1D');
+        setting_set('auto_backfill_fails', '0');
+        $next = '1D';
+    }
+
     if ($next === 'done' || $next === 'stalled') {
         return null;
     }
