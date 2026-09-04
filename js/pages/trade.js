@@ -183,21 +183,71 @@ function daysFor(tf) {
   return { '1m': 7, '5m': 30, '15m': 90, '1h': 365, '4h': 730, '1D': null, '1W': null }[tf];
 }
 
+/** How many candles to pull per timeframe so every view is properly populated. */
+function wantFor(tf) {
+  return { '1m': 1000, '5m': 1000, '15m': 1000, '1h': 1000, '4h': 1000, '1D': 2500, '1W': 1200 }[tf] || 800;
+}
+
+/**
+ * The scale that turns a BTC-USD price into the ARV rupee index:
+ *   ARV = BTC_usd × ( arv_base_inr × fx ÷ BTC_launch_in_INR )
+ * which is exactly the server's index_price() identity. Returns null if the
+ * snapshot has not provided the anchor yet.
+ */
+function arvFactor() {
+  var idx = st.snap && st.snap.index;
+  if (!idx || !idx.base || !idx.baseBtcInr || idx.fxUsdInr == null) return null;
+  var f = idx.base * idx.fxUsdInr / idx.baseBtcInr;
+  return isFinite(f) && f > 0 ? f : null;
+}
+
+/**
+ * Candles for the chart, fetched CLIENT-SIDE from the live exchange feed — the
+ * same channel that already delivers the live price. This is the fix for the
+ * chart that kept coming back empty: it no longer depends on the server having
+ * backfilled its candle tables (which was failing on the live host). Coins are
+ * shown in USD as reported; ARV is BTC scaled by the index factor so its shape
+ * is dot-for-dot Bitcoin's, in rupees. Falls back to the server candle endpoint
+ * only if the exchange fetch returns nothing.
+ */
+async function loadSeries(coin) {
+  var want = wantFor(st.tf);
+
+  try {
+    if (coin) {
+      var c = await feed.candles(st.asset, st.tf, want);
+      if (c && c.length) return c;
+    } else {
+      var f = arvFactor();
+      var btc = await feed.candles('BTC', st.tf, want);
+      if (btc && btc.length && f) {
+        return btc.map(function (k) {
+          return { t: k.t, o: k.o * f, h: k.h * f, l: k.l * f, c: k.c * f, v: k.v };
+        });
+      }
+    }
+  } catch (_) { /* fall through to the server */ }
+
+  try {
+    var r = coin
+      ? await api.assetCandles(st.asset, st.tf, daysFor(st.tf), CFG.CHARTS.maxCandles)
+      : await api.candles(st.tf, daysFor(st.tf), CFG.CHARTS.maxCandles);
+    return r.candles || [];
+  } catch (e) { return []; }
+}
+
 async function loadChart() {
   var host = ui.el('[data-chart]');
   if (!host || !globalThis.LightweightCharts) return;
 
   try {
     var coin = isCoinAsset();
-    var r = coin
-      ? await api.assetCandles(st.asset, st.tf, daysFor(st.tf), CFG.CHARTS.maxCandles)
-      : await api.candles(st.tf, daysFor(st.tf), CFG.CHARTS.maxCandles);
-    st.candles = r.candles || [];
+    st.candles = await loadSeries(coin);
 
     var label = coin ? st.asset + ' \u00b7 USD \u00b7 ' : '';
     ui.setText('[data-candle-count]', st.candles.length
       ? label + st.candles.length + ' candles \u00b7 ' + ui.fmtDate(st.candles[0].t) + ' to now'
-      : (r.hint || 'no candles for this timeframe'));
+      : 'chart data unavailable \u2014 the live feed could not be reached');
 
     if (!st.candles.length) return;
 

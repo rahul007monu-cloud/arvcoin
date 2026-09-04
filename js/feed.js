@@ -489,51 +489,122 @@ function startHealthCheck() {
  * Only used for the watchlist sparklines — ARV's own candles come from the
  * server, which is what gives them five years of depth.
  */
+// Per-source timeframe mapping. Binance is lowercase for day/week (1d/1w) — the
+// old code passed '1D'/'1W' straight through and Binance rejected them, which is
+// why the daily and weekly charts came back empty.
+var BINANCE_IV = { '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1D': '1d', '1W': '1w' };
+var OKX_BAR    = { '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1H', '4h': '4H', '1D': '1D', '1W': '1W' };
+var CB_GRAN    = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 21600, '1D': 86400, '1W': 86400 };
+
+function dedupeSort(rows) {
+  var seen = Object.create(null);
+  var out = [];
+  for (var i = 0; i < rows.length; i++) {
+    var k = rows[i];
+    if (k && isFinite(k.t) && !seen[k.t]) { seen[k.t] = 1; out.push(k); }
+  }
+  out.sort(function (a, b) { return a.t - b.t; });
+  return out;
+}
+
+// Binance klines, paged backwards (1000 per call) so deep history (years of
+// daily/weekly) is actually returned rather than one 1000-bar window.
+async function pageBinance(asset, tf, want) {
+  var iv = BINANCE_IV[tf] || '1m';
+  var acc = [];
+  var endTime = null;
+  for (var i = 0; i < 10 && acc.length < want; i++) {
+    var url = 'https://api.binance.com/api/v3/klines?symbol=' + asset.symbols.binance
+            + '&interval=' + iv + '&limit=1000' + (endTime ? '&endTime=' + endTime : '');
+    var t = withTimeout(15000);
+    var batch;
+    try { batch = await getJson(url, t.signal); t.done(); }
+    catch (e) { t.done(); break; }
+    if (!Array.isArray(batch) || !batch.length) break;
+    var mapped = batch.map(function (k) {
+      return { t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5] };
+    });
+    acc = mapped.concat(acc);
+    endTime = mapped[0].t - 1;
+    if (batch.length < 1000) break;
+  }
+  return dedupeSort(acc).slice(-want);
+}
+
+// OKX history-candles, paged with `after` (older-than), 100 per call.
+async function pageOkx(asset, tf, want) {
+  var bar = OKX_BAR[tf] || tf;
+  var acc = [];
+  var after = null;
+  for (var i = 0; i < 15 && acc.length < want; i++) {
+    var url = 'https://www.okx.com/api/v5/market/history-candles?instId=' + asset.symbols.okx
+            + '&bar=' + bar + '&limit=100' + (after ? '&after=' + after : '');
+    var t = withTimeout(15000);
+    var j;
+    try { j = await getJson(url, t.signal); t.done(); }
+    catch (e) { t.done(); break; }
+    var data = (j && j.data) || [];
+    if (!data.length) break;
+    var mapped = data.map(function (k) {
+      return { t: +k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5] };
+    });
+    acc = acc.concat(mapped);
+    // OKX returns newest-first, so the last row is the oldest; page older than it.
+    after = mapped[mapped.length - 1].t;
+    if (data.length < 100) break;
+  }
+  return dedupeSort(acc).slice(-want);
+}
+
+async function oneCoinbase(asset, tf, want) {
+  var gran = CB_GRAN[tf] || 60;
+  var t = withTimeout(15000);
+  try {
+    var rows = await getJson('https://api.exchange.coinbase.com/products/' + asset.symbols.coinbase
+          + '/candles?granularity=' + gran, t.signal);
+    t.done();
+    // [time, low, high, open, close, volume] — low and high come first here.
+    var out = (rows || []).map(function (k) {
+      return { t: k[0] * 1000, o: k[3], h: k[2], l: k[1], c: k[4], v: k[5] };
+    });
+    return dedupeSort(out).slice(-want);
+  } catch (e) { t.done(); return []; }
+}
+
+async function oneKraken(asset, tf, want) {
+  var iv = TF_MINUTES[tf] || 1;
+  var t = withTimeout(15000);
+  try {
+    var j = await getJson('https://api.kraken.com/0/public/OHLC?pair=' + asset.symbols.kraken
+          + '&interval=' + iv, t.signal);
+    t.done();
+    var key = Object.keys(j.result || {}).find(function (k) { return k !== 'last'; });
+    var out = (j.result[key] || []).map(function (k) {
+      return { t: +k[0] * 1000, o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[6] };
+    });
+    return dedupeSort(out).slice(-want);
+  } catch (e) { t.done(); return []; }
+}
+
+/**
+ * Candles for a reference asset, in USD, fetched CLIENT-SIDE from whichever
+ * exchange the live feed selected. This is the same channel that already
+ * delivers the live price, so a chart built from it works even when the server
+ * has not backfilled its own candle tables. Binance and OKX are paged for depth;
+ * Coinbase and Kraken return their single-call window.
+ */
 export async function candles(assetKey, tf, limit) {
   await selectSource();
   var asset = allAssets().find(function (a) { return a.key === assetKey; });
   if (!asset) throw new Error('Unknown asset ' + assetKey);
 
-  var n = limit || 100;
-  var t = withTimeout(15000);
-  try {
-    var out;
-    switch (state.source) {
-      case 'binance':
-        out = (await getJson('https://api.binance.com/api/v3/klines?symbol=' + asset.symbols.binance
-              + '&interval=' + tf + '&limit=' + n, t.signal))
-          .map(function (k) { return { t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5] }; });
-        break;
-      case 'okx':
-        var bar = { '1h': '1H', '4h': '4H', '1D': '1D', '1W': '1W' }[tf] || tf;
-        out = ((await getJson('https://www.okx.com/api/v5/market/candles?instId=' + asset.symbols.okx
-              + '&bar=' + bar + '&limit=' + Math.min(n, 300), t.signal)).data || [])
-          .map(function (k) { return { t: +k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5] }; });
-        break;
-      case 'coinbase':
-        var gran = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '1D': 86400 }[tf] || 60;
-        out = (await getJson('https://api.exchange.coinbase.com/products/' + asset.symbols.coinbase
-              + '/candles?granularity=' + gran, t.signal))
-          // [time, low, high, open, close, volume] — low and high come first here.
-          .map(function (k) { return { t: k[0] * 1000, o: k[3], h: k[2], l: k[1], c: k[4], v: k[5] }; });
-        break;
-      case 'kraken':
-        var iv = TF_MINUTES[tf] || 1;
-        var j = await getJson('https://api.kraken.com/0/public/OHLC?pair=' + asset.symbols.kraken
-              + '&interval=' + iv, t.signal);
-        var key = Object.keys(j.result || {}).find(function (k) { return k !== 'last'; });
-        out = (j.result[key] || []).map(function (k) {
-          return { t: +k[0] * 1000, o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[6] };
-        });
-        break;
-      default:
-        out = [];
-    }
-    t.done();
-    return out.sort(function (a, b) { return a.t - b.t; }).slice(-n);
-  } catch (e) {
-    t.done();
-    throw e;
+  var want = Math.max(10, Math.min(limit || 500, 5000));
+  switch (state.source) {
+    case 'binance':  return pageBinance(asset, tf, want);
+    case 'okx':      return pageOkx(asset, tf, want);
+    case 'coinbase': return oneCoinbase(asset, tf, want);
+    case 'kraken':   return oneKraken(asset, tf, want);
+    default:         return [];
   }
 }
 

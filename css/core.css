@@ -285,7 +285,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: var(--sp-5) 0; }
   padding: 5px 12px; border-radius: var(--r-sm);
   background: var(--k-2); border: 1px solid var(--line);
   font-size: .85rem;
+  cursor: pointer; text-decoration: none; color: inherit;
+  transition: border-color .15s ease, background .15s ease;
 }
+.nav-ticker:hover { border-color: var(--line-2, #2a2a34); background: var(--k-3, #14141a); }
 /* An author `display` beats the UA stylesheet's rule for [hidden], so the ticker
    would sit there showing two em-dashes until a price arrived. It stays out of
    the layout until it has something to say. */

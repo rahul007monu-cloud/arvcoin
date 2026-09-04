@@ -29,7 +29,7 @@
 
 // Only used to evict superseded caches. Updates no longer depend on this being
 // changed — see the same-origin branch in the fetch handler for why that mattered.
-var CACHE = 'arv-v3.1.0';
+var CACHE = 'arv-v3.2.0';
 
 var ASSETS = [
   'index.html',

@@ -112,13 +112,36 @@ function buildRangeTabs() {
   });
 }
 
+/**
+ * Chart series, fetched CLIENT-SIDE from the live exchange feed (BTC scaled by
+ * the index factor into rupees), so the chart works even when the server has
+ * not backfilled its candle tables. Falls back to the server candles only if
+ * the exchange fetch returns nothing.
+ */
+async function seriesForRange() {
+  var tf = st.range.tf, days = st.range.days;
+  var want = { '1m': 1000, '5m': 1000, '15m': 1000, '1h': 1000, '4h': 1000, '1D': 2500, '1W': 1200 }[tf] || 800;
+  var idx = st.snap && st.snap.index;
+  var f = (idx && idx.base && idx.baseBtcInr && idx.fxUsdInr != null)
+    ? idx.base * idx.fxUsdInr / idx.baseBtcInr : null;
+  try {
+    var btc = await feed.candles('BTC', tf, want);
+    if (btc && btc.length && f) {
+      var conv = btc.map(function (k) { return { t: k.t, o: k.o * f, h: k.h * f, l: k.l * f, c: k.c * f, v: k.v }; });
+      if (days) { var cut = Date.now() - days * 86400000; conv = conv.filter(function (k) { return k.t >= cut; }); }
+      if (conv.length) return conv;
+    }
+  } catch (_) { /* fall through */ }
+  try { var r = await api.candles(tf, days, CFG.CHARTS.maxCandles); return r.candles || []; }
+  catch (e) { return []; }
+}
+
 async function loadChart() {
   var host = ui.el('[data-chart]');
   if (!host || !globalThis.LightweightCharts || !st.range) return;
 
   try {
-    var r = await api.candles(st.range.tf, st.range.days, CFG.CHARTS.maxCandles);
-    st.candles = r.candles || [];
+    st.candles = await seriesForRange();
 
     ui.setText('[data-candle-count]', st.candles.length
       ? st.candles.length + ' candles \u00b7 ' + st.range.tf
