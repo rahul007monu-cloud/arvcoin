@@ -160,7 +160,8 @@ function backfill_tf(string $tf = '1D', int $days = 0): array
     // (now ~2015, roughly ten years of daily/weekly). The sub-hour frames only
     // cover the recent window a free API will actually page: five years of 1m is
     // ~2.6M rows nobody serves, so minute/tick history is recent-only by design.
-    $allowed = ['5m' => 30, '15m' => 90, '1m' => 7, '1h' => 90, '4h' => 730, '1D' => 0, '1W' => 0];
+    // 1h raised to 365d so the 1M/1Y range buttons are properly populated.
+    $allowed = ['5m' => 30, '15m' => 90, '1m' => 7, '1h' => 365, '4h' => 730, '1D' => 0, '1W' => 0];
     if (!isset($allowed[$tf])) {
         throw new RuntimeException('tf must be one of 5m, 15m, 1m, 1h, 4h, 1D, 1W');
     }

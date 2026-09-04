@@ -157,9 +157,10 @@ function handle_candles(): void
 {
     require_method('GET');
 
-    $tf    = (string)($_GET['tf'] ?? '15m');
+    $tf    = (string)($_GET['tf'] ?? '1m');
     $days  = isset($_GET['days']) && $_GET['days'] !== '' ? (int)$_GET['days'] : null;
-    $limit = max(10, min(3000, (int)($_GET['limit'] ?? 2600)));
+    // 10Y of daily = ~3,650 bars; raised from 3000 to 4000 to fit.
+    $limit = max(10, min(4000, (int)($_GET['limit'] ?? 4000)));
 
     if (!in_array($tf, ['1m', '5m', '15m', '1h', '4h', '1D', '1W'], true)) {
         json_fail(422, 'Unknown timeframe.');

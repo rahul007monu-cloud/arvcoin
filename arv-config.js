@@ -378,17 +378,20 @@
     defaultType: 'candles',
     // Every tf a range can request needs a backfill depth, or that range renders
     // near-empty. 5m and 15m are now backfilled so 1D and 1W are populated.
+    // Backfill depths per timeframe. null = since launch (2015).
+    // 1m/5m/15m stay shallow — no free API serves minute data 10y deep.
+    // 1h goes 1 year; 4h goes 2 years; 1D and 1W go all the way to 2015.
     backfill: { '1m': 7, '5m': 30, '15m': 90, '1h': 365, '4h': 730, '1D': null, '1W': null },
-    // Five years of daily is ~1,830 bars, so the old 1,500 cap would have
-    // silently truncated the earliest months of history.
-    maxCandles: 2600,
+    // 10 years of daily = ~3,650 bars; weekly = ~520 bars. Cap raised to fit.
+    maxCandles: 4000,
     showVolume: true,
     showEntryLine: true,
-    // Ranges offered on the chart toolbar, in days. null = since launch. Each
-    // window is paired with a tf that keeps the bar count readable: a day of
-    // minutes, a week of 15m, a month of hours, a quarter of 4h, then daily out
-    // to five years and weekly for everything. No range is left near-empty and
-    // none crams years of daily bars into a one-day view.
+    // Ranges offered on the chart toolbar.
+    // Rule: each range uses the finest tf that keeps bar count readable AND
+    // has enough backfill depth to be populated. Short ranges get fine candles
+    // (good for trading); long ranges get daily/weekly (good for history).
+    // '10Y' and 'All' both use 1W — ~520 bars of weekly since 2015, the full
+    // Bitcoin cycle visible in one view.
     ranges: [
       { label: '1D',  days: 1,    tf: '1m'  },
       { label: '1W',  days: 7,    tf: '15m' },
@@ -396,6 +399,7 @@
       { label: '3M',  days: 90,   tf: '4h'  },
       { label: '1Y',  days: 365,  tf: '1D'  },
       { label: '5Y',  days: 1825, tf: '1D'  },
+      { label: '10Y', days: 3650, tf: '1D'  },
       { label: 'All', days: null, tf: '1W'  }
     ],
     defaultRange: '1W'

@@ -88,9 +88,17 @@
         </div></div>
 
         <div class="card card-tight card-lift" data-reveal><div class="stat">
-          <span class="stat-k">Unrealised</span>
+          <span class="stat-k">Unrealised P&amp;L</span>
           <span class="stat-v" data-unrealised>—</span>
           <span class="stat-sub"><span class="chip flat" data-unrealised-pct>—</span></span>
+        </div></div>
+
+        <!-- Profit since first buy — tied to the actual date the user first bought,
+             so they see "since X days ago" rather than a context-free % -->
+        <div class="card card-tight card-lift" data-reveal><div class="stat">
+          <span class="stat-k" data-since-buy-label>Profit since first buy</span>
+          <span class="stat-v" data-since-buy>—</span>
+          <span class="stat-sub"><span class="chip flat" data-since-buy-pct>—</span></span>
         </div></div>
 
         <div class="card card-tight card-lift" data-reveal><div class="stat">

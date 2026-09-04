@@ -556,6 +556,17 @@ function wallet_public(array $w, ?float $nav): array
     $invested = (int)$w['invested_paise'];
     $value    = $nav !== null ? u8_to_paise($totalU8, $nav) : 0;
 
+    // First buy date — the earliest open lot. Used by the UI to show
+    // "profit since you first bought" rather than a context-free percentage.
+    $firstBuyAt = null;
+    if ($totalU8 > 0) {
+        $fb = qval(
+            'SELECT MIN(acquired_at) FROM lots WHERE user_id = ? AND units_remaining > 0',
+            [(int)$w['user_id']]
+        );
+        $firstBuyAt = $fb ?: null;
+    }
+
     return [
         'inrPaise'         => (int)$w['inr_paise'],
         'inrLockedPaise'   => (int)$w['inr_locked_paise'],
@@ -569,5 +580,6 @@ function wallet_public(array $w, ?float $nav): array
             ? round((($value - $invested) / $invested) * 100, 4) : 0,
         'realisedPaise'    => (int)$w['realised_pnl_paise'],
         'avgCostNav'       => $totalU8 > 0 ? round(($invested / 100) / ($totalU8 / U8), 8) : 0,
+        'firstBuyAt'       => $firstBuyAt,
     ];
 }
