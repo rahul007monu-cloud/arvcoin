@@ -537,6 +537,142 @@ export async function candles(assetKey, tf, limit) {
   }
 }
 
+/* ------------------------------------------------------------ deep history -- */
+
+/**
+ * Deep candle history, in USD, fetched CLIENT-SIDE straight from the exchanges.
+ *
+ * This is what powers the ARV/coin chart. ARV is BTC scaled by a constant, so
+ * the chart fetches BTC's real klines here and the page scales them to rupees —
+ * exactly how the live tick is already converted. It deliberately does NOT go
+ * through the server: the server's stored candles depend on a cron + exchange
+ * backfill on a shared host that repeatedly left the chart empty. The browser
+ * can always reach an exchange (the live tape proves it), so the history comes
+ * from the same place, at every timeframe, with zero server dependency.
+ *
+ * Tries the source already proven to work in this browser first, then the rest,
+ * and pages backwards to gather up to `want` bars. Returns ascending OHLC, or []
+ * if every exchange was unreachable (caller then leaves the chart as-is).
+ */
+var HIST_IV = {
+  binance:  { '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1D': '1d', '1W': '1w' },
+  okx:      { '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1H', '4h': '4H', '1D': '1D', '1W': '1W' },
+  // Coinbase granularities are a fixed set (seconds); it has no 4h or 1W bar.
+  coinbase: { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '1D': 86400 },
+  kraken:   { '1m': 1, '5m': 5, '15m': 15, '1h': 60, '4h': 240, '1D': 1440, '1W': 10080 }
+};
+
+function dedupSortAsc(rows) {
+  var seen = Object.create(null), out = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (r && isFinite(r.c) && !seen[r.t]) { seen[r.t] = 1; out.push(r); }
+  }
+  out.sort(function (a, b) { return a.t - b.t; });
+  return out;
+}
+
+async function histBinance(sym, tf, want, signal) {
+  var iv = HIST_IV.binance[tf];
+  if (!iv) return [];
+  var perCall = Math.min(1000, Math.max(want, 2));
+  var out = [], endTime = null, guard = 0;
+  while (out.length < want && guard++ < 10) {
+    var url = 'https://api.binance.com/api/v3/klines?symbol=' + sym + '&interval=' + iv
+            + '&limit=' + perCall + (endTime ? '&endTime=' + endTime : '');
+    var j = await getJson(url, signal);
+    if (!Array.isArray(j) || !j.length) break;
+    var batch = j.map(function (k) { return { t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5] }; });
+    out = batch.concat(out);
+    if (j.length < perCall) break;            // reached the listing start
+    endTime = batch[0].t - 1;                 // page older
+  }
+  return dedupSortAsc(out).slice(-want);
+}
+
+async function histOkx(inst, tf, want, signal) {
+  var bar = HIST_IV.okx[tf];
+  if (!bar) return [];
+  var out = [], after = null, guard = 0;
+  while (out.length < want && guard++ < 15) {
+    var url = 'https://www.okx.com/api/v5/market/history-candles?instId=' + inst + '&bar=' + bar
+            + '&limit=100' + (after ? '&after=' + after : '');
+    var j = await getJson(url, signal);
+    var data = (j && j.data) || [];
+    if (!data.length) break;
+    // data is newest-first: [ts, o, h, l, c, vol, ...]
+    var batch = data.map(function (k) { return { t: +k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5] }; });
+    out = out.concat(batch);
+    var oldest = batch[batch.length - 1].t;
+    if (data.length < 100 || !oldest) break;
+    after = oldest;                           // page older
+  }
+  return dedupSortAsc(out).slice(-want);
+}
+
+async function histCoinbase(prod, tf, want, signal) {
+  var gran = HIST_IV.coinbase[tf];
+  if (!gran) return [];
+  var out = [], end = Math.floor(Date.now() / 1000), guard = 0;
+  while (out.length < want && guard++ < 12) {
+    var start = end - gran * 300;
+    var url = 'https://api.exchange.coinbase.com/products/' + prod + '/candles?granularity=' + gran
+            + '&start=' + new Date(start * 1000).toISOString()
+            + '&end=' + new Date(end * 1000).toISOString();
+    var j = await getJson(url, signal);
+    if (!Array.isArray(j) || !j.length) break;
+    // [time, low, high, open, close, volume] — low/high come first.
+    var batch = j.map(function (k) { return { t: k[0] * 1000, o: k[3], h: k[2], l: k[1], c: k[4], v: k[5] }; });
+    out = batch.concat(out);
+    if (j.length < 250) break;
+    end = start - 1;                          // page older
+  }
+  return dedupSortAsc(out).slice(-want);
+}
+
+async function histKraken(pair, tf, want, signal) {
+  var iv = HIST_IV.kraken[tf];
+  if (!iv) return [];
+  var j = await getJson('https://api.kraken.com/0/public/OHLC?pair=' + pair + '&interval=' + iv, signal);
+  var key = Object.keys((j && j.result) || {}).find(function (k) { return k !== 'last'; });
+  if (!key) return [];
+  var rows = (j.result[key] || []).map(function (k) {
+    return { t: +k[0] * 1000, o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[6] };
+  });
+  return dedupSortAsc(rows).slice(-want);
+}
+
+export async function history(assetKey, tf, want) {
+  var asset = allAssets().find(function (a) { return a.key === assetKey; });
+  if (!asset) throw new Error('Unknown asset ' + assetKey);
+  want = Math.max(2, Math.min(want || 1000, 6000));
+
+  // Prefer whatever source already answered in this browser, then the others.
+  var order = ['binance', 'okx', 'coinbase', 'kraken'];
+  if (state.source && order.indexOf(state.source) !== -1) {
+    order = [state.source].concat(order.filter(function (s) { return s !== state.source; }));
+  }
+
+  for (var i = 0; i < order.length; i++) {
+    var src = order[i];
+    var sym = asset.symbols[src];
+    if (!sym) continue;
+    var t = withTimeout(15000);
+    try {
+      var rows;
+      if (src === 'binance')       rows = await histBinance(sym, tf, want, t.signal);
+      else if (src === 'okx')      rows = await histOkx(sym, tf, want, t.signal);
+      else if (src === 'coinbase') rows = await histCoinbase(sym, tf, want, t.signal);
+      else                         rows = await histKraken(sym, tf, want, t.signal);
+      t.done();
+      if (rows && rows.length) return rows;
+    } catch (_) {
+      t.done();
+    }
+  }
+  return [];
+}
+
 /* -------------------------------------------------------------------- api -- */
 
 export async function start() {

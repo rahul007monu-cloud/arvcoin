@@ -175,12 +175,31 @@ function buildTfTabs() {
   });
 }
 
-/** Days of history worth pulling for a timeframe. */
-function daysFor(tf) {
-  // Windows mirror CFG.CHARTS.ranges so a tab pulls the same depth its range
-  // would: a week of minutes for the default 1m view, then progressively longer
-  // windows as the candle widens.
-  return { '1m': 7, '5m': 30, '15m': 90, '1h': 365, '4h': 730, '1D': null, '1W': null }[tf];
+/**
+ * The BTC->ARV scale factor for the whole series.
+ *
+ * ARV = arv_base_inr × (BTC_now_in_INR ÷ BTC_launch_in_INR), so per candle
+ *   ARV_price = BTC_usd × ( arv_base_inr × fx ÷ BTC_launch_in_INR ).
+ * The bracket is a constant for the current snapshot — the SAME expression
+ * liveArvPrice() uses — so the historical series and the live-updating last bar
+ * share one scale and join with no seam. Falls back to the config anchors and
+ * the fx fallback rate when the snapshot has not arrived yet.
+ */
+function arvScale() {
+  var idx = st.snap && st.snap.index;
+  if (idx && idx.base && idx.baseBtcInr > 0 && idx.fxUsdInr != null) {
+    return idx.base * idx.fxUsdInr / idx.baseBtcInr;
+  }
+  var baseBtcInr = CFG.INDEX.baseUsd.BTC * CFG.INDEX.baseFxUsdInr;
+  var fx = (idx && idx.fxUsdInr) || (CFG.FEED.fx && CFG.FEED.fx.fallbackRate) || 90;
+  return baseBtcInr > 0 ? (CFG.INDEX.arvBaseInr * fx) / baseBtcInr : 0;
+}
+
+/** Scale raw USD OHLC rows to the chart's asset (identity for a coin, ×s for ARV). */
+function applyScale(rows, s) {
+  return rows.map(function (k) {
+    return { t: k.t, o: k.o * s, h: k.h * s, l: k.l * s, c: k.c * s, v: k.v };
+  });
 }
 
 async function loadChart() {
@@ -189,15 +208,18 @@ async function loadChart() {
 
   try {
     var coin = isCoinAsset();
-    var r = coin
-      ? await api.assetCandles(st.asset, st.tf, daysFor(st.tf), CFG.CHARTS.maxCandles)
-      : await api.candles(st.tf, daysFor(st.tf), CFG.CHARTS.maxCandles);
-    st.candles = r.candles || [];
+    // Candles come CLIENT-SIDE straight from the exchanges (feed.history), not
+    // the server — ARV is BTC scaled by the index formula, so we pull BTC's real
+    // klines and scale them here. This is why the chart is always as full as the
+    // coin charts at every timeframe, with no dependency on server backfill.
+    var raw = await feed.history(coin ? st.asset : 'BTC', st.tf, CFG.CHARTS.maxCandles);
+    var scale = coin ? 1 : arvScale();
+    st.candles = applyScale(raw, scale);
 
     var label = coin ? st.asset + ' \u00b7 USD \u00b7 ' : '';
     ui.setText('[data-candle-count]', st.candles.length
       ? label + st.candles.length + ' candles \u00b7 ' + ui.fmtDate(st.candles[0].t) + ' to now'
-      : (r.hint || 'no candles for this timeframe'));
+      : 'chart unavailable \u2014 could not reach a market data source');
 
     if (!st.candles.length) return;
 
@@ -854,10 +876,9 @@ function sideConfigLight() {
 async function resyncLiveBar() {
   if (!st.series) return;
   try {
-    var r = isCoinAsset()
-      ? await api.assetCandles(st.asset, st.tf, daysFor(st.tf), 2)
-      : await api.candles(st.tf, daysFor(st.tf), 2);
-    var rows = r.candles || [];
+    var coin = isCoinAsset();
+    var raw = await feed.history(coin ? st.asset : 'BTC', st.tf, 3);
+    var rows = applyScale(raw, coin ? 1 : arvScale());
     var last = rows[rows.length - 1];
     if (!last) return;
     // Only adopt the server bar if it is at or ahead of what we are showing, so a
