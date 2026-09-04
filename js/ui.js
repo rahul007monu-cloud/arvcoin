@@ -210,6 +210,63 @@ function currentPage() {
   return p === '' ? 'index.html' : p;
 }
 
+/* Support contact - a mailto with a sensible default subject. One place so the
+   footer link and the mobile overflow menu always agree on the address. */
+var SUPPORT_EMAIL = 'info@ARVcoin.com';
+var SUPPORT_MAILTO = 'mailto:' + SUPPORT_EMAIL + '?subject=' + encodeURIComponent('ARV Coin support request');
+
+/**
+ * The primary destinations for the mobile bottom tab bar (CoinDCX-style).
+ *
+ * A curated subset of NAV: the five things a trader reaches for. Secondary
+ * items (Deposit/Withdraw/Refer/Profile/Help) live in the overflow "More" menu.
+ * Each carries an inline monochrome SVG so the bar needs no icon library and
+ * stays on the silver-on-black palette (currentColor inherits the tab colour).
+ */
+var TAB_ICONS = {
+  overview: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>',
+  trade: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17V7"/><path d="M4 7l5 5 4-4 7 7"/><path d="M20 8v7h-7"/></svg>',
+  wallet: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h15a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M3 7l0-1a2 2 0 0 1 2-2h11"/><circle cx="16" cy="13" r="1.4"/></svg>',
+  portfolio: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M12 3v9l7-4a9 9 0 0 0-7-5z"/></svg>',
+  history: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v3h3"/><path d="M12 8v4l3 2"/></svg>',
+  signin: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>'
+};
+
+var TABS = [
+  { href: 'index.html',        label: 'Overview',  icon: 'overview' },
+  { href: 'trade.html',        label: 'Trade',     icon: 'trade' },
+  { href: 'dashboard.html',    label: 'Wallet',    icon: 'wallet',    auth: true },
+  { href: 'portfolio.html',    label: 'Portfolio', icon: 'portfolio', auth: true },
+  { href: 'transactions.html', label: 'History',   icon: 'history',   auth: true }
+];
+
+/**
+ * The fixed bottom tab bar, mobile-only (shown/hidden by CSS at the 760px
+ * breakpoint). Auth-only tabs appear only for a signed-in user; a signed-out
+ * user gets Overview + Trade and a Sign in tab so no account-only destination
+ * is ever exposed. The current page is marked .on, reusing currentPage().
+ */
+function tabbarMarkup(user, here) {
+  var tabs = TABS.filter(function (t) { return !t.auth || user; });
+
+  var last = user
+    ? { href: 'profile.html', label: 'Account', icon: 'wallet' }
+    : { href: 'login.html', label: 'Sign in', icon: 'signin' };
+  // Only add the account/sign-in slot when it is not already the current-page
+  // set, keeping the bar to five even, touch-friendly targets.
+  if (!tabs.some(function (t) { return t.href === last.href; })) tabs = tabs.concat(last);
+
+  var items = tabs.map(function (t) {
+    var on = t.href === here ? ' on' : '';
+    return '<a class="tab' + on + '" href="' + t.href + '"'
+      + (on ? ' aria-current="page"' : '') + '>'
+      + '<span class="tab-ic">' + (TAB_ICONS[t.icon] || '') + '</span>'
+      + '<span class="tab-l">' + esc(t.label) + '</span></a>';
+  }).join('');
+
+  return '<nav class="tabbar" data-tabbar aria-label="Primary">' + items + '</nav>';
+}
+
 export function mountNav(user) {
   var host = el('[data-nav]');
   if (!host) return;
@@ -219,7 +276,10 @@ export function mountNav(user) {
     .map(function (n) {
       return '<a href="' + n.href + '"' + (n.href === here ? ' class="on"' : '') + '>'
            + n.label + '</a>';
-    }).join('');
+    }).join('')
+    // Help lives in the collapsible menu (the mobile "More" overflow) so support
+    // is always one tap away even though it is not a primary bottom-bar tab.
+    + '<a href="' + SUPPORT_MAILTO + '" class="nav-help">Help &amp; support</a>';
 
   var right = user
     ? '<a href="profile.html" class="btn btn-ghost btn-sm">'
@@ -239,8 +299,11 @@ export function mountNav(user) {
       + '<span class="num" data-nav-price>\u2014</span>'
       + '<span class="chip flat" data-nav-change>\u2014</span></div>'
     + '<div class="row" style="gap:8px">' + right + '</div>'
-    + '<button class="nav-toggle" data-navtoggle aria-label="Menu" aria-expanded="false">\u2261</button>'
-    + '</div></nav>';
+    + '<button class="nav-toggle" data-navtoggle aria-label="More" aria-expanded="false">\u2261</button>'
+    + '</div></nav>'
+    // A fixed bottom tab bar for mobile (CoinDCX-style). Hidden on desktop by
+    // CSS; the top nav above remains the desktop navigation.
+    + tabbarMarkup(user, here);
 
   var toggle = el('[data-navtoggle]', host);
   var linksEl = el('[data-navlinks]', host);
@@ -307,6 +370,11 @@ export function mountFooter() {
         + '<li><a href="legal.html#tax">Tax treatment</a></li>'
         + '<li><a href="legal.html#privacy">Privacy</a></li>'
         + '<li><a href="legal.html#regulatory">Regulatory status</a></li>'
+      + '</ul></div>'
+      + '<div><h5>Help &amp; support</h5><ul>'
+        + '<li><a href="' + SUPPORT_MAILTO + '">Contact support</a></li>'
+        + '<li><a href="' + SUPPORT_MAILTO + '">' + esc(SUPPORT_EMAIL) + '</a></li>'
+        + '<li><a href="index.html#how">How the price works</a></li>'
       + '</ul></div>'
     + '</div>'
     + '<div class="foot-bottom">'
