@@ -646,7 +646,7 @@ function arv_default_settings(): array
         'match_at_index_price'  => '1',
         'buy_fills_from_treasury' => '1',
         'sell_fallback_to_treasury' => '1',
-        'sell_fallback_minutes' => '60',
+        'sell_fallback_minutes' => '5',
         'order_expiry_hours'    => '168',
 
         'deposit_min_minutes'   => '2',
