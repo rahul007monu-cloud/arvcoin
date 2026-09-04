@@ -80,6 +80,26 @@ function paintPortfolio() {
   ui.paintSigned('[data-unrealised]', w.unrealisedPaise, { base: 'stat-v' });
   ui.paintChange('[data-unrealised-pct]', w.unrealisedPct);
   ui.paintSigned('[data-realised]', w.realisedPaise, { base: 'stat-v' });
+
+  // "Profit since first buy" — shows exactly how much the holding has moved
+  // since the user's earliest purchase date, so they see real P&L context
+  // tied to when they actually bought, not a context-free percentage.
+  var sinceEl = ui.el('[data-since-buy]');
+  var sinceLabel = ui.el('[data-since-buy-label]');
+  if (sinceEl && w.firstBuyAt) {
+    var buyDate = new Date(w.firstBuyAt.replace(' ', 'T') + 'Z');
+    var daysHeld = Math.floor((Date.now() - buyDate.getTime()) / 86400000);
+    var label = daysHeld <= 0 ? 'today'
+      : daysHeld === 1 ? '1 day ago'
+      : daysHeld < 30 ? daysHeld + ' days ago'
+      : daysHeld < 365 ? Math.floor(daysHeld / 30) + ' months ago'
+      : (daysHeld / 365).toFixed(1) + ' years ago';
+    if (sinceLabel) sinceLabel.textContent = 'Since first buy \u00b7 ' + label;
+    ui.paintSigned(sinceEl, w.unrealisedPaise, { base: 'stat-v' });
+    ui.paintChange('[data-since-buy-pct]', w.unrealisedPct);
+  } else if (sinceEl) {
+    ui.setText(sinceEl, '\u2014');
+  }
 }
 
 function paintPaused() {
