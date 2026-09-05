@@ -430,6 +430,11 @@ export var admin = {
   },
   reconcile: function () { return request('admin', 'reconcile', { method: 'GET' }); },
   users: function (search) { return request('admin', 'users', { method: 'GET', query: { q: search } }); },
+  setUserStatus: function (userId, status) { return request('admin', 'set_user_status', { data: { userId: userId, status: status } }); },
+  setUserAdmin: function (userId, isAdmin) { return request('admin', 'set_user_admin', { data: { userId: userId, isAdmin: isAdmin } }); },
+  ledger: function (search) { return request('admin', 'ledger', { method: 'GET', query: { q: search } }); },
+  ordersAll: function (status, search) { return request('admin', 'orders_all', { method: 'GET', query: { status: status, q: search } }); },
+  cancelOrder: function (orderId) { return request('admin', 'cancel_order_admin', { data: { orderId: orderId } }); },
   settings: function () { return request('admin', 'settings', { method: 'GET' }); },
   saveSetting: function (key, value) { return request('admin', 'save_setting', { data: { key: key, value: value } }); }
 };

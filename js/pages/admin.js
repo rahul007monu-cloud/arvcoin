@@ -11,7 +11,13 @@ import * as ui from '../ui.js';
 import * as api from '../api.js';
 
 var CFG = globalThis.ARV_CONFIG;
-var st = { overview: null, recon: null };
+// Search/filter state is kept here so the 30s poll — which re-runs load() —
+// preserves whatever the operator last searched for rather than snapping every
+// table back to its unfiltered default.
+var st = {
+  overview: null, recon: null,
+  userQuery: '', ledgerQuery: '', orderStatus: 'open', orderQuery: ''
+};
 
 /* ---------------------------------------------------------------- overview -- */
 
@@ -59,6 +65,43 @@ function paintOverview(o) {
     return '<div class="stat"><span class="stat-k">' + r[0] + '</span>'
       + '<span class="stat-v" style="font-size:1.25rem">' + ui.fmtPaise(r[1] || 0) + '</span>'
       + '<span class="stat-sub">' + r[2] + '</span></div>';
+  }).join(''));
+
+  paintOverviewStats(q, m);
+}
+
+/**
+ * The at-a-glance stat grid.
+ *
+ * A wider read of the same overview payload than the queue cards give. Money is
+ * shown with ui.fmtPaise (integer paise, never a float) and units with
+ * ui.fmtUnits. GST and TDS are labelled as liabilities, not revenue — only the
+ * platform-fee line is income.
+ */
+function paintOverviewStats(q, m) {
+  var pending = (q.deposits_pending || 0)
+    + (q.withdrawals_pending || 0) + (q.withdrawals_approved || 0)
+    + (q.kyc_pending || 0);
+
+  var stats = [
+    ['Active users', String(q.users_active || 0), 'currently active'],
+    ['\u20b9 held for users', ui.fmtPaise(m.userInrPaise || 0), 'rupees in user wallets'],
+    ['ARV outstanding', ui.fmtUnits(m.unitsOutstanding, 8) + ' ARV', 'units owed to holders'],
+    ['Invested', ui.fmtPaise(m.investedPaise || 0), 'cost basis held'],
+    ['Deposited', ui.fmtPaise(m.depositedPaise || 0), 'confirmed in, all time'],
+    ['Paid out', ui.fmtPaise(m.paidOutPaise || 0), 'withdrawals settled'],
+    ['Platform fees', ui.fmtPaise(m.feesPaise || 0), 'this is the revenue'],
+    ['Referral paid', ui.fmtPaise(m.referralPaidPaise || 0), 'from your own margin'],
+    ['GST collected', ui.fmtPaise(m.gstPaise || 0), 'liability, not revenue'],
+    ['TDS withheld', ui.fmtPaise(m.tdsPaise || 0), 'liability, not revenue'],
+    ['Open orders', String(q.orders_open || 0), 'live on the book'],
+    ['Pending queues', String(pending), 'deposits, withdrawals, KYC']
+  ];
+
+  ui.setHtml('[data-overview-stats]', stats.map(function (s) {
+    return '<div class="stat"><span class="stat-k">' + s[0] + '</span>'
+      + '<span class="stat-v" style="font-size:1.25rem">' + s[1] + '</span>'
+      + '<span class="stat-sub">' + s[2] + '</span></div>';
   }).join(''));
 }
 
@@ -409,7 +452,217 @@ async function loadCoverage() {
   }
 }
 
+/* ------------------------------------------------------------------- users -- */
+
+/**
+ * The user directory.
+ *
+ * Read plus two safe toggles: suspend/activate and grant/remove operator. There
+ * is deliberately no way to edit a balance here — money only ever moves through
+ * the ledger, and the server refuses a self-suspend or self-demotion so an
+ * operator cannot lock themselves out.
+ */
+async function loadUsers(search) {
+  var host = ui.el('[data-users]');
+  try {
+    var r = await api.admin.users(search || '');
+    var rows = r.users || [];
+    if (!rows.length) {
+      host.innerHTML = '<tr><td colspan="9" class="empty">No users found.</td></tr>';
+      return;
+    }
+    host.innerHTML = rows.map(function (u) {
+      var status = u.status === 'active'
+        ? '<span class="badge ok">active</span>'
+        : '<span class="badge warn">' + ui.esc(u.status) + '</span>';
+      var kyc = '<span class="badge ' + (u.kycStatus === 'verified' ? 'ok' : 'muted') + '">'
+        + ui.esc(u.kycStatus) + '</span>';
+      var adminBadge = u.isAdmin ? ' <span class="badge info">operator</span>' : '';
+      var inr = (u.inrPaise || 0) + (u.inrLocked || 0);
+      var arv = Number(u.arvUnits || 0) + Number(u.arvLocked || 0);
+      return '<tr>'
+        + '<td><div class="tiny">' + ui.esc(u.email) + '</div>'
+          + '<div class="tiny muted">' + ui.esc(u.name || '') + adminBadge + '</div>'
+          + '<div class="mono tiny muted">#' + u.id
+            + (u.refCode ? ' \u00b7 ' + ui.esc(u.refCode) : '') + '</div></td>'
+        + '<td>' + status + '</td>'
+        + '<td>' + kyc + '</td>'
+        + '<td class="num">' + ui.fmtPaise(inr) + '</td>'
+        + '<td class="num tiny">' + ui.fmtUnits(arv, 4) + '</td>'
+        + '<td class="num">' + ui.fmtPaise(u.investedPaise || 0) + '</td>'
+        + '<td class="tiny muted">' + ui.fmtDate(u.joined) + '</td>'
+        + '<td class="tiny muted">' + (u.lastLogin ? ui.fmtDate(u.lastLogin) : '\u2014') + '</td>'
+        + '<td class="right nowrap">'
+          + (u.status === 'active'
+              ? '<button class="btn btn-sm btn-ghost" data-suspend="' + u.id + '">Suspend</button>'
+              : '<button class="btn btn-sm btn-buy" data-activate="' + u.id + '">Activate</button>')
+          + ' '
+          + (u.isAdmin
+              ? '<button class="btn btn-sm btn-ghost" data-admin-off="' + u.id + '">Remove admin</button>'
+              : '<button class="btn btn-sm btn-ghost" data-admin-on="' + u.id + '">Make admin</button>')
+        + '</td></tr>';
+    }).join('');
+
+    var reloadUsers = function () { return loadUsers(st.userQuery); };
+
+    bindAction('[data-suspend]', async function (b) {
+      var id = Number(b.dataset.suspend);
+      if (!confirm('Suspend user #' + id + '?\n\nThey are signed out and cannot sign back in '
+                 + 'until reactivated.')) return false;
+      var r2 = await api.admin.setUserStatus(id, 'suspended');
+      ui.toast(r2.message || 'Suspended.', 'ok');
+      return true;
+    }, reloadUsers);
+
+    bindAction('[data-activate]', async function (b) {
+      var r2 = await api.admin.setUserStatus(Number(b.dataset.activate), 'active');
+      ui.toast(r2.message || 'Activated.', 'ok');
+      return true;
+    }, reloadUsers);
+
+    bindAction('[data-admin-on]', async function (b) {
+      var id = Number(b.dataset.adminOn);
+      if (!confirm('Grant operator access to user #' + id + '?\n\nThey will be able to see and '
+                 + 'manage everything on this page.')) return false;
+      var r2 = await api.admin.setUserAdmin(id, 1);
+      ui.toast(r2.message || 'Operator access granted.', 'ok');
+      return true;
+    }, reloadUsers);
+
+    bindAction('[data-admin-off]', async function (b) {
+      var id = Number(b.dataset.adminOff);
+      if (!confirm('Remove operator access from user #' + id + '?')) return false;
+      var r2 = await api.admin.setUserAdmin(id, 0);
+      ui.toast(r2.message || 'Operator access removed.', 'ok');
+      return true;
+    }, reloadUsers);
+  } catch (e) {
+    host.innerHTML = '<tr><td colspan="9" class="empty">' + ui.esc(e.message) + '</td></tr>';
+  }
+}
+
+/* ------------------------------------------------------------------ ledger -- */
+
+/**
+ * The book of record, read-only.
+ *
+ * No edit, no delete — the ledger is append-only and the database enforces it.
+ * Rupee and unit deltas are shown signed from the holder's point of view.
+ */
+async function loadLedger(search) {
+  var host = ui.el('[data-ledger]');
+  try {
+    var r = await api.admin.ledger(search || '');
+    var rows = r.ledger || [];
+    if (!rows.length) {
+      host.innerHTML = '<tr><td colspan="8" class="empty">No ledger entries.</td></tr>';
+      return;
+    }
+    host.innerHTML = rows.map(function (l) {
+      var inr = l.inrDeltaPaise
+        ? '<span class="' + (l.inrDeltaPaise > 0 ? 'up' : 'down') + '">'
+          + (l.inrDeltaPaise > 0 ? '+' : '\u2212') + ui.fmtPaise(Math.abs(l.inrDeltaPaise)) + '</span>'
+        : '\u2014';
+      var units = Number(l.arvDeltaUnits);
+      var arv = units
+        ? '<span class="' + (units > 0 ? 'up' : 'down') + '">'
+          + (units > 0 ? '+' : '\u2212') + ui.fmtUnits(Math.abs(units), 4) + '</span>'
+        : '\u2014';
+      var who = l.email ? ui.esc(l.email) : (l.userId != null ? '#' + l.userId : 'system');
+      return '<tr>'
+        + '<td class="tiny muted nowrap">' + ui.fmtTime(l.createdAt, true) + '</td>'
+        + '<td class="tiny">' + who + '</td>'
+        + '<td><span class="badge">' + ui.esc(l.kind) + '</span></td>'
+        + '<td class="num">' + inr + '</td>'
+        + '<td class="num tiny">' + arv + '</td>'
+        + '<td class="mono tiny muted">' + ui.esc(l.ref || '\u2014') + '</td>'
+        + '<td class="tiny">' + ui.esc(l.note || '') + '</td>'
+        + '<td class="tiny muted">' + ui.esc(l.fy || '') + '</td>'
+        + '</tr>';
+    }).join('');
+  } catch (e) {
+    host.innerHTML = '<tr><td colspan="8" class="empty">' + ui.esc(e.message) + '</td></tr>';
+  }
+}
+
+/* ------------------------------------------------------------------ orders -- */
+
+/**
+ * Every order across every user.
+ *
+ * One editable action: cancel a still-open order. It releases only the unfilled
+ * remainder, exactly as the holder's own cancel does — the balance maths lives on
+ * the server and is not reinvented here.
+ */
+async function loadOrders(status, search) {
+  var host = ui.el('[data-orders]');
+  try {
+    var r = await api.admin.ordersAll(status || 'open', search || '');
+    var rows = r.orders || [];
+    if (!rows.length) {
+      host.innerHTML = '<tr><td colspan="9" class="empty">No orders.</td></tr>';
+      return;
+    }
+    host.innerHTML = rows.map(function (o) {
+      var side = '<span class="badge ' + (o.side === 'buy' ? 'ok' : 'info') + '">'
+        + ui.esc(o.side) + '</span>';
+      var isOpen = o.status === 'open' || o.status === 'triggered' || o.status === 'partial';
+      // For a buy the size is named in rupees; for a sell, in units.
+      var size = o.side === 'buy'
+        ? (o.amountPaise != null ? ui.fmtPaise(o.amountPaise) : '\u2014')
+        : (o.units != null ? ui.fmtUnits(o.units, 4) : '\u2014');
+      return '<tr>'
+        + '<td><div class="tiny">' + ui.esc(o.email) + '</div>'
+          + '<div class="mono tiny muted">' + ui.esc(o.ref) + '</div></td>'
+        + '<td>' + side + '</td>'
+        + '<td class="tiny">' + ui.esc(o.type) + '</td>'
+        + '<td class="num tiny">' + size + '</td>'
+        + '<td class="num tiny">' + ui.fmtUnits(o.filledUnits, 4) + '</td>'
+        + '<td><span class="badge">' + ui.esc(o.status) + '</span></td>'
+        + '<td class="num tiny">' + (o.triggerNav != null ? ui.fmtPrice(o.triggerNav) : 'index') + '</td>'
+        + '<td class="tiny muted nowrap">' + ui.fmtTime(o.createdAt, true) + '</td>'
+        + '<td class="right nowrap">'
+          + (isOpen ? '<button class="btn btn-sm btn-ghost" data-cancel-order="' + o.id + '">Cancel</button>' : '')
+        + '</td></tr>';
+    }).join('');
+
+    bindAction('[data-cancel-order]', async function (b) {
+      var id = Number(b.dataset.cancelOrder);
+      if (!confirm('Cancel order #' + id + '?\n\nThe unfilled remainder is returned to the holder. '
+                 + 'This cannot be undone.')) return false;
+      var r2 = await api.admin.cancelOrder(id);
+      ui.toast(r2.message || 'Order cancelled.', 'ok');
+      return true;
+    }, function () { return loadOrders(st.orderStatus, st.orderQuery); });
+  } catch (e) {
+    host.innerHTML = '<tr><td colspan="9" class="empty">' + ui.esc(e.message) + '</td></tr>';
+  }
+}
+
 /* -------------------------------------------------------------------- glue -- */
+
+/**
+ * Wire action buttons that reload only their own section on success.
+ *
+ * Unlike bind() below — which reloads the whole page — this reloads via the
+ * supplied `after` callback, so a per-row action in a searched table keeps its
+ * search filter instead of snapping back to the unfiltered view.
+ */
+function bindAction(sel, handler, after) {
+  ui.els(sel).forEach(function (b) {
+    b.addEventListener('click', async function () {
+      ui.busy(b, true, '\u2026');
+      try {
+        var reload = await handler(b);
+        if (reload && after) { await after(); return; }
+        ui.busy(b, false);
+      } catch (e) {
+        ui.toastError(e);
+        ui.busy(b, false);
+      }
+    });
+  });
+}
 
 /** Wire a set of action buttons, reloading once the action succeeds. */
 function bind(sel, handler) {
@@ -463,7 +716,11 @@ async function load() {
     paintRecon(await api.admin.reconcile());
   } catch (_) {}
 
-  await Promise.all([loadDeposits(), loadWithdrawals(), loadKyc(), loadCoverage()]);
+  await Promise.all([
+    loadDeposits(), loadWithdrawals(), loadKyc(), loadCoverage(),
+    loadUsers(st.userQuery), loadLedger(st.ledgerQuery),
+    loadOrders(st.orderStatus, st.orderQuery)
+  ]);
   return true;
 }
 
@@ -504,6 +761,38 @@ async function load() {
         ui.busy(b, false);
       }
     });
+  });
+
+  // Search boxes for the three big tables. Each stores its query in `st` so the
+  // 30s poll re-runs the same filtered query rather than resetting the table.
+  var userForm = ui.el('[data-user-form]');
+  if (userForm) userForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    st.userQuery = (ui.el('[data-user-search]').value || '').trim();
+    loadUsers(st.userQuery);
+  });
+
+  var ledgerForm = ui.el('[data-ledger-form]');
+  if (ledgerForm) ledgerForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    st.ledgerQuery = (ui.el('[data-ledger-search]').value || '').trim();
+    loadLedger(st.ledgerQuery);
+  });
+
+  var orderForm = ui.el('[data-order-form]');
+  if (orderForm) orderForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    st.orderStatus = ui.el('[data-order-status]').value || 'open';
+    st.orderQuery = (ui.el('[data-order-search]').value || '').trim();
+    loadOrders(st.orderStatus, st.orderQuery);
+  });
+
+  // The status dropdown filters immediately, without needing the button.
+  var orderStatus = ui.el('[data-order-status]');
+  if (orderStatus) orderStatus.addEventListener('change', function () {
+    st.orderStatus = orderStatus.value || 'open';
+    st.orderQuery = (ui.el('[data-order-search]').value || '').trim();
+    loadOrders(st.orderStatus, st.orderQuery);
   });
 
   // Queues change when users act, so this refreshes on its own.
