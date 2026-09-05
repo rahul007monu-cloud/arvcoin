@@ -33,6 +33,11 @@ switch ($action) {
     case 'kyc_review':        handle_kyc_review();      break;
     case 'reconcile':         handle_reconcile();       break;
     case 'users':             handle_users();           break;
+    case 'set_user_status':   handle_set_user_status(); break;
+    case 'set_user_admin':    handle_set_user_admin();  break;
+    case 'ledger':            handle_ledger();          break;
+    case 'orders_all':        handle_orders_all();      break;
+    case 'cancel_order_admin':handle_cancel_order_admin(); break;
     case 'settings':          handle_settings();        break;
     case 'save_setting':      handle_save_setting();    break;
     default:
@@ -635,6 +640,273 @@ function handle_users(): void
         'joined'      => $u['created_at'],
         'lastLogin'   => $u['last_login_at'],
     ], $rows)]);
+}
+
+/**
+ * Suspend or reactivate a user.
+ *
+ * status is only ever active <-> suspended here; 'closed' is a separate lifecycle
+ * step and is not reachable from this toggle. An operator cannot suspend their own
+ * account — locking yourself out of the panel that would let you undo it is a trap
+ * with no way back, exactly like the mail-delivery lockout the OTP table guards
+ * against.
+ */
+function handle_set_user_status(): void
+{
+    require_method('POST');
+    require_csrf();
+    $admin = require_admin();
+
+    $userId = input_int('userId');
+    $status = input_str('status');
+
+    if ($userId <= 0) {
+        json_fail(422, 'Which user?');
+    }
+    if (!in_array($status, ['active', 'suspended'], true)) {
+        json_fail(422, 'Status must be active or suspended.');
+    }
+    // You cannot lock yourself out of the operator panel.
+    if ($userId === (int)$admin['id'] && $status === 'suspended') {
+        json_fail(422, 'You cannot suspend your own account.');
+    }
+
+    $u = q1('SELECT id, status FROM users WHERE id = ?', [$userId]);
+    if (!$u) {
+        json_fail(404, 'No such user.');
+    }
+
+    q('UPDATE users SET status = ? WHERE id = ?', [$status, $userId]);
+
+    audit('user.status', ['entity' => 'users', 'entity_id' => (string)$userId,
+                          'detail' => ['from' => $u['status'], 'to' => $status]]);
+
+    json_ok(['message' => $status === 'suspended' ? 'User suspended.' : 'User activated.']);
+}
+
+/**
+ * Grant or remove operator access.
+ *
+ * An operator cannot remove their own admin flag — the same lock-yourself-out
+ * trap as suspension, and worse here because it would leave a site with no
+ * operator at all if they are the only one. Removing it must be done by another
+ * operator.
+ */
+function handle_set_user_admin(): void
+{
+    require_method('POST');
+    require_csrf();
+    $admin = require_admin();
+
+    $userId  = input_int('userId');
+    $isAdmin = input_int('isAdmin');
+
+    if ($userId <= 0) {
+        json_fail(422, 'Which user?');
+    }
+    if (!in_array($isAdmin, [0, 1], true)) {
+        json_fail(422, 'isAdmin must be 0 or 1.');
+    }
+    // You cannot strip your own operator access.
+    if ($userId === (int)$admin['id'] && $isAdmin === 0) {
+        json_fail(422, 'You cannot remove your own operator access — ask another operator to do it.');
+    }
+
+    $u = q1('SELECT id, is_admin FROM users WHERE id = ?', [$userId]);
+    if (!$u) {
+        json_fail(404, 'No such user.');
+    }
+
+    q('UPDATE users SET is_admin = ? WHERE id = ?', [$isAdmin, $userId]);
+
+    audit('user.admin', ['entity' => 'users', 'entity_id' => (string)$userId,
+                         'detail' => ['from' => (int)$u['is_admin'], 'to' => $isAdmin]]);
+
+    json_ok(['message' => $isAdmin ? 'Operator access granted.' : 'Operator access removed.']);
+}
+
+/* ============================================================= ledger ===== */
+
+/**
+ * The book of record, read-only.
+ *
+ * Every rupee and unit movement, most recent first. This is append-only and
+ * enforced as such by a database trigger — there is deliberately no edit or delete
+ * here or anywhere, because a correction is a new compensating entry, never a
+ * change to a past one. Optional search is by user id (numeric) or email.
+ */
+function handle_ledger(): void
+{
+    require_method('GET');
+    require_admin();
+
+    $search = trim((string)($_GET['q'] ?? ''));
+    $params = [];
+    $where  = '';
+    if ($search !== '') {
+        if (ctype_digit($search)) {
+            $where  = 'WHERE l.user_id = ?';
+            $params = [(int)$search];
+        } else {
+            $where  = 'WHERE u.email LIKE ?';
+            $params = ['%' . $search . '%'];
+        }
+    }
+
+    $rows = q(
+        "SELECT l.id, l.user_id, l.kind, l.inr_delta_paise, l.arv_delta_units,
+                l.nav, l.ref, l.related_id, l.note, l.fy, l.created_at, u.email
+           FROM ledger l
+           LEFT JOIN users u ON u.id = l.user_id
+           {$where}
+          ORDER BY l.id DESC LIMIT 200", $params
+    )->fetchAll();
+
+    json_ok(['ledger' => array_map(static fn($r) => [
+        'id'            => (int)$r['id'],
+        'userId'        => $r['user_id'] !== null ? (int)$r['user_id'] : null,
+        'email'         => $r['email'],
+        'kind'          => $r['kind'],
+        'inrDeltaPaise' => (int)$r['inr_delta_paise'],
+        'arvDeltaUnits' => (string)$r['arv_delta_units'],
+        'nav'           => $r['nav'] !== null ? (float)$r['nav'] : null,
+        'ref'           => $r['ref'],
+        'relatedId'     => $r['related_id'] !== null ? (int)$r['related_id'] : null,
+        'note'          => $r['note'],
+        'fy'            => $r['fy'],
+        'createdAt'     => $r['created_at'],
+    ], $rows)]);
+}
+
+/* ============================================================= orders ===== */
+
+/**
+ * Every order across every user, most recent first.
+ *
+ * The status filter mirrors the book's own vocabulary: "open" means anything still
+ * live (open, triggered or partial), the terminal states are exact, and "all"
+ * drops the filter. Optional search is by user id (numeric) or email.
+ */
+function handle_orders_all(): void
+{
+    require_method('GET');
+    require_admin();
+
+    $status = (string)($_GET['status'] ?? 'open');
+    $search = trim((string)($_GET['q'] ?? ''));
+
+    $where  = [];
+    $params = [];
+
+    if ($status === 'open') {
+        $where[] = 'o.status IN ("open","triggered","partial")';
+    } elseif (in_array($status, ['filled', 'cancelled', 'expired'], true)) {
+        $where[]  = 'o.status = ?';
+        $params[] = $status;
+    }
+    // 'all' (or anything unrecognised) adds no status clause.
+
+    if ($search !== '') {
+        if (ctype_digit($search)) {
+            $where[]  = 'o.user_id = ?';
+            $params[] = (int)$search;
+        } else {
+            $where[]  = 'u.email LIKE ?';
+            $params[] = '%' . $search . '%';
+        }
+    }
+
+    $clause = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+
+    $rows = q(
+        "SELECT o.*, u.email
+           FROM orders o
+           JOIN users u ON u.id = o.user_id
+           {$clause}
+          ORDER BY o.created_at DESC, o.id DESC LIMIT 200", $params
+    )->fetchAll();
+
+    json_ok(['orders' => array_map(static fn($o) => [
+        'id'          => (int)$o['id'],
+        'ref'         => $o['ref'],
+        'userId'      => (int)$o['user_id'],
+        'email'       => $o['email'],
+        'side'        => $o['side'],
+        'type'        => $o['otype'],
+        'amountPaise' => $o['amount_paise'] !== null ? (int)$o['amount_paise'] : null,
+        'units'       => $o['units'] !== null ? (string)$o['units'] : null,
+        'triggerNav'  => $o['trigger_nav'] !== null ? (float)$o['trigger_nav'] : null,
+        'filledUnits' => (string)$o['filled_units'],
+        'filledPaise' => (int)$o['filled_paise'],
+        'lockedPaise' => (int)$o['locked_paise'],
+        'lockedUnits' => (string)$o['locked_units'],
+        'status'      => $o['status'],
+        'createdAt'   => $o['created_at'],
+    ], $rows)]);
+}
+
+/**
+ * Cancel an open order on a user's behalf.
+ *
+ * This mirrors the user's own cancel in orders.php exactly: only the unfilled
+ * remainder is released, and it is released the same way — locked rupees back to
+ * available, locked units back to available — inside one transaction that also
+ * flips the order to cancelled and writes the ledger entry. The balance maths is
+ * not reinvented here; anything already filled is a completed trade and is not
+ * touched.
+ */
+function handle_cancel_order_admin(): void
+{
+    require_method('POST');
+    require_csrf();
+    require_admin();
+
+    $id = input_int('orderId');
+    if ($id <= 0) {
+        json_fail(422, 'Which order?');
+    }
+
+    $result = tx(static function (PDO $pdo) use ($id) {
+        $st = $pdo->prepare('SELECT * FROM orders WHERE id = ? FOR UPDATE');
+        $st->execute([$id]);
+        $o = $st->fetch();
+
+        if (!$o) {
+            throw new RuntimeException('Order not found.');
+        }
+        if (!in_array($o['status'], ['open', 'triggered', 'partial'], true)) {
+            throw new RuntimeException('That order is already ' . $o['status'] . '.');
+        }
+
+        $userId      = (int)$o['user_id'];
+        $lockedPaise = (int)$o['locked_paise'];
+        $lockedUnits = u8((string)$o['locked_units']);
+
+        if ($lockedPaise > 0) {
+            wallet_apply($pdo, $userId, $lockedPaise, -$lockedPaise);
+        }
+        if ($lockedUnits > 0) {
+            wallet_apply($pdo, $userId, 0, 0, $lockedUnits, -$lockedUnits);
+        }
+
+        $pdo->prepare('UPDATE orders SET status = "cancelled", locked_paise = 0, locked_units = 0
+                       WHERE id = ?')->execute([$id]);
+
+        ledger_add($pdo, $userId, 'adjustment', 0, 0, [
+            'ref' => (string)$o['ref'], 'relatedId' => $id,
+            'note' => 'Order cancelled by operator — unfilled portion returned',
+        ]);
+
+        return [
+            'userId'        => $userId,
+            'returnedPaise' => $lockedPaise,
+            'returnedUnits' => u8str($lockedUnits),
+            'filledUnits'   => (string)$o['filled_units'],
+        ];
+    });
+
+    audit('order.cancel.admin', ['entity' => 'orders', 'entity_id' => (string)$id, 'detail' => $result]);
+    json_ok($result + ['message' => 'Order cancelled.']);
 }
 
 /* =========================================================== settings ===== */

@@ -59,6 +59,21 @@
     </div></div>
   </div>
 
+  <!-- ======================================================= overview stats -->
+  <section class="card" style="margin-bottom:var(--sp-4)">
+    <div class="card-head">
+      <h3 style="font-size:1rem">At a glance</h3>
+      <span class="badge">live from the database</span>
+    </div>
+    <div class="grid g-4" data-overview-stats>
+      <div class="empty">Loading…</div>
+    </div>
+    <p class="tiny muted" style="margin:var(--sp-4) 0 0">
+      GST and TDS are liabilities held on behalf of others, never revenue. Only the
+      platform fee line is income.
+    </p>
+  </section>
+
   <!-- ====================================================== reconciliation -->
   <section class="card" style="margin-bottom:var(--sp-4)">
     <div class="card-head">
@@ -166,6 +181,99 @@
       be deposited with the department and reported so it appears in each holder's
       Form 26AS. GST on fees is likewise a liability. Only the platform fee line is
       actual revenue.
+    </div>
+  </section>
+
+  <!-- =============================================================== users -->
+  <section class="card card-flush" style="margin-top:var(--sp-4)">
+    <div class="card-head row-wrap" style="padding:var(--sp-4);margin:0">
+      <div>
+        <h3 style="font-size:1rem;margin:0">Users</h3>
+        <div class="tiny muted">Search by email, name or referral code</div>
+      </div>
+      <form class="row" data-user-form style="margin:0">
+        <input data-user-search type="search" placeholder="email, name or ref code"
+               autocomplete="off" style="max-width:280px">
+        <button class="btn btn-sm btn-ghost" type="submit">Search</button>
+      </form>
+    </div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>Who</th><th>Status</th><th>KYC</th><th class="num">₹ balance</th>
+          <th class="num">ARV</th><th class="num">Invested</th>
+          <th>Joined</th><th>Last login</th><th></th>
+        </tr></thead>
+        <tbody data-users><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
+      Suspending a user blocks their sign-in at once. Balances are never edited here
+      — money only ever moves through the ledger.
+    </div>
+  </section>
+
+  <!-- ============================================================== ledger -->
+  <section class="card card-flush" style="margin-top:var(--sp-4)">
+    <div class="card-head row-wrap" style="padding:var(--sp-4);margin:0">
+      <div>
+        <h3 style="font-size:1rem;margin:0">Ledger</h3>
+        <div class="tiny muted">The book of record — append-only, most recent first</div>
+      </div>
+      <form class="row" data-ledger-form style="margin:0">
+        <input data-ledger-search type="search" placeholder="email or user id"
+               autocomplete="off" style="max-width:280px">
+        <button class="btn btn-sm btn-ghost" type="submit">Search</button>
+      </form>
+    </div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>When</th><th>Who</th><th>Kind</th><th class="num">₹</th>
+          <th class="num">ARV</th><th>Ref</th><th>Note</th><th>FY</th>
+        </tr></thead>
+        <tbody data-ledger><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
+      Read-only by design and by database trigger. A correction is a new
+      compensating entry, never an edit or deletion of a past one.
+    </div>
+  </section>
+
+  <!-- ============================================================== orders -->
+  <section class="card card-flush" style="margin-top:var(--sp-4)">
+    <div class="card-head row-wrap" style="padding:var(--sp-4);margin:0">
+      <div>
+        <h3 style="font-size:1rem;margin:0">Orders</h3>
+        <div class="tiny muted">All orders across users, most recent first</div>
+      </div>
+      <form class="row" data-order-form style="margin:0">
+        <select data-order-status style="max-width:150px">
+          <option value="open">Open</option>
+          <option value="filled">Filled</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="all">All</option>
+        </select>
+        <input data-order-search type="search" placeholder="email or user id"
+               autocomplete="off" style="max-width:240px">
+        <button class="btn btn-sm btn-ghost" type="submit">Search</button>
+      </form>
+    </div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>Who</th><th>Side</th><th>Type</th><th class="num">Units</th>
+          <th class="num">Filled</th><th>Status</th><th class="num">Trigger</th>
+          <th>Created</th><th></th>
+        </tr></thead>
+        <tbody data-orders><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
+      Cancelling an open order releases only its unfilled remainder to the holder,
+      the same way their own cancel does. Filled portions are completed trades and
+      are never reversed.
     </div>
   </section>
 
