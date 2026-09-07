@@ -17,11 +17,15 @@ declare(strict_types=1);
 require __DIR__ . '/_boot.php';
 require __DIR__ . '/_money.php';
 require __DIR__ . '/_match.php';
+require __DIR__ . '/_p2p.php';
 
 $action = $_GET['action'] ?? input_str('action');
 
 switch ($action) {
     case 'overview':          handle_overview();        break;
+    case 'p2p_trades':        handle_p2p_trades();      break;
+    case 'p2p_release':       handle_p2p_release();     break;
+    case 'p2p_cancel':        handle_p2p_cancel();      break;
     case 'deposits':          handle_deposits();        break;
     case 'confirm_deposit':   handle_confirm_deposit(); break;
     case 'reject_deposit':    handle_reject_deposit();  break;
@@ -907,6 +911,143 @@ function handle_cancel_order_admin(): void
 
     audit('order.cancel.admin', ['entity' => 'orders', 'entity_id' => (string)$id, 'detail' => $result]);
     json_ok($result + ['message' => 'Order cancelled.']);
+}
+
+/* ============================================================== p2p ======= */
+
+/**
+ * Every P2P escrow trade, most recent first, with both parties' details.
+ *
+ * The operator sees the full seller payment snapshot (they may need it to settle
+ * a dispute) and both emails — this endpoint is operator-only and audited. The
+ * status filter mirrors the trade lifecycle; 'active' is the live subset an
+ * operator would act on (matched or paid), and 'all' drops the filter.
+ */
+function handle_p2p_trades(): void
+{
+    require_method('GET');
+    require_admin();
+
+    $status = (string)($_GET['status'] ?? 'active');
+    $search = trim((string)($_GET['q'] ?? ''));
+
+    $where  = [];
+    $params = [];
+
+    if ($status === 'active') {
+        $where[] = "p.status IN ('matched','paid')";
+    } elseif (in_array($status, ['matched', 'paid', 'released', 'cancelled'], true)) {
+        $where[]  = 'p.status = ?';
+        $params[] = $status;
+    }
+    if ($search !== '') {
+        if (ctype_digit($search)) {
+            $where[]  = '(p.buyer_id = ? OR p.seller_id = ?)';
+            $params[] = (int)$search;
+            $params[] = (int)$search;
+        } else {
+            $where[]  = '(bu.email LIKE ? OR su.email LIKE ?)';
+            $params[] = '%' . $search . '%';
+            $params[] = '%' . $search . '%';
+        }
+    }
+    $clause = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+
+    $rows = q(
+        "SELECT p.*, bu.email AS buyer_email, su.email AS seller_email
+           FROM p2p_trades p
+           JOIN users bu ON bu.id = p.buyer_id
+           JOIN users su ON su.id = p.seller_id
+           {$clause}
+          ORDER BY p.id DESC LIMIT 200", $params
+    )->fetchAll();
+
+    json_ok(['trades' => array_map(static function ($t) {
+        // -1 viewer id so it is neither buyer nor seller; isAdmin exposes the
+        // payment snapshot for dispute handling.
+        $pub = p2p_trade_public($t, -1, true);
+        $pub['buyerEmail']  = $t['buyer_email'];
+        $pub['sellerEmail'] = $t['seller_email'];
+        $pub['proofImage']  = ($t['proof_image_path'] ?? '') !== '' ? $t['proof_image_path'] : null;
+        return $pub;
+    }, $rows)]);
+}
+
+/**
+ * Operator override: release a trade's escrow to the buyer.
+ *
+ * The same money path as the seller's own confirm (p2p_release_core) — units to
+ * the buyer, a `trades` row for tax, ledger entries both sides. Allowed for a
+ * matched or paid trade so an operator can resolve one the seller has stopped
+ * responding to. Use only when the rupees genuinely reached the seller.
+ */
+function handle_p2p_release(): void
+{
+    require_method('POST');
+    require_csrf();
+    $admin = require_admin();
+
+    $id = input_int('id');
+    if ($id <= 0) {
+        json_fail(422, 'Which trade?');
+    }
+
+    $result = tx(static function (PDO $pdo) use ($id) {
+        $st = $pdo->prepare('SELECT * FROM p2p_trades WHERE id = ? FOR UPDATE');
+        $st->execute([$id]);
+        $t = $st->fetch();
+        if (!$t) {
+            throw new RuntimeException('Trade not found.');
+        }
+        if (!in_array($t['status'], ['matched', 'paid'], true)) {
+            throw new RuntimeException('This trade is ' . $t['status'] . ' and cannot be released.');
+        }
+        return p2p_release_core($pdo, $t);
+    });
+
+    audit('p2p.release.admin', ['entity' => 'p2p_trades', 'entity_id' => (string)$id,
+                                'actor' => (int)$admin['id'], 'detail' => $result]);
+    json_ok($result + ['message' => sprintf('Released %s ARV to the buyer.', $result['units'])]);
+}
+
+/**
+ * Operator override: cancel a trade and return the escrow to the seller.
+ *
+ * The same money path as a user cancel (p2p_cancel_core). Allowed for matched or
+ * paid; a reason is required because it is a manual intervention that the audit
+ * log should carry.
+ */
+function handle_p2p_cancel(): void
+{
+    require_method('POST');
+    require_csrf();
+    $admin = require_admin();
+
+    $id     = input_int('id');
+    $reason = substr(input_str('reason'), 0, 200);
+    if ($id <= 0) {
+        json_fail(422, 'Which trade?');
+    }
+    if ($reason === '') {
+        json_fail(422, 'Give a reason — this is a manual intervention and it is logged.');
+    }
+
+    $result = tx(static function (PDO $pdo) use ($id, $reason) {
+        $st = $pdo->prepare('SELECT * FROM p2p_trades WHERE id = ? FOR UPDATE');
+        $st->execute([$id]);
+        $t = $st->fetch();
+        if (!$t) {
+            throw new RuntimeException('Trade not found.');
+        }
+        if (!in_array($t['status'], ['matched', 'paid'], true)) {
+            throw new RuntimeException('This trade is ' . $t['status'] . ' and cannot be cancelled.');
+        }
+        return p2p_cancel_core($pdo, $t, 'operator: ' . $reason);
+    });
+
+    audit('p2p.cancel.admin', ['entity' => 'p2p_trades', 'entity_id' => (string)$id,
+                               'actor' => (int)$admin['id'], 'detail' => ['reason' => $reason] + $result]);
+    json_ok($result + ['message' => 'Trade cancelled and escrow returned to the seller.']);
 }
 
 /* =========================================================== settings ===== */

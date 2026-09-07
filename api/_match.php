@@ -62,6 +62,7 @@ function activate_triggers(float $nav): int
         'UPDATE orders
             SET status = "triggered"
           WHERE status = "open"
+            AND channel = "index"
             AND otype = "limit"
             AND (
                   (side = "buy"  AND trigger_nav >= ?)
@@ -83,6 +84,7 @@ function ready_orders(PDO $pdo, string $side, bool $lock = true): array
 {
     $sql = 'SELECT * FROM orders
              WHERE side = ?
+               AND channel = "index"
                AND status IN ("open","triggered","partial")
                AND (otype = "market" OR status IN ("triggered","partial"))
              ORDER BY created_at ASC, id ASC';
@@ -497,6 +499,7 @@ function run_matching(float $nav): array
             $st = $pdo->prepare(
                 'SELECT * FROM orders
                   WHERE side = "sell"
+                    AND channel = "index"
                     AND status IN ("open","triggered","partial")
                     AND fallback_at IS NOT NULL
                     AND fallback_at <= UTC_TIMESTAMP()
@@ -548,7 +551,8 @@ function fill_buy_now(int $orderId, float $nav): array
         $st = $pdo->prepare('SELECT * FROM orders WHERE id = ? FOR UPDATE');
         $st->execute([$orderId]);
         $buy = $st->fetch();
-        if (!$buy || !in_array($buy['status'], ['open', 'triggered', 'partial'], true)) {
+        if (!$buy || ($buy['channel'] ?? 'index') !== 'index'
+            || !in_array($buy['status'], ['open', 'triggered', 'partial'], true)) {
             return [];
         }
 
@@ -562,7 +566,7 @@ function fill_buy_now(int $orderId, float $nav): array
         // treasury, and it is what gives sellers their exit.
         $sellSt = $pdo->prepare(
             'SELECT * FROM orders
-              WHERE side = "sell" AND status IN ("open","triggered","partial")
+              WHERE side = "sell" AND channel = "index" AND status IN ("open","triggered","partial")
                 AND user_id <> ?
                 AND (otype = "market" OR status IN ("triggered","partial"))
               ORDER BY created_at ASC, id ASC
@@ -623,7 +627,8 @@ function fill_sell_now(int $orderId, float $nav): array
         $st = $pdo->prepare('SELECT * FROM orders WHERE id = ? FOR UPDATE');
         $st->execute([$orderId]);
         $sell = $st->fetch();
-        if (!$sell || !in_array($sell['status'], ['open', 'triggered', 'partial'], true)) {
+        if (!$sell || ($sell['channel'] ?? 'index') !== 'index'
+            || !in_array($sell['status'], ['open', 'triggered', 'partial'], true)) {
             return [];
         }
 
@@ -634,7 +639,7 @@ function fill_sell_now(int $orderId, float $nav): array
 
         $buySt = $pdo->prepare(
             'SELECT * FROM orders
-              WHERE side = "buy" AND status IN ("open","triggered","partial")
+              WHERE side = "buy" AND channel = "index" AND status IN ("open","triggered","partial")
                 AND user_id <> ?
                 AND (otype = "market" OR status IN ("triggered","partial"))
               ORDER BY created_at ASC, id ASC
@@ -687,7 +692,8 @@ function expire_orders(): int
     return tx(static function (PDO $pdo) {
         $st = $pdo->prepare(
             'SELECT * FROM orders
-              WHERE status IN ("open","triggered","partial")
+              WHERE channel = "index"
+                AND status IN ("open","triggered","partial")
                 AND expires_at IS NOT NULL AND expires_at <= UTC_TIMESTAMP()
               FOR UPDATE'
         );
@@ -733,7 +739,8 @@ function order_book(float $nav, int $limit = 20): array
         'SELECT side, otype, trigger_nav, units, filled_units, locked_paise,
                 created_at, fallback_at
            FROM orders
-          WHERE status IN ("open","triggered","partial")
+          WHERE channel = "index"
+            AND status IN ("open","triggered","partial")
           ORDER BY created_at ASC
           LIMIT 500'
     )->fetchAll();

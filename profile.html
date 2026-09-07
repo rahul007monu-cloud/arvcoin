@@ -130,6 +130,67 @@
     </form>
   </section>
 
+  <!-- =================================================== payment methods -->
+  <section id="payment-methods" class="card" style="margin-bottom:var(--sp-4)">
+    <div class="card-head">
+      <h3 style="font-size:1rem">Payment methods <span class="muted" style="font-weight:400">(for receiving P2P payments)</span></h3>
+    </div>
+    <p class="tiny muted" style="margin:0 0 var(--sp-4)">
+      When you sell ARV peer-to-peer, the buyer pays you here directly — the
+      platform never holds this money. Add at least one method before you list a
+      sell. Your default is the one shared with a buyer at the moment of a match.
+    </p>
+
+    <div class="ledger-list" data-pm-list style="margin-bottom:var(--sp-4)">
+      <div class="empty tiny">Loading…</div>
+    </div>
+
+    <form data-pm-form class="stack" style="border-top:1px solid var(--line);padding-top:var(--sp-4)">
+      <div class="grid g-2" style="gap:var(--sp-4)">
+        <div class="field">
+          <label for="pmType">Type</label>
+          <select id="pmType">
+            <option value="upi">UPI</option>
+            <option value="bank">Bank account</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="pmLabel">Label <span class="muted">(optional)</span></label>
+          <input id="pmLabel" type="text" maxlength="80" placeholder="e.g. My HDFC" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="field" data-pm-upi>
+        <label for="pmVpa">UPI ID</label>
+        <input id="pmVpa" type="text" placeholder="yourname@bank" autocomplete="off">
+        <span class="err hidden" data-err="upiVpa"></span>
+      </div>
+
+      <div class="hidden" data-pm-bank>
+        <div class="field">
+          <label for="pmAccName">Account holder name</label>
+          <input id="pmAccName" type="text" maxlength="120" autocomplete="off">
+          <span class="err hidden" data-err="accountName"></span>
+        </div>
+        <div class="grid g-2" style="gap:var(--sp-4)">
+          <div class="field">
+            <label for="pmAccNo">Account number</label>
+            <input id="pmAccNo" type="text" inputmode="numeric" maxlength="20" autocomplete="off">
+            <span class="err hidden" data-err="bankAccountNo"></span>
+          </div>
+          <div class="field">
+            <label for="pmIfsc">IFSC</label>
+            <input id="pmIfsc" type="text" maxlength="11" placeholder="HDFC0001234"
+                   style="text-transform:uppercase" autocomplete="off">
+            <span class="err hidden" data-err="bankIfsc"></span>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" data-pm-submit>Add payment method</button>
+    </form>
+  </section>
+
   <div class="grid g-2" style="align-items:start">
 
     <!-- ====================================================== tax position -->

@@ -277,6 +277,44 @@
     </div>
   </section>
 
+  <!-- ============================================================ P2P trades -->
+  <section class="card card-flush" style="margin-top:var(--sp-4)">
+    <div class="card-head row-wrap" style="padding:var(--sp-4);margin:0">
+      <div>
+        <h3 style="font-size:1rem;margin:0">P2P escrow trades</h3>
+        <div class="tiny muted">Peer-to-peer trades — release to the buyer or return escrow to the seller</div>
+      </div>
+      <form class="row" data-p2p-form style="margin:0">
+        <select data-p2p-status style="max-width:150px">
+          <option value="active">Active</option>
+          <option value="matched">Matched</option>
+          <option value="paid">Paid</option>
+          <option value="released">Released</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="all">All</option>
+        </select>
+        <input data-p2p-search type="search" placeholder="email or user id"
+               autocomplete="off" style="max-width:240px">
+        <button class="btn btn-sm btn-ghost" type="submit">Search</button>
+      </form>
+    </div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>Ref</th><th>Buyer</th><th>Seller</th><th class="num">Units</th>
+          <th class="num">Amount</th><th>Status</th><th>Proof</th><th></th>
+        </tr></thead>
+        <tbody data-p2p-trades><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
+      Releasing moves the escrowed ARV to the buyer and writes an immutable trade
+      row for tax; cancelling returns the escrow to the seller. Both go through the
+      same money path as the users' own actions and are logged. Only release once
+      the rupees genuinely reached the seller.
+    </div>
+  </section>
+
   <!-- ============================================================== history -->
   <section class="card" style="margin-top:var(--sp-4)">
     <div class="card-head">

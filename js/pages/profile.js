@@ -281,6 +281,121 @@ async function changePassword(e) {
   }
 }
 
+/* ------------------------------------------------------- payment methods -- */
+
+var IFSC_RE = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+
+function pmTypeToggle() {
+  var type = ui.el('#pmType').value;
+  ui.el('[data-pm-upi]').classList.toggle('hidden', type !== 'upi');
+  ui.el('[data-pm-bank]').classList.toggle('hidden', type !== 'bank');
+}
+
+function pmLabelFor(m) {
+  if (m.type === 'upi') return m.upiVpa;
+  var tail = (m.bankAccountNo || '').slice(-4);
+  return (m.accountName || 'Bank') + ' · ' + m.bankIfsc + ' · ' + '••' + tail;
+}
+
+function paintPaymentMethods(methods) {
+  var host = ui.el('[data-pm-list]');
+  if (!host) return;
+
+  if (!methods || !methods.length) {
+    host.innerHTML = '<div class="empty tiny">No payment methods yet. Add one below to sell ARV peer-to-peer.</div>';
+    return;
+  }
+
+  host.innerHTML = methods.map(function (m) {
+    return '<div class="ledger-row" style="align-items:center">'
+      + '<span class="l">'
+        + '<span class="badge ' + (m.isDefault ? 'ok' : '') + '">' + (m.type === 'upi' ? 'UPI' : 'Bank') + '</span> '
+        + (m.label ? '<strong>' + ui.esc(m.label) + '</strong> · ' : '')
+        + '<span class="num tiny">' + ui.esc(pmLabelFor(m)) + '</span>'
+        + (m.isDefault ? ' <span class="tiny muted">(default)</span>' : '')
+      + '</span>'
+      + '<span class="a" style="display:flex;gap:6px">'
+        + (m.isDefault ? '' : '<button class="btn btn-sm btn-ghost" data-pm-default="' + m.id + '">Make default</button>')
+        + '<button class="btn btn-sm btn-ghost" data-pm-del="' + m.id + '">Delete</button>'
+      + '</span>'
+      + '</div>';
+  }).join('');
+
+  ui.els('[data-pm-default]').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      ui.busy(b, true, '…');
+      try {
+        await api.paymentMethods.setDefault(Number(b.dataset.pmDefault));
+        await loadPaymentMethods();
+        ui.toast('Default updated.', 'ok');
+      } catch (e) { ui.toastError(e); ui.busy(b, false); }
+    });
+  });
+  ui.els('[data-pm-del]').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      ui.busy(b, true, '…');
+      try {
+        var r = await api.paymentMethods.remove(Number(b.dataset.pmDel));
+        await loadPaymentMethods();
+        ui.toast(r.message || 'Removed.', 'ok');
+      } catch (e) { ui.toastError(e); ui.busy(b, false); }
+    });
+  });
+}
+
+async function loadPaymentMethods() {
+  try {
+    var r = await api.paymentMethods.list();
+    paintPaymentMethods(r.methods || []);
+  } catch (_) {
+    var host = ui.el('[data-pm-list]');
+    if (host) host.innerHTML = '<div class="empty tiny">Could not load payment methods.</div>';
+  }
+}
+
+async function addPaymentMethod(e) {
+  e.preventDefault();
+  var btn = ui.el('[data-pm-submit]');
+  clearFieldErrors();
+
+  var type = ui.el('#pmType').value;
+  var data = { type: type, label: (ui.el('#pmLabel').value || '').trim() };
+
+  var local = {};
+  if (type === 'upi') {
+    data.upiVpa = (ui.el('#pmVpa').value || '').trim();
+    if (!VPA_RE.test(data.upiVpa)) local.upiVpa = 'A UPI ID looks like yourname@bank.';
+  } else {
+    data.accountName = (ui.el('#pmAccName').value || '').trim();
+    data.bankAccountNo = (ui.el('#pmAccNo').value || '').replace(/\s+/g, '');
+    data.bankIfsc = (ui.el('#pmIfsc').value || '').trim().toUpperCase();
+    if (data.accountName.length < 2) local.accountName = 'Enter the account holder name.';
+    if (!/^\d{6,20}$/.test(data.bankAccountNo)) local.bankAccountNo = 'A bank account number is 6 to 20 digits.';
+    if (!IFSC_RE.test(data.bankIfsc)) local.bankIfsc = 'An IFSC is like HDFC0001234.';
+  }
+  if (Object.keys(local).length) { paintFieldErrors(local); return; }
+
+  ui.busy(btn, true, 'Saving…');
+  try {
+    var r = await api.paymentMethods.add(data);
+    ui.el('#pmVpa').value = '';
+    ui.el('#pmAccName').value = '';
+    ui.el('#pmAccNo').value = '';
+    ui.el('#pmIfsc').value = '';
+    ui.el('#pmLabel').value = '';
+    await loadPaymentMethods();
+    ui.toast(r.message || 'Saved.', 'ok');
+  } catch (err) {
+    if (err.fields && paintFieldErrors(err.fields)) {
+      ui.toast('Check the highlighted fields.', 'warn', 6000);
+    } else {
+      ui.toastError(err);
+    }
+  } finally {
+    ui.busy(btn, false);
+  }
+}
+
 /* ---------------------------------------------------------------------- boot -- */
 
 (async function () {
@@ -302,6 +417,21 @@ async function changePassword(e) {
 
   ui.on('[data-kyc-form]', 'submit', submitKyc);
   ui.on('[data-pw-form]', 'submit', changePassword);
+
+  // Payment methods (for receiving P2P payments).
+  ui.on('[data-pm-form]', 'submit', addPaymentMethod);
+  var pmType = ui.el('#pmType');
+  if (pmType) pmType.addEventListener('change', pmTypeToggle);
+  var pmIfsc = ui.el('#pmIfsc');
+  if (pmIfsc) pmIfsc.addEventListener('input', function (e) {
+    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+  });
+  var pmAccNo = ui.el('#pmAccNo');
+  if (pmAccNo) pmAccNo.addEventListener('input', function (e) {
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 20);
+  });
+  pmTypeToggle();
+  loadPaymentMethods();
 
   // Uppercase as they type — a lowercase PAN is the commonest rejection.
   ui.el('#pan').addEventListener('input', function (e) {
