@@ -255,7 +255,13 @@ function p2p_order_ready(array $o, float $nav): bool
     if ($trigger <= 0) {
         return false;
     }
-    return $o['side'] === 'buy' ? ($nav <= $trigger) : ($nav >= $trigger);
+    // The type sets the trigger DIRECTION:
+    //   limit / target : buy fires at/below trigger, sell fires at/above.
+    //   stop           : buy fires at/above trigger, sell fires at/below.
+    $isStop = ($o['otype'] === 'stop');
+    return $o['side'] === 'buy'
+        ? ($isStop ? ($nav >= $trigger) : ($nav <= $trigger))
+        : ($isStop ? ($nav <= $trigger) : ($nav >= $trigger));
 }
 
 /* ================================================= order status sync ======= */
@@ -1116,9 +1122,44 @@ function p2p_maintenance(): array
         });
     }
 
+    /* -- Case D: price triggers. A resting limit/stop/target P2P order fires when
+       the live index price reaches its trigger (direction per p2p_order_ready).
+       This is also what lets two resting orders pair on pure price movement. */
+    // Never fire on a missing/stale price — nominate nothing if the feed is down.
+    $navNow = null;
+    try {
+        $navNow = arv_nav();
+    } catch (\Throwable $e) {
+        $navNow = null;
+    }
+    $triggersFired = 0;
+    if ($navNow !== null && $navNow > 0) {
+        $candidates = q(
+            "SELECT id, side, otype, trigger_nav FROM orders
+              WHERE channel = 'p2p'
+                AND otype IN ('limit','stop','target')
+                AND status IN ('open','triggered','partial')
+              ORDER BY created_at ASC, id ASC
+              LIMIT 500"
+        )->fetchAll();
+        foreach ($candidates as $c) {
+            if (!p2p_order_ready($c, $navNow)) {
+                continue;   // trigger not reached yet
+            }
+            // p2p_try_match locks the order FOR UPDATE and re-checks readiness +
+            // status before creating any trade, so a racing tick, cancel or
+            // placement can never double-fire the same units.
+            $made = p2p_try_match((int)$c['id'], $navNow);
+            if ($made) {
+                $triggersFired += count($made);
+            }
+        }
+    }
+
     return [
         'ordersExpired'  => $ordersExpired,
         'tradesExpired'  => $tradesExpired,
         'tradesDisputed' => $tradesDisputed,
+        'triggersFired'  => $triggersFired,
     ];
 }

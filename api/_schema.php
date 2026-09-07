@@ -116,7 +116,7 @@ declare(strict_types=1);
 //     and wallets still equal the ledger. If no fee account resolves, divert = 0.
 // This migration does NOT touch wallets, lots, the append-only ledger, `trades`,
 // or any existing unit balance; the new columns default to 0.
-const ARV_SCHEMA_VERSION = 14;
+const ARV_SCHEMA_VERSION = 15;
 
 function arv_schema(): array
 {
@@ -321,7 +321,7 @@ function arv_schema(): array
         user_id         BIGINT UNSIGNED NOT NULL,
 
         side            ENUM('buy','sell') NOT NULL,
-        otype           ENUM('market','limit') NOT NULL,
+        otype           ENUM('market','limit','stop','target') NOT NULL,
 
         -- Which venue this order belongs to. 'index' is the original
         -- deposit-then-index/treasury book that _match.php's engine fills;
@@ -1579,6 +1579,18 @@ function arv_migrations(PDO $pdo): array
         $done[] = 'schema-14: seeded P2P treasury + fee/TDS settings; added '
                 . 'fee_units/tds_units columns (schema/settings only; no '
                 . 'wallet/lot/ledger/unit writes)';
+    }
+
+    // schema-15: P2P stop-loss + target order types. Widen orders.otype so a P2P
+    // order can be a price trigger in either direction. One-time, guarded; no
+    // money/unit writes. Existing 'market'/'limit' rows are unaffected.
+    if (!setting_b('p2p_phase3_v15', false)) {
+        $pdo->exec(
+            "ALTER TABLE orders
+               MODIFY COLUMN otype ENUM('market','limit','stop','target') NOT NULL"
+        );
+        setting_set('p2p_phase3_v15', '1');
+        $done[] = 'schema-15: widened orders.otype to include stop/target (P2P triggers)';
     }
 
     if ($done) {
