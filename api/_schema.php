@@ -1328,9 +1328,15 @@ function arv_migrations(PDO $pdo): array
         setting_set('auto_backfill_fails', '0');
         setting_set('auto_backfill_fail_step', '');
 
-        // (f) Clear stale v9 flags.
+        // (f) Clear the stale v9 REBUILD flag only.
+        //
+        // anchor_recomputed_v9 must NOT be cleared. It is the guard on the v9
+        // block, which FORCE-SETS arv_base_inr back to 17.83. Clearing it made v9
+        // eligible again, so the very next migration pass undid the 21.08 anchor
+        // set two lines above and left the anchor stuck at 17.83 — which is why a
+        // live install showed ~₹7,555 (~$80) instead of the intended ~$94-100, and
+        // why any correction computed against 21.08 silently did not apply.
         setting_set('arv_candles_rebuild_v9', '');
-        setting_set('anchor_recomputed_v9',   '');
 
         // (g) Idempotency guard.
         setting_set($wipeFlag, '1');
@@ -1598,22 +1604,38 @@ function arv_migrations(PDO $pdo): array
     // the same factor. Paise cost basis is IMMUTABLE, the append-only ledger is
     // corrected only by an 'adjustment' INSERT, and no other balance moves.
     //
-    // WHICH holdings are affected, exactly (not a heuristic): settings.updated_at
-    // records when each migration flag was written, so the moment v9 ran and the
-    // moment v10 ran are both known. A lot's acquired_at against those two
-    // instants says precisely which anchor it was priced at:
-    //     acquired before v9        -> priced at 1.78   -> divide by 21.08/1.78
-    //     acquired between v9 & v10 -> priced at 17.83  -> divide by 21.08/17.83
-    //     acquired after v10        -> already correct   -> untouched
+    // WHICH holdings are affected. Everything is derived from the LIVE anchor and
+    // price, never from a hard-coded figure, because a real install may sit on
+    // 17.83 or 21.08 depending on how far the earlier steps got — a correction
+    // pinned to one of them would silently do nothing. So:
+    //     F         = live arv_base_inr / 1.78   (the basis the units are on)
+    //     threshold = live NAV / sqrt(F)         (geometric midpoint of the cohorts)
+    //     lot.nav < threshold  -> priced on the old basis -> units / F, nav * F
+    //     lot.nav >= threshold -> already on the live basis -> untouched
+    // A lot on the old basis prices about F times lower than one on the current
+    // basis, so at F ≈ 10 the two groups sit ~3.2x either side of the threshold and
+    // the test stays correct as Bitcoin moves. (A timestamp would be exact, but the
+    // v9 flag was rewritten when its block became re-eligible, so its
+    // settings.updated_at no longer marks the original anchor move.)
     //
-    // Guards: runs once (units_rescaled_v16); refuses unless arv_base_inr is
-    // exactly the 21.08 this factor is computed against (a customised anchor means
-    // F is unknowable); and refuses while ANY units are escrowed in open orders or
-    // live P2P trades, because rescaling lots underneath an escrow would desync
-    // orders.locked_units / p2p_trades.units. In that case the flag is NOT set, so
-    // it simply runs on a later tick once those settle.
+    // Guards: runs once (units_rescaled_v16); does nothing unless F > 1.5, so the
+    // cohorts are always well separated rather than guessed at; defers (WITHOUT
+    // setting the flag) when the anchor or price is unavailable, and while ANY units
+    // are escrowed in open orders or live P2P trades — rescaling lots underneath an
+    // escrow would desync orders.locked_units / p2p_trades.units.
     if (!setting_b('units_rescaled_v16', false)) {
-        $curBase16 = (string)setting('arv_base_inr', '');
+        // The basis the unit counts are actually on: v8 was the last step that
+        // rescaled them, and it left them on ₹1.78.
+        $unitsBase = 1.78;
+        // The anchor and price as they REALLY are, not as any earlier migration
+        // intended. A live install can sit on 17.83 or 21.08 depending on how far
+        // the earlier steps got (the v9/v10 flag interaction above), so hard-coding
+        // either one would make this correction silently skip.
+        $curBase16 = (float)setting('arv_base_inr', 0);
+        $curNav16  = (float)(qval(
+            "SELECT close FROM arv_candles WHERE tf = '1m' ORDER BY ts DESC LIMIT 1"
+        ) ?? 0);
+        $f16 = $curBase16 > 0 ? $curBase16 / $unitsBase : 0.0;
 
         // Anything escrowed right now? Rescale only when nothing is mid-flight.
         $liveOrders = (int)(qval(
@@ -1628,9 +1650,20 @@ function arv_migrations(PDO $pdo): array
             $liveP2p = 0;   // table not present yet on a very old install
         }
 
-        if ($curBase16 !== '21.08') {
-            $done[] = 'units: anchor is not the 21.08 this correction is computed for — '
-                    . 'skipped the rescale and left units untouched';
+        if ($curBase16 <= 0 || $curNav16 <= 0) {
+            // No anchor or no stored price yet (a fresh install still backfilling).
+            // Defer WITHOUT setting the flag so it runs once both exist.
+            $done[] = 'units: deferred the corrective rescale — the anchor or the live price is '
+                    . 'not available yet. It runs automatically once they are.';
+        } elseif ($f16 <= 1.5) {
+            // Either the anchor never left 1.78, or it moved so little that the two
+            // cohorts cannot be separated by price magnitude. Refuse to guess.
+            $done[] = sprintf(
+                'units: no corrective rescale applied — the anchor (₹%s) is within %.2fx of the '
+                . '₹1.78 basis the units are on, so there is nothing to correct (or the cohorts '
+                . 'could not be told apart safely).',
+                rtrim(rtrim(number_format($curBase16, 2, '.', ''), '0'), '.'), $f16
+            );
             setting_set('units_rescaled_v16', '1');
         } elseif ($liveOrders > 0 || $liveP2p > 0) {
             // Deliberately does NOT set the flag: retry once the escrow clears.
@@ -1640,37 +1673,38 @@ function arv_migrations(PDO $pdo): array
                 $liveOrders, $liveP2p
             );
         } else {
-            // When each earlier anchor move happened. NULL means this install never
-            // ran that step (a fresh install has no pre-move lots, so nothing to fix).
-            $t9  = qval("SELECT updated_at FROM settings WHERE skey = 'anchor_recomputed_v9'");
-            $t10 = qval("SELECT updated_at FROM settings WHERE skey = 'candles_wiped_v10'");
+            // WHICH lots are on the old basis. A lot stores the NAV it was bought
+            // at, and a lot priced on the ₹1.78 basis sits about F times lower than
+            // one priced on the current basis (F ≈ 10 when the anchor is 17.83).
+            // The cut is the geometric midpoint between the two, so the decision
+            // has ~sqrt(F) headroom on each side (≈3.2x at F≈10) and stays correct
+            // as Bitcoin moves. F is only allowed here when it exceeds 1.5, so the
+            // two groups are always well separated (see the guard above).
+            //
+            // A timestamp would be exact, but is not usable: the v9 flag is written
+            // by a block that became re-eligible, so settings.updated_at for it no
+            // longer marks the original anchor move.
+            $threshold16 = $curNav16 / sqrt($f16);
 
-            // F for each basis, as SQL DECIMAL — no PHP float touches a unit count.
+            // The factor as SQL DECIMAL — no PHP float touches a stored unit count.
             $fCast = 'CAST(? AS DECIMAL(30,10)) / CAST(? AS DECIMAL(30,10))';
-            $f178  = ['21.08', '1.78'];    // 11.8427…
-            $f1783 = ['21.08', '17.83'];   // 1.1823…
+            $fArgs16 = [
+                number_format($curBase16, 8, '.', ''),
+                number_format($unitsBase, 8, '.', ''),
+            ];
+            $thrArg = [number_format($threshold16, 8, '.', '')];
 
             $pdo->beginTransaction();
             try {
-                if ($t9 !== null) {
-                    // Pre-v9 lots: priced at the 1.78 basis.
-                    $pdo->prepare(
-                        "UPDATE lots SET units = units / ({$fCast}),
-                                         units_remaining = units_remaining / ({$fCast}),
-                                         nav = nav * ({$fCast})
-                          WHERE acquired_at < ?"
-                    )->execute(array_merge($f178, $f178, $f178, [$t9]));
-
-                    // Lots taken between the two moves: priced at the 17.83 basis.
-                    if ($t10 !== null) {
-                        $pdo->prepare(
-                            "UPDATE lots SET units = units / ({$fCast}),
-                                             units_remaining = units_remaining / ({$fCast}),
-                                             nav = nav * ({$fCast})
-                              WHERE acquired_at >= ? AND acquired_at < ?"
-                        )->execute(array_merge($f1783, $f1783, $f1783, [$t9, $t10]));
-                    }
-                }
+                // Old-basis lots: divide the unit counts by F and multiply nav by F,
+                // so units x nav (the paise cost) is unchanged and the lot's price is
+                // finally expressed in the same basis as the live NAV.
+                $pdo->prepare(
+                    "UPDATE lots SET units = units / ({$fCast}),
+                                     units_remaining = units_remaining / ({$fCast}),
+                                     nav = nav * ({$fCast})
+                      WHERE nav < CAST(? AS DECIMAL(30,10))"
+                )->execute(array_merge($fArgs16, $fArgs16, $fArgs16, $thrArg));
 
                 // The ledger is the book of record and admin reconcile asserts
                 // Σ wallets units == Σ ledger arv_delta_units. Post one compensating
@@ -1684,7 +1718,7 @@ function arv_migrations(PDO $pdo): array
                      SELECT w.user_id, 'adjustment', 0,
                             ROUND({$newTotal}, 8) - (w.arv_units + w.arv_locked_units),
                             NULL, 'rescale_v16',
-                            'Corrected the unit count for the earlier anchor moves to ₹21.08: holding value and paise cost basis unchanged.',
+                            'Corrected the unit count for the earlier anchor move: holding value and paise cost basis unchanged.',
                             ''
                        FROM wallets w
                       WHERE ROUND({$newTotal}, 8) <> (w.arv_units + w.arv_locked_units)"
