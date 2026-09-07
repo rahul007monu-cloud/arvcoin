@@ -116,7 +116,7 @@ declare(strict_types=1);
 //     and wallets still equal the ledger. If no fee account resolves, divert = 0.
 // This migration does NOT touch wallets, lots, the append-only ledger, `trades`,
 // or any existing unit balance; the new columns default to 0.
-const ARV_SCHEMA_VERSION = 15;
+const ARV_SCHEMA_VERSION = 16;
 
 function arv_schema(): array
 {
@@ -1579,6 +1579,147 @@ function arv_migrations(PDO $pdo): array
         $done[] = 'schema-14: seeded P2P treasury + fee/TDS settings; added '
                 . 'fee_units/tds_units columns (schema/settings only; no '
                 . 'wallet/lot/ledger/unit writes)';
+    }
+
+    // ---------------------------------------------------------------------
+    // Schema 16: the corrective unit rescale v9 and v10 omitted.
+    //
+    // Why this exists. v8 moved the anchor to ₹1.78 and correctly rescaled every
+    // holding's unit COUNT alongside it (units / F, lots.nav * F), so holding
+    // value and paise cost basis were preserved. v9 then moved arv_base_inr
+    // 1.78 -> 17.83 and v10 17.83 -> 21.08 WITHOUT that companion rescale. Since
+    //     NAV = arv_base_inr × (BTC now ÷ BTC at launch)
+    // those moves multiplied NAV by 21.08/1.78 ≈ 11.84 while each holding kept its
+    // old unit count. value = units × NAV therefore reads ~11.84× too high against
+    // an unchanged invested_paise — the inflated unrealised profit holders saw.
+    //
+    // The fix is exactly the rescale that was skipped: divide the affected unit
+    // counts by the factor their basis is out by, and multiply those lots' nav by
+    // the same factor. Paise cost basis is IMMUTABLE, the append-only ledger is
+    // corrected only by an 'adjustment' INSERT, and no other balance moves.
+    //
+    // WHICH holdings are affected, exactly (not a heuristic): settings.updated_at
+    // records when each migration flag was written, so the moment v9 ran and the
+    // moment v10 ran are both known. A lot's acquired_at against those two
+    // instants says precisely which anchor it was priced at:
+    //     acquired before v9        -> priced at 1.78   -> divide by 21.08/1.78
+    //     acquired between v9 & v10 -> priced at 17.83  -> divide by 21.08/17.83
+    //     acquired after v10        -> already correct   -> untouched
+    //
+    // Guards: runs once (units_rescaled_v16); refuses unless arv_base_inr is
+    // exactly the 21.08 this factor is computed against (a customised anchor means
+    // F is unknowable); and refuses while ANY units are escrowed in open orders or
+    // live P2P trades, because rescaling lots underneath an escrow would desync
+    // orders.locked_units / p2p_trades.units. In that case the flag is NOT set, so
+    // it simply runs on a later tick once those settle.
+    if (!setting_b('units_rescaled_v16', false)) {
+        $curBase16 = (string)setting('arv_base_inr', '');
+
+        // Anything escrowed right now? Rescale only when nothing is mid-flight.
+        $liveOrders = (int)(qval(
+            "SELECT COUNT(*) FROM orders WHERE status IN ('open','triggered','partial')"
+        ) ?? 0);
+        $liveP2p = 0;
+        try {
+            $liveP2p = (int)(qval(
+                "SELECT COUNT(*) FROM p2p_trades WHERE status IN ('matched','paid','disputed')"
+            ) ?? 0);
+        } catch (Throwable $e) {
+            $liveP2p = 0;   // table not present yet on a very old install
+        }
+
+        if ($curBase16 !== '21.08') {
+            $done[] = 'units: anchor is not the 21.08 this correction is computed for — '
+                    . 'skipped the rescale and left units untouched';
+            setting_set('units_rescaled_v16', '1');
+        } elseif ($liveOrders > 0 || $liveP2p > 0) {
+            // Deliberately does NOT set the flag: retry once the escrow clears.
+            $done[] = sprintf(
+                'units: deferred the v9/v10 corrective rescale — %d open order(s) and %d live '
+                . 'P2P trade(s) still hold escrow. It runs automatically once they settle.',
+                $liveOrders, $liveP2p
+            );
+        } else {
+            // When each earlier anchor move happened. NULL means this install never
+            // ran that step (a fresh install has no pre-move lots, so nothing to fix).
+            $t9  = qval("SELECT updated_at FROM settings WHERE skey = 'anchor_recomputed_v9'");
+            $t10 = qval("SELECT updated_at FROM settings WHERE skey = 'candles_wiped_v10'");
+
+            // F for each basis, as SQL DECIMAL — no PHP float touches a unit count.
+            $fCast = 'CAST(? AS DECIMAL(30,10)) / CAST(? AS DECIMAL(30,10))';
+            $f178  = ['21.08', '1.78'];    // 11.8427…
+            $f1783 = ['21.08', '17.83'];   // 1.1823…
+
+            $pdo->beginTransaction();
+            try {
+                if ($t9 !== null) {
+                    // Pre-v9 lots: priced at the 1.78 basis.
+                    $pdo->prepare(
+                        "UPDATE lots SET units = units / ({$fCast}),
+                                         units_remaining = units_remaining / ({$fCast}),
+                                         nav = nav * ({$fCast})
+                          WHERE acquired_at < ?"
+                    )->execute(array_merge($f178, $f178, $f178, [$t9]));
+
+                    // Lots taken between the two moves: priced at the 17.83 basis.
+                    if ($t10 !== null) {
+                        $pdo->prepare(
+                            "UPDATE lots SET units = units / ({$fCast}),
+                                             units_remaining = units_remaining / ({$fCast}),
+                                             nav = nav * ({$fCast})
+                              WHERE acquired_at >= ? AND acquired_at < ?"
+                        )->execute(array_merge($f1783, $f1783, $f1783, [$t9, $t10]));
+                    }
+                }
+
+                // The ledger is the book of record and admin reconcile asserts
+                // Σ wallets units == Σ ledger arv_delta_units. Post one compensating
+                // append-only 'adjustment' per holder for the exact change the wallet
+                // rewrite below is about to make, using the SAME expression, so the
+                // two sums agree to the last representable digit. Escrow is zero here
+                // (guarded above), so the new total is simply the sum of open lots.
+                $newTotal = "COALESCE((SELECT SUM(l.units_remaining) FROM lots l WHERE l.user_id = w.user_id), 0)";
+                $pdo->exec(
+                    "INSERT INTO ledger (user_id, kind, inr_delta_paise, arv_delta_units, nav, ref, note, fy)
+                     SELECT w.user_id, 'adjustment', 0,
+                            ROUND({$newTotal}, 8) - (w.arv_units + w.arv_locked_units),
+                            NULL, 'rescale_v16',
+                            'Corrected the unit count for the earlier anchor moves to ₹21.08: holding value and paise cost basis unchanged.',
+                            ''
+                       FROM wallets w
+                      WHERE ROUND({$newTotal}, 8) <> (w.arv_units + w.arv_locked_units)"
+                );
+
+                // Rewrite each wallet from its own lots (escrow is zero here), which
+                // also self-heals any pre-existing drift between the two.
+                $pdo->exec(
+                    "UPDATE wallets w
+                        SET w.arv_units = ROUND({$newTotal}, 8),
+                            w.arv_locked_units = 0"
+                );
+
+                // Dust coherence, exactly as v8: a holding that floors to zero units
+                // must not keep a stranded paise cost basis, or avgCostNav and
+                // unrealised P&L read as a phantom -100% position.
+                $pdo->exec('UPDATE lots SET cost_paise = 0 WHERE units_remaining = 0 AND cost_paise <> 0');
+                $pdo->exec(
+                    'UPDATE wallets SET invested_paise = 0
+                      WHERE (arv_units + arv_locked_units) = 0 AND invested_paise <> 0'
+                );
+
+                $pdo->commit();
+                setting_set('units_rescaled_v16', '1');
+                $done[] = 'units: applied the corrective rescale v9/v10 omitted — pre-anchor-move '
+                        . 'lots divided by their basis factor, lots.nav multiplied by it, wallets '
+                        . 'rebuilt from lots, per-holder ledger adjustments posted, dust cost basis '
+                        . 'zeroed (paise cost basis and the ledger history itself untouched)';
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                throw $e;
+            }
+        }
     }
 
     // schema-15: P2P stop-loss + target order types. Widen orders.otype so a P2P
