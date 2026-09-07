@@ -538,6 +538,18 @@ function p2p_trade_public(array $t, int $viewerId, bool $isAdmin = false): array
     $role     = $isAdmin && !$isBuyer && !$isSeller ? 'admin'
               : ($isBuyer ? 'buyer' : ($isSeller ? 'seller' : 'other'));
 
+    // Phase-2 deadlines, computed from the same TTL settings the maintenance cron
+    // enforces so the UI counts down to the exact instant an auto-action fires.
+    // A 'matched' trade shows the buyer's pay deadline; a 'paid' one shows the
+    // seller's confirm deadline (after which it goes to dispute). Everything else
+    // has no live deadline.
+    $payDeadline = $t['status'] === 'matched'
+        ? p2p_deadline_iso($t['matched_at'] ?? null, setting_i('p2p_pay_ttl_minutes', 60) * 60)
+        : null;
+    $confirmDeadline = $t['status'] === 'paid'
+        ? p2p_deadline_iso($t['paid_at'] ?? null, setting_i('p2p_confirm_ttl_hours', 4) * 3600)
+        : null;
+
     $out = [
         'id'          => (int)$t['id'],
         'ref'         => $t['ref'],
@@ -554,9 +566,17 @@ function p2p_trade_public(array $t, int $viewerId, bool $isAdmin = false): array
         'paidAt'      => $t['paid_at'] ?? null,
         'releasedAt'  => $t['released_at'] ?? null,
         'cancelledAt' => $t['cancelled_at'] ?? null,
+        'disputeAt'   => $t['dispute_at'] ?? null,
+        'resolvedAt'  => $t['resolved_at'] ?? null,
+        'resolution'  => ($t['resolution'] ?? '') !== '' ? $t['resolution'] : null,
         'createdAt'   => $t['created_at'] ?? null,
+        // ISO-8601 UTC deadlines (with a trailing Z) so the browser can count
+        // down correctly regardless of the viewer's timezone.
+        'payDeadline'     => $payDeadline,
+        'confirmDeadline' => $confirmDeadline,
         // What each viewer may do next, so the UI does not have to re-derive the
-        // rules the endpoints already enforce.
+        // rules the endpoints already enforce. A 'disputed' trade is operator-only
+        // — neither party may act, so all three stay false.
         'canUploadProof' => $isBuyer && $t['status'] === 'matched',
         'canConfirm'     => $isSeller && $t['status'] === 'paid',
         'canCancel'      => ($isBuyer || $isSeller) && $t['status'] === 'matched',
@@ -574,4 +594,202 @@ function p2p_trade_public(array $t, int $viewerId, bool $isAdmin = false): array
     }
 
     return $out;
+}
+
+
+/* ================================================= phase-2 maintenance ==== */
+
+/**
+ * A UTC ISO-8601 deadline = a stored UTC datetime + N seconds, or null.
+ *
+ * The p2p_trades timestamps are written with UTC_TIMESTAMP(), so they are parsed
+ * as UTC here (the ' UTC' suffix) and re-emitted with a trailing Z. That lets the
+ * browser count down to the exact instant the maintenance cron will act, no
+ * matter the viewer's timezone.
+ */
+function p2p_deadline_iso(?string $baseUtc, int $addSeconds): ?string
+{
+    if ($baseUtc === null || $baseUtc === '') {
+        return null;
+    }
+    $ts = strtotime($baseUtc . ' UTC');
+    if ($ts === false) {
+        return null;
+    }
+    return gmdate('Y-m-d\TH:i:s\Z', $ts + $addSeconds);
+}
+
+/**
+ * P2P Phase-2 timer sweep — run every cron tick, idempotent.
+ *
+ * Three independent cases, each row handled in its OWN tx() with the row locked
+ * FOR UPDATE and its status/age re-checked under that lock before anything moves.
+ * Every escrow movement goes through the SAME Phase-1 cores the user and admin
+ * paths use (p2p_cancel_core) or the same unlock code as handle_cancel_order —
+ * nothing here invents balance math, and nothing writes a wallet column directly.
+ *
+ * The re-check under FOR UPDATE is the guard against double-refund/double-release:
+ * if a user confirm/cancel or an operator override raced this sweep, the status
+ * will no longer qualify and the row is skipped. Candidate ids are gathered with
+ * an unlocked read first, then re-validated inside each tx, so a long tick never
+ * holds a wide lock.
+ *
+ * @return array{ordersExpired:int,tradesExpired:int,tradesDisputed:int}
+ */
+function p2p_maintenance(): array
+{
+    // Same guardrails as admin.php handle_save_setting, applied defensively in
+    // case a value was ever written out of band.
+    $matchTtlH   = max(1, min(168,  setting_i('p2p_match_ttl_hours', 24)));
+    $payTtlMin   = max(5, min(1440, setting_i('p2p_pay_ttl_minutes', 60)));
+    $confirmTtlH = max(1, min(72,   setting_i('p2p_confirm_ttl_hours', 4)));
+
+    $ordersExpired  = 0;   // unmatched P2P orders past the match TTL
+    $tradesExpired  = 0;   // matched, buyer never paid → auto-cancel + expired
+    $tradesDisputed = 0;   // paid, seller never confirmed → disputed (no money move)
+
+    /* -- Case A: unmatched P2P orders past the match TTL, with no active trade. */
+    // A resting P2P order older than the TTL with nothing live hanging off it is
+    // abandoned. For a sell we return its remaining escrow exactly as
+    // handle_cancel_order / p2p_cancel_core do (arv_locked_units -> arv_units,
+    // locked_units -> 0, a zero-delta 'adjustment' ledger note); a buy holds no
+    // escrow so it merely stops matching.
+    $orderIds = array_map('intval', array_column(q(
+        "SELECT id FROM orders
+          WHERE channel = 'p2p'
+            AND status IN ('open','triggered','partial')
+            AND created_at <= (UTC_TIMESTAMP() - INTERVAL ? HOUR)",
+        [$matchTtlH]
+    )->fetchAll(), 'id'));
+
+    foreach ($orderIds as $oid) {
+        $ordersExpired += tx(static function (PDO $pdo) use ($oid, $matchTtlH) {
+            $st = $pdo->prepare("SELECT * FROM orders WHERE id = ? AND channel = 'p2p' FOR UPDATE");
+            $st->execute([$oid]);
+            $o = $st->fetch();
+            if (!$o || !in_array($o['status'], ['open', 'triggered', 'partial'], true)) {
+                return 0;   // already terminal, or a racing cancel won
+            }
+            // Re-check the age under the lock, in the DB's own clock.
+            $tooOld = (bool)qval(
+                "SELECT created_at <= (UTC_TIMESTAMP() - INTERVAL ? HOUR) FROM orders WHERE id = ?",
+                [$matchTtlH, $oid]
+            );
+            if (!$tooOld) {
+                return 0;
+            }
+
+            if ($o['side'] === 'sell') {
+                // If any live trade still reserves this order's escrow, it is not
+                // abandoned — leave it to the trade timers (Case B/C).
+                $reserved = p2p_reserved_sell_u8($pdo, (int)$o['id']);
+                if ($reserved > 0) {
+                    return 0;
+                }
+                $lockedUnits = u8((string)$o['locked_units']);
+                if ($lockedUnits > 0) {
+                    // reserved == 0 here, so the whole locked balance is unreserved
+                    // escrow and returns to available. Net-zero move, same as a
+                    // user order-cancel.
+                    wallet_apply($pdo, (int)$o['user_id'], 0, 0, $lockedUnits, -$lockedUnits);
+                    $pdo->prepare('UPDATE orders SET locked_units = 0 WHERE id = ?')->execute([$oid]);
+                    ledger_add($pdo, (int)$o['user_id'], 'adjustment', 0, 0, [
+                        'ref' => (string)$o['ref'], 'relatedId' => (int)$o['id'],
+                        'note' => 'P2P sell order expired — escrow returned',
+                    ]);
+                }
+            } else {
+                // Buy: no escrow, but refuse to expire it out from under a live
+                // trade (matched/paid) still resolving against it.
+                $active = u8((string)(qval(
+                    "SELECT COALESCE(SUM(units),0) FROM p2p_trades
+                      WHERE buyer_order_id = ? AND status IN ('matched','paid')", [$oid]
+                ) ?? '0'));
+                if ($active > 0) {
+                    return 0;
+                }
+            }
+
+            $pdo->prepare("UPDATE orders SET status = 'expired' WHERE id = ?")->execute([$oid]);
+            return 1;
+        });
+    }
+
+    /* -- Case B: matched trades the buyer never paid, past the pay TTL. */
+    // Auto-cancel through the Phase-1 core (escrow returns to the seller), then
+    // mark 'expired' to distinguish an automatic timeout from a manual cancel.
+    // Both are terminal and excluded from the reserved/released sums, so the
+    // status rewrite does not disturb the order sync the core already ran.
+    $matchedIds = array_map('intval', array_column(q(
+        "SELECT id FROM p2p_trades
+          WHERE status = 'matched'
+            AND matched_at IS NOT NULL
+            AND matched_at <= (UTC_TIMESTAMP() - INTERVAL ? MINUTE)",
+        [$payTtlMin]
+    )->fetchAll(), 'id'));
+
+    foreach ($matchedIds as $tid) {
+        $tradesExpired += tx(static function (PDO $pdo) use ($tid, $payTtlMin) {
+            $st = $pdo->prepare('SELECT * FROM p2p_trades WHERE id = ? FOR UPDATE');
+            $st->execute([$tid]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] !== 'matched') {
+                return 0;   // buyer paid, or someone cancelled, in the meantime
+            }
+            $tooOld = (bool)qval(
+                "SELECT matched_at <= (UTC_TIMESTAMP() - INTERVAL ? MINUTE) FROM p2p_trades WHERE id = ?",
+                [$payTtlMin, $tid]
+            );
+            if (!$tooOld) {
+                return 0;
+            }
+            // Returns the escrow to the seller and sets status='cancelled'.
+            p2p_cancel_core($pdo, $t, 'auto-expired: buyer did not pay within the payment window');
+            // Relabel to 'expired' so the auto path is distinguishable from a
+            // human cancel. cancelled_at + cancel_reason set by the core stay.
+            $pdo->prepare("UPDATE p2p_trades SET status = 'expired' WHERE id = ?")->execute([$tid]);
+            return 1;
+        });
+    }
+
+    /* -- Case C: paid trades the seller never confirmed, past the confirm TTL. */
+    // The buyer paid and uploaded proof; the seller went quiet. This must NOT
+    // auto-release (the seller may genuinely not have been paid) and must NOT
+    // auto-return the escrow (the buyer may genuinely have paid) — it goes to an
+    // operator. No money moves; only the status and dispute_at change.
+    $paidIds = array_map('intval', array_column(q(
+        "SELECT id FROM p2p_trades
+          WHERE status = 'paid'
+            AND paid_at IS NOT NULL
+            AND paid_at <= (UTC_TIMESTAMP() - INTERVAL ? HOUR)",
+        [$confirmTtlH]
+    )->fetchAll(), 'id'));
+
+    foreach ($paidIds as $tid) {
+        $tradesDisputed += tx(static function (PDO $pdo) use ($tid, $confirmTtlH) {
+            $st = $pdo->prepare('SELECT * FROM p2p_trades WHERE id = ? FOR UPDATE');
+            $st->execute([$tid]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] !== 'paid') {
+                return 0;   // seller confirmed (released) or it was cancelled
+            }
+            $tooOld = (bool)qval(
+                "SELECT paid_at <= (UTC_TIMESTAMP() - INTERVAL ? HOUR) FROM p2p_trades WHERE id = ?",
+                [$confirmTtlH, $tid]
+            );
+            if (!$tooOld) {
+                return 0;
+            }
+            $pdo->prepare(
+                "UPDATE p2p_trades SET status = 'disputed', dispute_at = UTC_TIMESTAMP() WHERE id = ?"
+            )->execute([$tid]);
+            return 1;
+        });
+    }
+
+    return [
+        'ordersExpired'  => $ordersExpired,
+        'tradesExpired'  => $tradesExpired,
+        'tradesDisputed' => $tradesDisputed,
+    ];
 }

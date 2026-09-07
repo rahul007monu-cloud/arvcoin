@@ -85,7 +85,20 @@ declare(strict_types=1);
 // (to the buyer) or returns on cancel. This migration is schema-only for the
 // new tables/column plus a settings flag — it does NOT touch existing wallets,
 // lots, the append-only ledger, or any unit balance.
-const ARV_SCHEMA_VERSION = 12;
+//
+// 13 is P2P PHASE 2 — timers, auto-expiry and disputes. It extends the
+// p2p_trades.status ENUM with two new terminal/limbo states, 'disputed' and
+// 'expired' (the ENUM already left room for them; adding them is an ALTER, not
+// a rethink), and adds four lifecycle columns — dispute_at, resolved_at,
+// resolution, resolved_by — so a dispute can be raised by the maintenance cron
+// and later resolved by an operator with an audit trail. It also seeds three
+// new timer settings (p2p_match_ttl_hours, p2p_pay_ttl_minutes,
+// p2p_confirm_ttl_hours) on installs that predate them. Schema/settings only:
+// it does NOT touch wallets, lots, the append-only ledger, `trades`, or any
+// unit balance. The escrow itself is still moved ONLY by the Phase-1 cores
+// p2p_release_core()/p2p_cancel_core(); this migration merely makes room for
+// the states those cores and the cron/admin dispute paths record.
+const ARV_SCHEMA_VERSION = 13;
 
 function arv_schema(): array
 {
@@ -453,7 +466,12 @@ function arv_schema(): array
         seller_payment_method_id BIGINT UNSIGNED NULL,
         seller_payment_snapshot  TEXT NULL,
 
-        status          ENUM('matched','paid','released','cancelled')
+        -- Phase 2 added 'disputed' and 'expired'. 'disputed' is a live limbo
+        -- state (a paid trade the seller never confirmed) that waits for an
+        -- operator and moves NO escrow on its own; 'expired' is a terminal
+        -- state for a match the buyer never paid (escrow already returned to the
+        -- seller by p2p_cancel_core) or an unmatched order that timed out.
+        status          ENUM('matched','paid','released','cancelled','disputed','expired')
                         NOT NULL DEFAULT 'matched',
 
         proof_utr        VARCHAR(40)  NOT NULL DEFAULT '',
@@ -467,6 +485,16 @@ function arv_schema(): array
         paid_at         DATETIME     NULL,
         released_at     DATETIME     NULL,
         cancelled_at    DATETIME     NULL,
+
+        -- Phase 2 dispute lifecycle. dispute_at is stamped when a paid trade
+        -- goes to 'disputed' (by cron auto-flag or an operator). resolution +
+        -- resolved_by + resolved_at record how an operator settled it (released
+        -- to the buyer, or cancelled back to the seller) for the audit trail.
+        dispute_at      DATETIME     NULL,
+        resolved_at     DATETIME     NULL,
+        resolution      VARCHAR(255) NOT NULL DEFAULT '',
+        resolved_by     BIGINT UNSIGNED NULL,
+
         created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
         UNIQUE KEY uq_p2p_ref (ref),
@@ -769,6 +797,21 @@ function arv_default_settings(): array
         'min_order_paise'       => '10000',
         'min_withdraw_paise'    => '10000',
         'match_at_index_price'  => '1',
+
+        // P2P Phase 2 timers. All three are operator-editable with guardrails in
+        // admin.php handle_save_setting.
+        //   match : how long an unmatched P2P order stays open before it
+        //           auto-expires and (for a sell) its escrow returns.
+        //   pay   : after a match, how long the BUYER has to pay + upload proof
+        //           before the trade auto-cancels and the escrow returns to the
+        //           seller. 60 min is a sensible default so a seller's escrow is
+        //           never stuck forever when a buyer vanishes — the operator can
+        //           tune it to suit their market.
+        //   confirm: after proof is uploaded, how long the SELLER has to confirm
+        //           before the trade goes to DISPUTE for an operator to settle.
+        'p2p_match_ttl_hours'   => '24',
+        'p2p_pay_ttl_minutes'   => '60',
+        'p2p_confirm_ttl_hours' => '4',
         'buy_fills_from_treasury' => '1',
         'sell_fallback_to_treasury' => '1',
         'sell_fallback_minutes' => '5',
@@ -1346,7 +1389,7 @@ function arv_migrations(PDO $pdo): array
             amount_paise    BIGINT       NOT NULL,
             seller_payment_method_id BIGINT UNSIGNED NULL,
             seller_payment_snapshot  TEXT NULL,
-            status          ENUM('matched','paid','released','cancelled')
+            status          ENUM('matched','paid','released','cancelled','disputed','expired')
                             NOT NULL DEFAULT 'matched',
             proof_utr        VARCHAR(40)  NOT NULL DEFAULT '',
             proof_image_path VARCHAR(255) NOT NULL DEFAULT '',
@@ -1356,6 +1399,10 @@ function arv_migrations(PDO $pdo): array
             paid_at         DATETIME     NULL,
             released_at     DATETIME     NULL,
             cancelled_at    DATETIME     NULL,
+            dispute_at      DATETIME     NULL,
+            resolved_at     DATETIME     NULL,
+            resolution      VARCHAR(255) NOT NULL DEFAULT '',
+            resolved_by     BIGINT UNSIGNED NULL,
             created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE KEY uq_p2p_ref (ref),
             KEY idx_p2p_buyer (buyer_id, status),
@@ -1374,6 +1421,62 @@ function arv_migrations(PDO $pdo): array
         setting_set('p2p_phase1_v12', '1');
         $done[] = 'schema-12: P2P escrow tables (payment_methods, p2p_trades) ready '
                 . '(schema only; no wallet/lot/ledger/unit writes)';
+    }
+
+    // ---------------------------------------------------------------------
+    // Schema 13: P2P Phase 2 — timers, auto-expiry and disputes.
+    //
+    // Two ALTERs and a settings seed, all idempotent and schema/settings-only.
+    // NOTHING here touches wallets, lots, the append-only ledger, `trades`, or
+    // any unit balance — the escrow is still moved solely by p2p_release_core()
+    // / p2p_cancel_core(). This only makes room for the new lifecycle states
+    // that the maintenance cron and the operator dispute actions record.
+    //
+    //   (a) Add the dispute lifecycle columns, guarded on column existence so
+    //       the ADD runs exactly once even though catch-up is re-entrant.
+    //   (b) Extend the status ENUM to include 'disputed' and 'expired'. MODIFY
+    //       is idempotent (re-running sets the column to the same definition);
+    //       it is guarded by a one-time flag purely to avoid paying the DDL cost
+    //       on every catch-up once it has run.
+    //   (c) Seed the three timer settings on installs that predate them, without
+    //       clobbering a value an operator has already set.
+    if (!$hasColumn('p2p_trades', 'dispute_at')) {
+        $pdo->exec(
+            "ALTER TABLE p2p_trades
+               ADD COLUMN dispute_at  DATETIME     NULL          AFTER cancelled_at,
+               ADD COLUMN resolved_at DATETIME     NULL          AFTER dispute_at,
+               ADD COLUMN resolution  VARCHAR(255) NOT NULL DEFAULT '' AFTER resolved_at,
+               ADD COLUMN resolved_by BIGINT UNSIGNED NULL       AFTER resolution"
+        );
+        $done[] = 'p2p_trades: added dispute_at, resolved_at, resolution, resolved_by';
+    }
+
+    if (!setting_b('p2p_phase2_v13', false)) {
+        $pdo->exec(
+            "ALTER TABLE p2p_trades
+               MODIFY COLUMN status
+                 ENUM('matched','paid','released','cancelled','disputed','expired')
+                 NOT NULL DEFAULT 'matched'"
+        );
+
+        // Seed the Phase-2 timer settings if absent. setting_i() in the code
+        // paths falls back to these same defaults, so an install that never runs
+        // this still behaves correctly; seeding just makes them visible/editable
+        // in the admin panel immediately. Never overwrite an operator's value.
+        foreach ([
+            'p2p_match_ttl_hours'   => '24',
+            'p2p_pay_ttl_minutes'   => '60',
+            'p2p_confirm_ttl_hours' => '4',
+        ] as $k => $v) {
+            if (setting($k, null) === null) {
+                setting_set($k, $v);
+            }
+        }
+
+        setting_set('p2p_phase2_v13', '1');
+        $done[] = 'schema-13: P2P status ENUM extended (disputed, expired); '
+                . 'seeded pay/confirm/match timer settings (schema/settings only; '
+                . 'no wallet/lot/ledger/unit writes)';
     }
 
     if ($done) {
