@@ -1576,3 +1576,79 @@ table.data tfoot td {
     max-height: 64vh;
   }
 }
+
+
+/* =========================================================== orders page ==
+   The P2P order/trade surface (orders.html). Everything here is either a
+   colour-coded card or a live countdown; the rest of the page reuses .card,
+   .badge, .note-box, .btn and the type helpers.
+
+   BUY is green and SELL is red, using the reserved direction tokens (--up /
+   --down) already used by .btn-buy / .btn-sell — nothing decorative on this site
+   is ever green or red, so the colour alone tells you the side from across the
+   room. The rail on the left edge does the work; the tint is kept very low so a
+   stack of cards still reads as silver-on-black. */
+
+.ocard {
+  position: relative;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-3);
+  border-radius: var(--r);
+  padding: var(--sp-4);
+  background: rgba(255, 255, 255, .022);
+}
+.ocard + .ocard { margin-top: var(--sp-3); }
+.ocard-buy  { border-left-color: var(--up);   background: var(--up-dim); }
+.ocard-sell { border-left-color: var(--down); background: var(--down-dim); }
+
+/* The side word itself, so BUY/SELL is legible even to someone who cannot tell
+   the two rails apart. */
+.ocard-side {
+  font-size: .72rem; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--tx-1);
+}
+.ocard-buy  .ocard-side { color: var(--up); }
+.ocard-sell .ocard-side { color: var(--down); }
+
+/* A live countdown. Tabular figures so the text does not jitter every second as
+   the digits change width. Amber under 25% of the window, red under 10% or once
+   the deadline has passed — the same escalation the copy uses. */
+.cd { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--tx-1); }
+.cd.cd-warn { color: var(--warn); }
+.cd.cd-late { color: var(--down); font-weight: 700; }
+
+/* One copyable payment field: label, value, Copy. A buyer on a phone should
+   never have to retype a UPI ID or an amount. */
+.copy-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-3); padding: 8px 0; border-bottom: 1px solid var(--line);
+}
+.copy-row:last-child { border-bottom: 0; }
+.copy-row .k { font-size: .74rem; color: var(--tx-2); flex: 0 0 auto; }
+.copy-row .v {
+  font-family: var(--mono); font-size: .82rem; color: var(--tx-0);
+  text-align: right; overflow-wrap: anywhere; min-width: 0;
+}
+
+/* The "needs your action" strip, and the compact history rows. */
+.ostrip-item { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.ostrip-item:last-child { border-bottom: 0; }
+.orow {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-3); padding: 9px 0; border-bottom: 1px solid var(--line);
+}
+.orow:last-child { border-bottom: 0; }
+
+/* The unread indicator on the Orders nav item and tab. Amber, not red: it is a
+   "you have something to do", not a failure. */
+.nav-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--warn); vertical-align: middle;
+}
+.tabbar .tab-ic { position: relative; }
+.tab-dot {
+  position: absolute; top: -1px; right: -3px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--warn); box-shadow: 0 0 0 2px rgba(7, 7, 10, .94);
+}

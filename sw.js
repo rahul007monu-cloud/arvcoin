@@ -34,6 +34,7 @@ var CACHE = 'arv-v4.0.0';
 var ASSETS = [
   'index.html',
   'trade.html',
+  'orders.html',
   'dashboard.html',
   'deposit.html',
   'withdraw.html',
@@ -57,6 +58,7 @@ var ASSETS = [
   'js/pages/auth.js',
   'js/pages/dashboard.js',
   'js/pages/trade.js',
+  'js/pages/orders.js',
   'js/pages/deposit.js',
   'js/pages/withdraw.js',
   'js/pages/transactions.js',

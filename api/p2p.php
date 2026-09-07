@@ -651,6 +651,16 @@ function p2p_order_row_public(array $o): array
         'matchableUnits' => u8str($matchable),
         'triggerNav'     => $o['trigger_nav'] !== null ? (float)$o['trigger_nav'] : null,
         'createdAt'      => $o['created_at'],
+        // When this resting order will be swept. Case A of p2p_sweep_timers()
+        // expires an unmatched P2P order once created_at is older than
+        // p2p_match_ttl_hours, but that instant was never exposed, so a client
+        // could only guess at it. Built exactly like the trade deadlines in
+        // p2p_trade_public() (p2p_deadline_iso -> ISO-8601 UTC with a trailing
+        // Z), so a browser countdown lands on the same second the cron acts.
+        'expiresAt'      => p2p_deadline_iso(
+            $o['created_at'] ?? null,
+            setting_i('p2p_match_ttl_hours', 24) * 3600
+        ),
     ];
 }
 

@@ -3,6 +3,7 @@ Allow: /
 
 # Account pages are behind auth and have nothing to index.
 Disallow: /dashboard.html
+Disallow: /orders.html
 Disallow: /buy.html
 Disallow: /withdraw.html
 Disallow: /transactions.html
