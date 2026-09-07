@@ -34,6 +34,9 @@ declare(strict_types=1);
 require __DIR__ . '/_boot.php';
 require __DIR__ . '/_money.php';
 require __DIR__ . '/_match.php';
+// The P2P escrow cores + the Phase-2 maintenance sweep. Its money movements
+// reuse wallet_apply()/ledger_add() exactly as the index path does.
+require __DIR__ . '/_p2p.php';
 // Brings _schema.php with it, for the migration step. Requiring _schema.php here
 // as well is a redeclaration fatal — a plain require does not care that
 // require_once already loaded it, and the whole endpoint dies with an empty
@@ -62,6 +65,7 @@ try {
             $out['ingest'] = job_ingest();
             $out['match']  = job_match();
             $out['expire'] = ['expired' => expire_orders()];
+            $out['p2p']    = job_p2p_maintenance();
             $out['tiers']  = job_tiers();
             // Builds the chart on the first few runs after an install, then costs
             // one query a minute for ever after. Nobody should have to press a
@@ -81,6 +85,7 @@ try {
         case 'match':    $out['match']  = job_match();  break;
         case 'backfill': $out['backfill'] = job_backfill(); break;
         case 'tiers':    $out['tiers']  = job_tiers();  break;
+        case 'p2p':      $out['p2p']    = job_p2p_maintenance(); break;
 
         default:
             json_fail(400, 'Unknown job.');
@@ -131,6 +136,34 @@ function job_match(): array
     }
     $r = run_matching($nav);
     cron_record('match', 'ok', sprintf('%d fills, %d triggered', $r['fills'], $r['triggered']));
+    return $r;
+}
+
+
+/* ==================================================== p2p maintenance ===== */
+
+/**
+ * The P2P Phase-2 timer sweep.
+ *
+ * Runs every tick and is idempotent: it acts only on rows whose status and age
+ * qualify, each in its own transaction with the row locked FOR UPDATE. Three
+ * cases (see p2p_maintenance in _p2p.php):
+ *   - an unmatched P2P order past the match TTL, with no live trade → expired
+ *     (a sell returns its remaining escrow to the seller);
+ *   - a matched trade the buyer never paid, past the pay TTL → auto-cancelled
+ *     through the Phase-1 core (escrow back to the seller) and marked expired;
+ *   - a paid trade the seller never confirmed, past the confirm TTL → disputed,
+ *     which moves NO money and waits for an operator.
+ * No price feed is needed — everything settles on the escrow already held — so it
+ * runs even when ingest is skipped on a stale feed.
+ */
+function job_p2p_maintenance(): array
+{
+    $r = p2p_maintenance();
+    cron_record('p2p_maintenance', 'ok', sprintf(
+        '%d orders expired, %d matched auto-cancelled (unpaid), %d sent to dispute (unconfirmed), %d triggers fired',
+        $r['ordersExpired'], $r['tradesExpired'], $r['tradesDisputed'], $r['triggersFired']
+    ));
     return $r;
 }
 

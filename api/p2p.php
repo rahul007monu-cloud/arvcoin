@@ -61,8 +61,8 @@ function handle_place(): void
     if (!in_array($side, ['buy', 'sell'], true)) {
         json_fail(422, 'Side must be buy or sell.');
     }
-    if (!in_array($otype, ['market', 'limit'], true)) {
-        json_fail(422, 'Order type must be market or limit.');
+    if (!in_array($otype, ['market', 'limit', 'stop', 'target'], true)) {
+        json_fail(422, 'Order type must be market, limit, stop or target.');
     }
 
     try {
@@ -86,21 +86,26 @@ function handle_place(): void
     // A limit order's trigger decides WHEN it may match; the price is always the
     // live index. An already-satisfied trigger is a market order in disguise —
     // say so rather than converting it silently, exactly as the index book does.
+    // limit/stop/target all trigger on the live index price; the type only sets
+    // the DIRECTION of the trigger (see p2p_order_ready):
+    //   limit / target  → buy fires at/below trigger, sell fires at/above.
+    //   stop            → buy fires at/above trigger, sell fires at/below.
+    // A trigger already satisfied now is just a market order — say so rather than
+    // firing instantly.
     $trigger = null;
-    if ($otype === 'limit') {
+    if ($otype !== 'market') {
         $trigger = (float)input_dec('triggerNav', '0');
         if ($trigger <= 0) {
-            json_fail(422, 'Enter the price you want the order to act at.');
+            json_fail(422, 'Enter the price you want the order to trigger at.');
         }
-        if ($side === 'buy' && $trigger >= $nav) {
+        $isStop   = ($otype === 'stop');
+        $readyNow = $side === 'buy'
+            ? ($isStop ? $nav >= $trigger : $nav <= $trigger)
+            : ($isStop ? $nav <= $trigger : $nav >= $trigger);
+        if ($readyNow) {
             json_fail(422, sprintf(
-                'ARV is already at ₹%.4f, at or below your ₹%.4f trigger. Place a market buy instead.',
-                $nav, $trigger));
-        }
-        if ($side === 'sell' && $trigger <= $nav) {
-            json_fail(422, sprintf(
-                'ARV is already at ₹%.4f, at or above your ₹%.4f trigger. Place a market sell instead.',
-                $nav, $trigger));
+                'ARV is already at ₹%.4f, which already meets your ₹%.4f trigger. Place a market %s instead.',
+                $nav, $trigger, $side));
         }
     }
 
@@ -587,6 +592,15 @@ function handle_offers(): void
         $buyU8 += p2p_buy_matchable_u8($pdo, $o);
     }
 
+    // Phase 2b transparency: the platform fee + TDS a buyer will pay (in ARV,
+    // out of the units they receive) on release, and whether the treasury can
+    // supply liquidity when no real seller is resting. `feeCollected` reflects
+    // whether a fee account actually resolves — if not, no fee is taken.
+    $feeAcct  = p2p_fee_account_user($pdo);
+    $feePct   = $feeAcct !== null ? setting_f('p2p_fee_pct', 1) : 0.0;
+    $tdsPct   = $feeAcct !== null ? setting_f('p2p_tds_pct', 0) : 0.0;
+    $treasury = p2p_treasury_user($pdo);
+
     json_ok([
         'price'          => $meta,
         'sellDepthUnits' => u8str(max(0, $sellU8)),
@@ -595,6 +609,13 @@ function handle_offers(): void
         'buyDepthPaise'  => $nav !== null ? u8_to_paise(max(0, $buyU8), (float)$nav) : null,
         'sellOrders'     => count($sells),
         'buyOrders'      => count($buys),
+        'fee'            => [
+            'collected'    => $feeAcct !== null && ($feePct > 0 || $tdsPct > 0),
+            'feePct'       => $feePct,
+            'tdsPct'       => $tdsPct,
+            'totalPct'     => $feePct + $tdsPct,
+        ],
+        'treasuryAvailable' => $treasury !== null,
         'note'           => 'Every P2P trade settles at the live index price. A limit order acts '
                           . 'when the index reaches its level; there is no spread to negotiate.',
     ]);

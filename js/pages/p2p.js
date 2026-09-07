@@ -19,7 +19,11 @@ var st = {
   side: 'buy',
   otype: 'market',
   nav: null,
-  user: null
+  user: null,
+  // Phase 2b: platform fee + TDS (in ARV) the buyer pays on release, from the
+  // offers endpoint, plus whether the treasury can supply liquidity.
+  fee: null,
+  treasuryAvailable: false
 };
 
 /* --------------------------------------------------------------- helpers -- */
@@ -44,8 +48,20 @@ function paintEstimate() {
       : '';
     return;
   }
-  host.innerHTML = (st.side === 'buy' ? 'You pay the seller about ' : 'You receive about ')
+  var line = (st.side === 'buy' ? 'You pay the seller about ' : 'You receive about ')
     + '<strong>' + ui.fmtPaise(paise) + '</strong> at ' + ui.fmtPrice(st.nav) + ' per ARV.';
+
+  // On a buy, the platform fee + TDS come out of the ARV you receive (never your
+  // rupees), so surface it up front. Uses the live pct from the offers endpoint.
+  if (st.side === 'buy' && st.fee && st.fee.collected && st.fee.totalPct > 0) {
+    var u = parseFloat(units);
+    var net = u * (1 - st.fee.totalPct / 100);
+    line += '<br><span class="tiny muted">Platform fee ' + st.fee.feePct + '%'
+      + (st.fee.tdsPct > 0 ? ' + TDS ' + st.fee.tdsPct + '%' : '')
+      + ' is deducted in ARV \u2014 you receive about <strong>' + ui.fmtUnits(net, 4)
+      + ' ARV</strong>.</span>';
+  }
+  host.innerHTML = line;
 }
 
 /* ------------------------------------------------------------------ form -- */
@@ -62,9 +78,15 @@ function syncFormChrome() {
     : 'Your ARV is escrowed now and released only when you confirm you were paid.');
 
   var hint = ui.el('[data-p2p-trigger-hint]');
-  if (hint) hint.textContent = isBuy
-    ? 'A P2P buy triggers when ARV falls to this level or below.'
-    : 'A P2P sell triggers when ARV rises to this level or above.';
+  if (hint) {
+    // stop = opposite direction to limit/target.
+    var isStop = st.otype === 'stop';
+    var up = isBuy ? isStop : !isStop;   // does it fire when the price RISES?
+    hint.textContent = 'This ' + (isBuy ? 'buy' : 'sell') + ' triggers when ARV '
+      + (up ? 'rises to this level or above' : 'falls to this level or below') + '.'
+      + (isStop && !isBuy ? ' (Stop-loss: sells to limit your downside.)' : '')
+      + (!isStop && !isBuy ? ' (Target: sells to lock in a gain.)' : '');
+  }
   paintEstimate();
 }
 
@@ -77,9 +99,9 @@ async function place() {
   }
 
   var payload = { side: st.side, type: st.otype, units: String(units) };
-  if (st.otype === 'limit') {
+  if (st.otype !== 'market') {
     var trigger = parseFloat((ui.el('#p2pTrigger').value || '').replace(/[^\d.]/g, ''));
-    if (!trigger) { ui.toast('Enter the price the order should act at.', 'warn'); return; }
+    if (!trigger) { ui.toast('Enter the price the order should trigger at.', 'warn'); return; }
     payload.triggerNav = String(trigger);
   }
 
@@ -100,8 +122,24 @@ async function place() {
 /* -------------------------------------------------------------- rendering -- */
 
 function statusBadge(status) {
-  var map = { matched: 'warn', paid: 'metal', released: 'ok', cancelled: '' };
+  var map = { matched: 'warn', paid: 'metal', released: 'ok', cancelled: '', disputed: 'bad', expired: '' };
   return '<span class="badge ' + (map[status] || '') + '">' + ui.esc(status) + '</span>';
+}
+
+/**
+ * A human countdown to an ISO-8601 (UTC) deadline, e.g. "42 min left" or
+ * "overdue". The server sends the deadline with a trailing Z, so new Date()
+ * parses it correctly regardless of the viewer's timezone.
+ */
+function countdownText(iso) {
+  if (!iso) return '';
+  var ms = new Date(iso).getTime() - Date.now();
+  if (isNaN(ms)) return '';
+  if (ms <= 0) return 'time is up';
+  var mins = Math.round(ms / 60000);
+  if (mins < 60) return mins + ' min left';
+  var hrs = Math.floor(mins / 60);
+  return hrs + 'h ' + (mins % 60) + 'm left';
 }
 
 function paymentDetailsHtml(p) {
@@ -126,9 +164,17 @@ function tradeCard(t) {
 
   var extra = '';
 
-  // Buyer, awaiting payment: show where to pay and a proof form.
+  // A live deadline line for whichever timer is running on this trade.
+  var payLeft = countdownText(t.payDeadline);
+  var confirmLeft = countdownText(t.confirmDeadline);
+
+  // Buyer, awaiting payment: show where to pay, the pay deadline, and a proof form.
   if (t.role === 'buyer' && t.status === 'matched') {
-    extra += '<div style="margin-top:8px">' + paymentDetailsHtml(t.sellerPayment) + '</div>'
+    extra += (payLeft
+        ? '<div class="note-box warn tiny" style="margin-top:8px">Pay and upload proof \u2014 <strong>'
+          + ui.esc(payLeft) + '</strong>. If the window passes the trade is cancelled and the ARV returns to the seller.</div>'
+        : '')
+      + '<div style="margin-top:8px">' + paymentDetailsHtml(t.sellerPayment) + '</div>'
       + '<div class="stack" style="margin-top:8px;gap:6px" data-proof="' + t.id + '">'
         + '<input class="num-input" type="text" placeholder="UTR / reference" data-proof-utr>'
         + '<input type="file" accept="image/*" data-proof-file>'
@@ -138,16 +184,44 @@ function tradeCard(t) {
         + '</div>'
       + '</div>';
   } else if (t.role === 'buyer' && t.status === 'paid') {
-    extra += '<div class="tiny muted" style="margin-top:8px">Proof submitted. Waiting for the seller to confirm receipt.</div>';
+    extra += '<div class="tiny muted" style="margin-top:8px">Proof submitted. Waiting for the seller to confirm receipt'
+      + (confirmLeft ? ' (' + ui.esc(confirmLeft) + ' before it goes to support)' : '') + '.</div>';
   } else if (t.role === 'seller' && t.status === 'matched') {
-    extra += '<div class="tiny muted" style="margin-top:8px">Waiting for the buyer to pay and upload proof.</div>'
+    extra += '<div class="tiny muted" style="margin-top:8px">Waiting for the buyer to pay and upload proof'
+      + (payLeft ? ' (' + ui.esc(payLeft) + ')' : '') + '.</div>'
       + '<button class="btn btn-sm btn-ghost" style="margin-top:6px" data-p2p-cancel="' + t.id + '">Cancel</button>';
   } else if (t.role === 'seller' && t.status === 'paid') {
     extra += '<div class="tiny" style="margin-top:8px">Buyer says paid'
       + (t.proofUtr ? ' · UTR ' + ui.esc(t.proofUtr) : '')
       + (t.hasProofImage ? ' · screenshot attached' : '') + '.</div>'
-      + '<div class="note-box warn tiny" style="margin-top:6px">Only confirm once the money is actually in your account — releasing is final.</div>'
+      + '<div class="note-box warn tiny" style="margin-top:6px">Only confirm once the money is actually in your account — releasing is final.'
+      + (confirmLeft ? ' Confirm within <strong>' + ui.esc(confirmLeft) + '</strong> or this goes to support to settle.' : '') + '</div>'
       + '<button class="btn btn-sm btn-primary" style="margin-top:6px" data-p2p-confirm="' + t.id + '">Confirm received &amp; release</button>';
+  } else if (t.status === 'disputed') {
+    extra += '<div class="note-box bad tiny" style="margin-top:8px">Under review by support. '
+      + (t.role === 'buyer'
+          ? 'Your payment proof is being checked; the ARV is released to you or the trade is cancelled once support decides.'
+          : (t.role === 'seller'
+              ? 'The buyer says they paid but this was not confirmed in time. Support will check the proof and settle it.'
+              : 'A moderator will settle this trade.'))
+      + '</div>';
+  } else if (t.status === 'expired') {
+    extra += '<div class="tiny muted" style="margin-top:8px">Expired — '
+      + (t.role === 'seller'
+          ? 'the buyer did not pay in time, so the escrowed ARV was returned to you.'
+          : 'payment was not made in time, so the trade was cancelled and the ARV returned to the seller.')
+      + '</div>';
+  }
+
+  // Buyer, released: show exactly what the platform took, in ARV, and what
+  // landed in the wallet — the fee is borne by the buyer, in ARV, so it should
+  // be transparent after the fact as well as up front on the form.
+  if (t.role === 'buyer' && t.status === 'released'
+      && (parseFloat(t.feeUnits) > 0 || parseFloat(t.tdsUnits) > 0)) {
+    extra += '<div class="tiny muted" style="margin-top:8px">Platform fee '
+      + ui.fmtUnits(t.feeUnits, 4) + ' ARV'
+      + (parseFloat(t.tdsUnits) > 0 ? ' \u00b7 TDS ' + ui.fmtUnits(t.tdsUnits, 4) + ' ARV' : '')
+      + ' \u00b7 you received <strong>' + ui.fmtUnits(t.netUnits, 4) + ' ARV</strong>.</div>';
   }
 
   return '<div class="asset-row" style="display:block;padding:10px 0;border-bottom:1px solid var(--line)">'
@@ -200,8 +274,14 @@ function bindTradeActions() {
 function paintTrades(trades) {
   var host = ui.el('[data-p2p-trades]');
   if (!host) return;
-  var live = (trades || []).filter(function (t) { return t.status === 'matched' || t.status === 'paid'; });
-  var past = (trades || []).filter(function (t) { return t.status === 'released' || t.status === 'cancelled'; });
+  // 'disputed' is live — it still needs a resolution — so it sorts with the
+  // active trades; 'expired' joins the settled history alongside released/cancelled.
+  var live = (trades || []).filter(function (t) {
+    return t.status === 'matched' || t.status === 'paid' || t.status === 'disputed';
+  });
+  var past = (trades || []).filter(function (t) {
+    return t.status === 'released' || t.status === 'cancelled' || t.status === 'expired';
+  });
   var rows = live.concat(past.slice(0, 8));
   if (!rows.length) {
     host.innerHTML = '<div class="empty tiny">None yet</div>';
@@ -254,6 +334,8 @@ async function refresh() {
   try {
     var o = await api.p2p.offers();
     if (o.price && o.price.nav != null) st.nav = o.price.nav;
+    if (o.fee) st.fee = o.fee;
+    st.treasuryAvailable = !!o.treasuryAvailable;
     paintDepth(o);
     paintEstimate();
   } catch (_) {}
@@ -292,7 +374,7 @@ async function refresh() {
       b.classList.add('on');
       st.otype = b.dataset.otype;
       var f = ui.el('[data-p2p-trigger-field]');
-      if (f) f.classList.toggle('hidden', st.otype !== 'limit');
+      if (f) f.classList.toggle('hidden', st.otype === 'market');
       syncFormChrome();
     });
   });
