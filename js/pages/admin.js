@@ -33,6 +33,17 @@ function paintOverview(o) {
   ui.setText('[data-q-withdrawals-late]', String(late.withdrawals || 0));
   ui.setText('[data-q-kyc]', String(q.kyc_pending || 0));
 
+  // A count on the Approvals tab so the operator can see there is something to
+  // action without opening it. Hidden at zero rather than showing a "0".
+  var pendingApprovals = (q.deposits_pending || 0)
+    + (q.withdrawals_pending || 0) + (q.withdrawals_approved || 0)
+    + (q.kyc_pending || 0);
+  var approvalsBadge = ui.el('[data-tab-count="approvals"]');
+  if (approvalsBadge) {
+    approvalsBadge.textContent = String(pendingApprovals);
+    approvalsBadge.hidden = pendingApprovals === 0;
+  }
+
   var p = o.price || {};
   // If the overview carries a live fx rate, thread it in; otherwise fmtUsd falls
   // back to CFG.FEED.fx.fallbackRate. Current price gets the muted $ companion.
@@ -367,61 +378,94 @@ async function loadKyc() {
 
 /* ---------------------------------------------------------------- settings -- */
 
-// Each row is [key, label, type, hint?]. The server keeps its own allow-list of
-// what is writable; this list is only what the operator is shown. The two used to
-// drift — google_client_id, trust_hours and login_otp_always were made writable
-// on the server but never given a field here, so there was no way to turn Google
-// sign-in on at all. Anything editable belongs in both places.
-var EDITABLE = [
-  ['upi_vpa', 'UPI ID for deposits', 'text'],
-  ['entry_fee_pct', 'Entry fee %', 'number'],
-  ['exit_fee_pct', 'Exit fee %', 'number'],
-  ['sell_fallback_minutes', 'Sell fallback (minutes)', 'number'],
-  ['sell_fallback_to_treasury', 'Sell fallback on', 'bool'],
-  ['referral_enabled', 'Referral on', 'bool'],
-  ['referral_pct', 'Referral %', 'number'],
-  ['kyc_required', 'KYC required', 'bool'],
-  ['deposit_max_minutes', 'Deposit window (max min)', 'number'],
-  ['withdraw_max_minutes', 'Withdraw window (max min)', 'number'],
-  ['price_max_age_seconds', 'Pause trading after (seconds)', 'number'],
-  ['maintenance_mode', 'Maintenance mode', 'bool'],
+// Each row is [key, label, type, hint?], and rows are collected under a group
+// heading so the panel reads as labelled sections rather than one flat wall of
+// fields. The server keeps its own allow-list of what is writable; this list is
+// only what the operator is shown. The two used to drift — google_client_id,
+// trust_hours and login_otp_always were made writable on the server but never
+// given a field here, so there was no way to turn Google sign-in on at all.
+// Anything editable belongs in both places.
+var SETTINGS_GROUPS = [
+  ['Deposits & withdrawals', [
+    ['upi_vpa', 'UPI ID for deposits', 'text'],
+    ['deposit_max_minutes', 'Deposit window (max min)', 'number'],
+    ['withdraw_max_minutes', 'Withdraw window (max min)', 'number']
+  ]],
+
+  ['Fees & tax', [
+    ['entry_fee_pct', 'Entry fee %', 'number'],
+    ['exit_fee_pct', 'Exit fee %', 'number']
+  ]],
+
+  ['Selling & fallback', [
+    ['sell_fallback_minutes', 'Sell fallback (minutes)', 'number'],
+    ['sell_fallback_to_treasury', 'Sell fallback on', 'bool']
+  ]],
+
+  ['Referrals', [
+    ['referral_enabled', 'Referral on', 'bool'],
+    ['referral_pct', 'Referral %', 'number']
+  ]],
+
+  ['Trading & access', [
+    ['kyc_required', 'KYC required', 'bool'],
+    ['price_max_age_seconds', 'Pause trading after (seconds)', 'number'],
+    ['maintenance_mode', 'Maintenance mode', 'bool']
+  ]],
 
   // P2P escrow timers (Phase 2).
-  ['p2p_match_ttl_hours', 'P2P order open for (hours)', 'number',
-   'An unmatched P2P order auto-expires after this many hours; a sell returns its escrow to the seller. 1\u2013168.'],
-  ['p2p_pay_ttl_minutes', 'P2P pay window (minutes)', 'number',
-   'After a match, how long the buyer has to pay and upload proof before the trade auto-cancels and the escrow returns to the seller. Default 60 \u2014 a sensible starting point; change it to suit your market. 5\u20131440.'],
-  ['p2p_confirm_ttl_hours', 'P2P confirm window (hours)', 'number',
-   'After proof is uploaded, how long the seller has to confirm before the trade goes to dispute for you to settle. 1\u201372.'],
+  ['P2P escrow timers', [
+    ['p2p_match_ttl_hours', 'P2P order open for (hours)', 'number',
+     'An unmatched P2P order auto-expires after this many hours; a sell returns its escrow to the seller. 1\u2013168.'],
+    ['p2p_pay_ttl_minutes', 'P2P pay window (minutes)', 'number',
+     'After a match, how long the buyer has to pay and upload proof before the trade auto-cancels and the escrow returns to the seller. Default 60 \u2014 a sensible starting point; change it to suit your market. 5\u20131440.'],
+    ['p2p_confirm_ttl_hours', 'P2P confirm window (hours)', 'number',
+     'After proof is uploaded, how long the seller has to confirm before the trade goes to dispute for you to settle. 1\u201372.']
+  ]],
 
-  // P2P treasury default-liquidity (Phase 2b).
-  ['p2p_treasury_email', 'P2P treasury account email', 'text',
-   'A normal, KYC-verified user account that holds ARV and a payment method (your company UPI/bank). When on, a buyer with no real seller buys from it \u2014 you confirm the trade from the list below once the company account is paid. Leave blank to disable.'],
-  ['p2p_treasury_enabled', 'P2P treasury on', 'bool',
-   'Master switch for treasury default-liquidity. Only turns on if the email above resolves to an active, KYC-verified account with a payment method.'],
+  // P2P treasury default-liquidity + platform fee/TDS, collected in ARV (Phase 2b).
+  ['P2P treasury & fees', [
+    ['p2p_treasury_email', 'P2P treasury account email', 'text',
+     'A normal, KYC-verified user account that holds ARV and a payment method (your company UPI/bank). When on, a buyer with no real seller buys from it \u2014 you confirm the trade from the P2P list on the Ledger & trades tab once the company account is paid. Leave blank to disable.'],
+    ['p2p_treasury_enabled', 'P2P treasury on', 'bool',
+     'Master switch for treasury default-liquidity. Only turns on if the email above resolves to an active, KYC-verified account with a payment method.'],
+    ['p2p_fee_account_email', 'P2P fee account email', 'text',
+     'Where the platform fee + TDS accrue, in ARV, on every P2P release. Blank falls back to the treasury account; if both are blank, no fee is collected. It only receives ARV, so it needs no KYC or payment method.'],
+    ['p2p_fee_pct', 'P2P platform fee %', 'number',
+     'Taken from the ARV the BUYER receives on each P2P trade (the seller keeps their full rupees). 0\u20135. Default 1. Confirm this fee model suits you \u2014 the buyer bears it, in ARV.'],
+    ['p2p_tds_pct', 'P2P TDS %', 'number',
+     'A separate TDS slice, also taken in ARV from the buyer\u2019s units. Independent of the index TDS. 0\u201330. Default 0 \u2014 nothing is taken until you set it.']
+  ]],
 
-  // P2P platform fee + TDS, collected in ARV (Phase 2b).
-  ['p2p_fee_account_email', 'P2P fee account email', 'text',
-   'Where the platform fee + TDS accrue, in ARV, on every P2P release. Blank falls back to the treasury account; if both are blank, no fee is collected. It only receives ARV, so it needs no KYC or payment method.'],
-  ['p2p_fee_pct', 'P2P platform fee %', 'number',
-   'Taken from the ARV the BUYER receives on each P2P trade (the seller keeps their full rupees). 0\u20135. Default 1. Confirm this fee model suits you \u2014 the buyer bears it, in ARV.'],
-  ['p2p_tds_pct', 'P2P TDS %', 'number',
-   'A separate TDS slice, also taken in ARV from the buyer\u2019s units. Independent of the index TDS. 0\u201330. Default 0 \u2014 nothing is taken until you set it.'],
+  ['Sign-in', [
+    ['google_client_id', 'Google client ID', 'text',
+     'Paste to switch Google sign-in on. Ends in .apps.googleusercontent.com. Leave blank to keep it off. This is the Client ID, not the secret — there is no secret in this flow.'],
+    ['login_otp_always', 'Always email a code at login', 'bool',
+     'On, and every sign-in needs a code, ignoring the trust window below.'],
+    ['trust_hours', 'Trust a device for (hours)', 'number',
+     'After one code, that device is not asked again for this long. 24 by default. Sign-out ends it.']
+  ]],
 
-  // Sign-in.
-  ['google_client_id', 'Google client ID', 'text',
-   'Paste to switch Google sign-in on. Ends in .apps.googleusercontent.com. Leave blank to keep it off. This is the Client ID, not the secret — there is no secret in this flow.'],
-  ['login_otp_always', 'Always email a code at login', 'bool',
-   'On, and every sign-in needs a code, ignoring the trust window below.'],
-  ['trust_hours', 'Trust a device for (hours)', 'number',
-   'After one code, that device is not asked again for this long. 24 by default. Sign-out ends it.'],
-
-  // Support assistant.
-  ['assistant_enabled', 'Support assistant on', 'bool',
-   'The floating help chat. On by default; it answers from a built-in ARV knowledge base even with no key below.'],
-  ['gemini_api_key', 'Gemini API key (optional)', 'text',
-   'Paste a Google Gemini API key to power the assistant with AI answers. Leave blank to use the built-in knowledge base only. Stored server-side, never shown to customers.']
+  ['Support assistant', [
+    ['assistant_enabled', 'Support assistant on', 'bool',
+     'The floating help chat. On by default; it answers from a built-in ARV knowledge base even with no key below.'],
+    ['gemini_api_key', 'Gemini API key (optional)', 'text',
+     'Paste a Google Gemini API key to power the assistant with AI answers. Leave blank to use the built-in knowledge base only. Stored server-side, never shown to customers.']
+  ]]
 ];
+
+/** Render one editable setting field. */
+function renderSettingField(row, s) {
+  var key = row[0], label = row[1], type = row[2], hint = row[3];
+  var val = s[key] != null ? s[key] : '';
+  var input = type === 'bool'
+    ? '<select data-setting="' + key + '">'
+      + '<option value="1"' + (val === '1' ? ' selected' : '') + '>on</option>'
+      + '<option value="0"' + (val !== '1' ? ' selected' : '') + '>off</option></select>'
+    : '<input data-setting="' + key + '" type="text" value="' + ui.esc(val) + '">';
+  return '<div class="field"><label>' + ui.esc(label) + '</label>' + input
+    + (hint ? '<span class="hint">' + ui.esc(hint) + '</span>' : '') + '</div>';
+}
 
 async function loadSettings() {
   var host = ui.el('[data-settings]');
@@ -429,16 +473,12 @@ async function loadSettings() {
     var r = await api.admin.settings();
     var s = r.settings || {};
 
-    host.innerHTML = EDITABLE.map(function (row) {
-      var key = row[0], label = row[1], type = row[2], hint = row[3];
-      var val = s[key] != null ? s[key] : '';
-      var input = type === 'bool'
-        ? '<select data-setting="' + key + '">'
-          + '<option value="1"' + (val === '1' ? ' selected' : '') + '>on</option>'
-          + '<option value="0"' + (val !== '1' ? ' selected' : '') + '>off</option></select>'
-        : '<input data-setting="' + key + '" type="text" value="' + ui.esc(val) + '">';
-      return '<div class="field"><label>' + ui.esc(label) + '</label>' + input
-        + (hint ? '<span class="hint">' + ui.esc(hint) + '</span>' : '') + '</div>';
+    host.innerHTML = SETTINGS_GROUPS.map(function (g) {
+      var title = g[0], rows = g[1];
+      var fields = rows.map(function (row) { return renderSettingField(row, s); }).join('');
+      return '<div class="settings-group">'
+        + '<h4 class="settings-group-title">' + ui.esc(title) + '</h4>'
+        + '<div class="grid g-3">' + fields + '</div></div>';
     }).join('');
 
     ui.els('[data-setting]').forEach(function (input) {
@@ -922,6 +962,39 @@ async function loadTreasury() {
   }
 }
 
+/**
+ * Tab switcher for the operations page.
+ *
+ * Every panel stays in the DOM — hidden panels are only display:none — so the
+ * per-section load()/paint functions that query by data-* attribute keep working
+ * whether or not their tab is showing, and the 30s poll refreshes all of them.
+ * The active tab is mirrored to the URL hash so a refresh (or the 30s poll's
+ * re-render) lands the operator back where they were.
+ */
+function setupTabs() {
+  var tabs = ui.els('.admin-tab');
+  var panels = ui.els('.admin-panel');
+  if (!tabs.length) return;
+
+  function show(name) {
+    tabs.forEach(function (t) {
+      var on = t.dataset.tab === name;
+      t.classList.toggle('is-active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+    try { history.replaceState(null, '', '#' + name); } catch (_) {}
+  }
+
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () { show(t.dataset.tab); });
+  });
+
+  var initial = (location.hash || '').replace('#', '');
+  var known = tabs.some(function (t) { return t.dataset.tab === initial; });
+  show(known ? initial : 'overview');
+}
+
 (async function () {
   await ui.boot({ feed: false });
   var user = await api.requireUser();
@@ -933,6 +1006,10 @@ async function loadTreasury() {
     refuse();
     return;
   }
+
+  // Wire the tabs before the first load so the panels are navigable immediately,
+  // even while the tables are still fetching.
+  setupTabs();
 
   if (!(await load())) return;
   loadSettings();
