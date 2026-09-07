@@ -113,60 +113,11 @@
     </div>
 
     <!-- ============================================================ panel -->
+    <!-- P2P is the primary trading flow. The old deposit-first form has been
+         removed from this sidebar because it required an on-platform INR balance
+         to buy, which is not how P2P settles (buyer pays the seller directly).
+         The P2P section that used to sit below now lives in this sidebar. -->
     <div class="stack">
-
-      <div class="card">
-        <div class="side-toggle" data-side-toggle style="margin-bottom:var(--sp-4)">
-          <button data-side="buy" class="on">Buy</button>
-          <button data-side="sell">Sell</button>
-        </div>
-
-        <div class="tabs" data-order-type style="margin-bottom:var(--sp-4);width:100%">
-          <button class="tab on" data-otype="market" style="flex:1">Market</button>
-          <button class="tab" data-otype="limit" style="flex:1">Limit</button>
-        </div>
-
-        <!-- balance -->
-        <div class="row-between small muted" style="margin-bottom:var(--sp-3)">
-          <span data-balance-label>Rupee balance</span>
-          <span class="num strong" data-balance>—</span>
-        </div>
-
-        <!-- amount / units -->
-        <div class="field" style="margin-bottom:var(--sp-3)">
-          <label for="amt" data-amt-label>Amount to invest</label>
-          <div class="amount-input" data-amt-wrap>
-            <span class="cur" data-cur>₹</span>
-            <input id="amt" class="num-input" type="text" inputmode="decimal"
-                   autocomplete="off" placeholder="0">
-          </div>
-          <span class="err hidden" data-amt-err></span>
-        </div>
-
-        <div class="quick" data-quick style="margin-bottom:var(--sp-4)"></div>
-
-        <!-- limit trigger -->
-        <div class="field hidden" data-trigger-field style="margin-bottom:var(--sp-4)">
-          <label for="trigger">Act when ARV reaches</label>
-          <div class="amount-input">
-            <span class="cur">₹</span>
-            <input id="trigger" class="num-input" type="text" inputmode="decimal"
-                   autocomplete="off" placeholder="0.0000">
-          </div>
-          <span class="hint" data-trigger-hint></span>
-        </div>
-
-        <!-- quote -->
-        <div class="ledger-list" data-quote style="margin-bottom:var(--sp-4)">
-          <div class="ledger-row"><span class="l muted">Enter an amount</span></div>
-        </div>
-
-        <button class="btn btn-primary btn-block btn-lg" data-submit disabled>
-          Buy ARV
-        </button>
-
-        <div class="tiny muted" style="margin-top:var(--sp-3)" data-side-note></div>
-      </div>
 
       <!-- my open orders -->
       <div class="card card-flush">
@@ -180,24 +131,26 @@
 
       <!-- how it works -->
       <div class="card card-tight">
-        <h5 style="margin-bottom:var(--sp-3)">How a fill works here</h5>
+        <h5 style="margin-bottom:var(--sp-3)">How a trade works here</h5>
         <ul class="small" style="padding-left:1.1rem;margin:0;color:var(--tx-1)">
           <li style="margin-bottom:8px">
-            <strong>Buys are instant.</strong> They fill against anyone waiting to
-            sell, and the treasury covers the rest. You never queue.
+            <strong>Buy:</strong> place the order, match with a real seller, pay
+            them directly on the UPI shown, upload proof — the seller confirms and
+            your ARV is released from escrow.
           </li>
           <li style="margin-bottom:8px">
-            <strong>Sells look for a buyer first.</strong> If none is waiting the
-            order rests — and after <span data-fallback>60</span> minutes the
-            treasury buys it, so there is always an exit.
+            <strong>Sell:</strong> list your ARV — a buyer pays you on the UPI
+            you set in your profile, and you confirm receipt to release the units.
           </li>
           <li style="margin-bottom:8px">
-            <strong>A limit order is a trigger</strong>, not an offer. It acts when
-            ARV reaches your level, at the index price.
+            <strong>Limit / stop-loss / target</strong> are price triggers on the
+            live index. A sell stop-loss protects the downside; a target locks in
+            a gain.
           </li>
           <li>
-            <strong>1% TDS is withheld on every sale.</strong> The 30% plus cess on
-            the gain is not withheld — it is yours to pay at filing.
+            <strong>Timers:</strong> an unmatched order stays open 24h; after a
+            match the buyer has 60 minutes to pay; after proof, the seller has
+            4 hours to confirm — otherwise it goes to support.
           </li>
         </ul>
       </div>
@@ -205,8 +158,14 @@
     </div>
   </div>
 
-  <!-- ========================================================= peer-to-peer -->
-  <section class="card" style="margin-top:var(--sp-4)" data-p2p hidden>
+  <!-- ============================================================ trade ===
+       This IS the buy/sell interface — a peer-to-peer escrow flow rather than a
+       deposit-first order book. A user's ARV comes from another user (or the
+       treasury) directly and payment is off-platform, so nothing on the trade
+       page ever asks a buyer to fund an on-platform INR balance first. The
+       section is un-hidden here (was hidden while it was a secondary panel) and
+       laid out as the primary control below the chart. -->
+  <section class="card" style="margin-top:var(--sp-4)" data-p2p>
     <div class="card-head">
       <h3 style="font-size:1rem">Peer-to-peer</h3>
       <span class="badge metal">escrow · index-priced</span>
