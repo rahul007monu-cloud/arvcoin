@@ -228,7 +228,11 @@ export function busy(btn, yes, label) {
  *       return !!w && (Number(w.inrPaise) || 0) + (Number(w.inrLockedPaise) || 0) > 0; } }
  */
 var NAV = [
-  { href: 'index.html',        label: 'Overview' },
+  // Overview is the landing page, so it is a destination only while signed out.
+  // Once signed in it is reachable from the brand mark's sibling links and the
+  // footer, and keeping it here alongside a logo that also pointed at it gave
+  // two controls for one page. The bottom tab bar makes the same call.
+  { href: 'index.html',        label: 'Overview',  when: function (u) { return !u; } },
   { href: 'trade.html',        label: 'Trade' },
   // Orders sits next to Trade: it is where a placed order is watched and where a
   // matched trade is paid for, confirmed and cancelled.
@@ -238,6 +242,21 @@ var NAV = [
   { href: 'transactions.html', label: 'History',   auth: true },
   { href: 'referral.html',     label: 'Refer',     auth: true }
 ];
+
+/**
+ * Where the brand mark goes.
+ *
+ * It used to always point at index.html, which meant the logo and the "Overview"
+ * nav item were two controls for one page — and for somebody already signed in,
+ * both led back to the marketing page they had finished with. So the logo now
+ * means "home" in the sense the viewer is in: the landing page while signed out,
+ * and the trading screen once signed in, which is where the product actually
+ * starts. Overview drops out of the nav for a signed-in viewer for the same
+ * reason (see NAV), which removes the duplication rather than hiding it.
+ */
+function brandHref(user) {
+  return user ? 'trade.html' : 'index.html';
+}
 
 /** One place that decides whether a NAV/TABS entry is visible to this viewer. */
 function navVisible(item, user) {
@@ -353,7 +372,7 @@ export function mountNav(user) {
 
   host.innerHTML =
     '<nav class="nav"><div class="wrap">'
-    + '<a href="index.html" class="brand">'
+    + '<a href="' + brandHref(user) + '" class="brand">'
       + '<span class="brand-mark">A</span><span>' + esc(CFG.UI.brand) + '</span></a>'
     + '<div class="nav-links" data-navlinks>' + links + '</div>'
     // The live price is a link to the chart: tapping the ARV price anywhere in
