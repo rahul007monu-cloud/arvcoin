@@ -57,7 +57,16 @@ var st = {
 function paintTicker() {
   var p = st.snap && st.snap.price;
   var s = st.snap && st.snap.stats;
-  if (!p || p.nav == null) return;
+
+  // No server price at all (snapshot failed, or the feed is cold). The chart is
+  // fed straight from the exchanges and does not need the server, so fall through
+  // to the derived stats instead of returning and leaving the whole header empty.
+  if (!p || p.nav == null) {
+    var live = liveArvPrice();
+    if (live != null) ui.paintPriceDual('[data-price]', live, 'trade');
+    paintStatsFallback();
+    return;
+  }
 
   ui.setUsdInr(st.snap.index && st.snap.index.fxUsdInr);
   ui.paintPriceDual('[data-price]', p.nav, 'trade');
@@ -74,6 +83,8 @@ function paintTicker() {
 
   var idx = st.snap.index || {};
   if (idx.btcInr != null) ui.setText('[data-btc]', ui.fmtBig(idx.btcInr));
+
+  paintStatsFallback();
 
   var dot = ui.el('[data-dot]');
   if (dot) dot.className = 'live-dot ' + (p.stale ? 'stale' : '');
@@ -221,7 +232,29 @@ async function loadChart() {
       ? label + st.candles.length + ' candles \u00b7 ' + ui.fmtDate(st.candles[0].t) + ' to now'
       : 'chart unavailable \u2014 could not reach a market data source');
 
-    if (!st.candles.length) return;
+    // Nothing came back. Previously this returned and left the panel completely
+    // blank, which reads as a broken page rather than an unreachable data source
+    // — and it is usually the latter: several mobile networks block the exchange
+    // endpoints. Say so, and offer the retry, because retrying often works.
+    if (!st.candles.length) {
+      host.innerHTML =
+        '<div style="height:100%;display:flex;flex-direction:column;align-items:center;'
+        + 'justify-content:center;gap:var(--sp-3);text-align:center;padding:var(--sp-4)">'
+        + '<div class="muted small">Could not reach a market data source.</div>'
+        + '<div class="tiny muted" style="max-width:34ch">Some mobile networks block the '
+        + 'exchange endpoints this chart reads. Retrying, or switching between Wi-Fi and '
+        + 'mobile data, usually fixes it.</div>'
+        + '<button class="btn btn-sm" data-chart-retry>Retry</button>'
+        + '</div>';
+      ui.on('[data-chart-retry]', 'click', function () {
+        host.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center">'
+          + '<span class="spinner"></span></div>';
+        loadChart();
+      });
+      return;
+    }
+
+    host.innerHTML = '';   // clear any previous empty/error state before drawing
 
     var L = globalThis.LightweightCharts;
 
@@ -877,6 +910,9 @@ function sideConfigLight() {
   sideConfig();
 
   await loadChart();
+  // The candles only exist now, so any header stat the server left null can be
+  // derived at this point (paintTicker above ran before the chart had data).
+  paintStatsFallback();
   loadBook();
   loadTape();
   loadMyOrders();
@@ -891,6 +927,64 @@ function sideConfigLight() {
     resyncLiveBar();
   }, 30000);
 })();
+
+/**
+ * Fill any header stat the server did not supply, from data the browser has.
+ *
+ * The 24h window, since-launch and the BTC reference all come from the server
+ * snapshot, which reads them out of arv_candles. When that table is thin — after
+ * a rebuild, or while a backfill is still walking the timeframes — those fields
+ * come back null and the header sits on em-dashes even though the chart beside it
+ * is showing a full, live series. The numbers are derivable from what is already
+ * on the page, so derive them rather than showing nothing.
+ *
+ * The server stays authoritative: every value here is only written when the
+ * server did not provide one, and only when the chart actually holds data.
+ */
+function paintStatsFallback() {
+  var s = (st.snap && st.snap.stats) || {};
+  var idx = (st.snap && st.snap.index) || {};
+
+  // 24h high/low from the candles already plotted, when the server had none.
+  // Skipped for a coin tab, where the header describes ARV, not the coin.
+  if (!isCoinAsset() && st.candles && st.candles.length
+      && (s.high24h == null || s.low24h == null)) {
+    var since = Date.now() - 86400000;
+    var win = st.candles.filter(function (k) { return k.t >= since; });
+    // A coarse timeframe can leave the last day with too few bars to describe a
+    // range; fall back to the tail of whatever is loaded.
+    if (win.length < 2) win = st.candles.slice(-2);
+
+    var hi = -Infinity, lo = Infinity;
+    win.forEach(function (k) {
+      if (isFinite(k.h) && k.h > hi) hi = k.h;
+      if (isFinite(k.l) && k.l < lo) lo = k.l;
+    });
+    if (isFinite(hi) && s.high24h == null) ui.setHtml('[data-high]', ui.fmtDual(hi));
+    if (isFinite(lo) && s.low24h == null)  ui.setHtml('[data-low]', ui.fmtDual(lo));
+  }
+
+  // Since launch. NAV_launch == arvBaseInr by definition of the index, so this is
+  // exactly the server's own formula, evaluated against the live price.
+  if (s.sinceLaunchPct == null) {
+    var nav = (st.snap && st.snap.price && st.snap.price.nav != null)
+      ? st.snap.price.nav : liveArvPrice();
+    var base = CFG.INDEX.arvBaseInr;
+    var l = ui.el('[data-launch]');
+    if (l && nav != null && base > 0) {
+      var pct = ((nav - base) / base) * 100;
+      l.textContent = ui.fmtPct(pct);
+      l.className = 'num ' + ui.direction(pct);
+    }
+  }
+
+  // The BTC reference, from the live feed the chart is already using.
+  if (idx.btcInr == null) {
+    var usd = feed.priceUsd('BTC');
+    var fx = idx.fxUsdInr || CFG.FEED.fx.fallbackRate;
+    if (usd && fx) ui.setText('[data-btc]', ui.fmtBig(usd * fx));
+  }
+}
 
 /**
  * Re-sync the live bar to the authoritative server candle.

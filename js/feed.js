@@ -648,7 +648,14 @@ export async function history(assetKey, tf, want) {
   want = Math.max(2, Math.min(want || 1000, 6000));
 
   // Prefer whatever source already answered in this browser, then the others.
-  var order = ['binance', 'okx', 'coinbase', 'kraken'];
+  //
+  // CoinGecko is last on purpose. It is the shallowest of the five (a few hundred
+  // daily/hourly points, no minute data) so it is a poor first choice — but it is
+  // the one that answers when the exchanges do not. Several Indian mobile networks
+  // block or throttle the exchange endpoints outright, and without a fallback
+  // history() returned [] and the chart painted nothing at all. A short, coarse
+  // series is worth far more than an empty panel.
+  var order = ['binance', 'okx', 'coinbase', 'kraken', 'coingecko'];
   if (state.source && order.indexOf(state.source) !== -1) {
     order = [state.source].concat(order.filter(function (s) { return s !== state.source; }));
   }
@@ -660,10 +667,11 @@ export async function history(assetKey, tf, want) {
     var t = withTimeout(15000);
     try {
       var rows;
-      if (src === 'binance')       rows = await histBinance(sym, tf, want, t.signal);
-      else if (src === 'okx')      rows = await histOkx(sym, tf, want, t.signal);
-      else if (src === 'coinbase') rows = await histCoinbase(sym, tf, want, t.signal);
-      else                         rows = await histKraken(sym, tf, want, t.signal);
+      if (src === 'binance')        rows = await histBinance(sym, tf, want, t.signal);
+      else if (src === 'okx')       rows = await histOkx(sym, tf, want, t.signal);
+      else if (src === 'coinbase')  rows = await histCoinbase(sym, tf, want, t.signal);
+      else if (src === 'coingecko') rows = await histCoinGecko(sym, tf, want, t.signal);
+      else                          rows = await histKraken(sym, tf, want, t.signal);
       t.done();
       if (rows && rows.length) return rows;
     } catch (_) {
@@ -671,6 +679,39 @@ export async function history(assetKey, tf, want) {
     }
   }
   return [];
+}
+
+/**
+ * CoinGecko OHLC — the last-resort history source.
+ *
+ * /coins/{id}/ohlc returns [ts, o, h, l, c] and chooses its own granularity from
+ * the number of days asked for: <= 2 days gives roughly half-hourly, <= 30 days
+ * gives four-hourly, beyond that daily. There is no way to request a specific
+ * interval and no volume, so this cannot reproduce a 1m or 5m chart. What it can
+ * do is put a real, correctly-shaped series on the screen when nothing else is
+ * reachable, which is the whole point of it being here.
+ */
+async function histCoinGecko(id, tf, want, signal) {
+  // Map the timeframe onto the smallest window CoinGecko will serve at a
+  // granularity that is not coarser than the timeframe itself.
+  var days = 1;
+  if (tf === '1m' || tf === '5m' || tf === '15m') days = 1;
+  else if (tf === '1h' || tf === '4h')            days = 30;
+  else                                            days = 365;   // 1D, 1W
+
+  var url = 'https://api.coingecko.com/api/v3/coins/' + encodeURIComponent(id)
+          + '/ohlc?vs_currency=usd&days=' + days;
+  var j = await getJson(url, signal);
+  if (!Array.isArray(j)) return [];
+
+  var rows = j.map(function (r) {
+    return { t: +r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: 0 };
+  }).filter(function (k) {
+    return isFinite(k.t) && isFinite(k.o) && isFinite(k.h) && isFinite(k.l) && isFinite(k.c);
+  });
+
+  rows.sort(function (a, b) { return a.t - b.t; });
+  return rows.slice(-want);
 }
 
 /* -------------------------------------------------------------------- api -- */

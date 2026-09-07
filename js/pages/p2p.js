@@ -97,6 +97,15 @@ function paintPayBlock() {
   }
   host.classList.remove('hidden');
 
+  // The 20s poll re-runs this. Rebuilding the markup while someone is part-way
+  // through typing a UPI ID or an account number would wipe what they entered,
+  // so once a field has content this leaves the block exactly as it is.
+  var typing = ['#p2pVpa', '#p2pAccName', '#p2pAccNo', '#p2pIfsc'].some(function (s) {
+    var e = ui.el(s);
+    return e && e.value && e.value.trim() !== '';
+  });
+  if (typing) return;
+
   if (st.methods == null) {                 // still loading
     host.innerHTML = '<div class="tiny muted">Loading your payment details\u2026</div>';
     return;
@@ -292,10 +301,18 @@ function syncFormChrome() {
           // the units box on every click. Read the attribute the button actually
           // has, and floor at 8dp so "100%" never asks for more than is held.
           var pct = Number(b.getAttribute('data-p2p-qpct'));
-          if (!isFinite(pct)) return;
-          var u = Math.floor(avail * (pct / 100) * 1e8) / 1e8;
+          // Read the holding at click time, not from the closure. The closure's
+          // copy is whatever the wallet held when the buttons were last drawn,
+          // which goes stale the moment a trade settles.
+          var w2 = st.user && st.user.wallet;
+          var have = w2 ? parseFloat(w2.arvUnits) : NaN;
           var inp = ui.el('#p2pUnits');
-          if (inp) { inp.value = String(u); paintEstimate(); }
+          if (!inp || !isFinite(pct) || !isFinite(have) || have <= 0) return;
+
+          var u = Math.floor(have * (pct / 100) * 1e8) / 1e8;
+          if (!isFinite(u) || u <= 0) return;   // never write NaN into the field
+          inp.value = String(u);
+          paintEstimate();
         });
       });
     }
@@ -563,6 +580,17 @@ async function refresh() {
     if (r.nav != null) st.nav = r.nav;
     paintTrades(r.trades || []);
     paintOrders(r.orders || []);
+  } catch (_) {}
+
+  // Re-read the wallet. It changes whenever a trade settles or escrow is
+  // returned, and the sell side reads it for both the "ARV available" line and
+  // the quick-% amounts — without this they keep showing the boot-time holding.
+  try {
+    var u = await api.me(true);
+    if (u) {
+      st.user = u;
+      if (st.side === 'sell') syncFormChrome();
+    }
   } catch (_) {}
 }
 
