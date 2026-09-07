@@ -469,6 +469,16 @@ export var admin = {
   users: function (search) { return request('admin', 'users', { method: 'GET', query: { q: search } }); },
   setUserStatus: function (userId, status) { return request('admin', 'set_user_status', { data: { userId: userId, status: status } }); },
   setUserAdmin: function (userId, isAdmin) { return request('admin', 'set_user_admin', { data: { userId: userId, isAdmin: isAdmin } }); },
+  deleteUser: function (userId) { return request('admin', 'delete_user', { data: { userId: userId } }); },
+
+  // Treasury inventory: the ARV a new buyer matches against when no real seller
+  // exists yet, and the budget a promotional grant is paid from.
+  treasuryStatus: function () { return request('admin', 'treasury_status', { method: 'GET' }); },
+  treasurySeed: function (units, note) { return request('admin', 'treasury_seed', { data: { units: String(units), note: note || '' } }); },
+  grantArv: function (userId, units, note) { return request('admin', 'grant_arv', { data: { userId: userId, units: String(units), note: note || '' } }); },
+
+  // Destructive: clears activity, keeps settings and the acting operator.
+  wipeData: function (confirm) { return request('admin', 'wipe_data', { data: { confirm: confirm } }); },
   ledger: function (search) { return request('admin', 'ledger', { method: 'GET', query: { q: search } }); },
   ordersAll: function (status, search) { return request('admin', 'orders_all', { method: 'GET', query: { status: status, q: search } }); },
   cancelOrder: function (orderId) { return request('admin', 'cancel_order_admin', { data: { orderId: orderId } }); },

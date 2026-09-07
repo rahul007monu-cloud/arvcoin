@@ -209,8 +209,75 @@
     </div>
     <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
       Suspending a user blocks their sign-in at once. Balances are never edited here
-      — money only ever moves through the ledger.
+      — money only ever moves through the ledger. <strong>Grant ARV</strong> moves units
+      out of the treasury, so it needs the treasury seeded below. <strong>Delete</strong>
+      is only offered for an account with no money history; anything else must be
+      suspended instead, so reconciliation stays intact.
     </div>
+  </section>
+
+  <!-- ==================================================== treasury inventory -->
+  <section class="card" style="margin-top:var(--sp-4)">
+    <div class="row-between" style="margin-bottom:var(--sp-3)">
+      <h3 style="font-size:1rem;margin:0">Treasury inventory</h3>
+      <span class="badge" data-treasury-badge>—</span>
+    </div>
+    <p class="small muted" style="margin-top:0">
+      The ARV a new buyer matches against when nobody is selling yet, and the budget a
+      promotional grant is paid from. Set the treasury email in Settings first.
+    </p>
+
+    <div class="grid g-3" style="margin:var(--sp-4) 0">
+      <div class="stat">
+        <div class="stat-k">Account</div>
+        <div class="stat-v tiny" data-treasury-email>—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-k">Free ARV</div>
+        <div class="stat-v num" data-treasury-free>—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-k">Sellable / grantable</div>
+        <div class="stat-v num" data-treasury-sellable>—</div>
+      </div>
+    </div>
+
+    <div class="note-box tiny" style="margin-bottom:var(--sp-3)">
+      Seeding <strong>issues</strong> units — they are not moved from anywhere, so the
+      platform's ARV obligation grows by the amount. Granting is units-neutral: the
+      treasury loses exactly what the recipient gains.
+    </div>
+
+    <form class="row-wrap" data-treasury-form style="gap:var(--sp-3)">
+      <div class="field" style="margin:0;flex:1;min-width:180px">
+        <label for="seedUnits">ARV to issue into the treasury</label>
+        <input id="seedUnits" class="num-input" type="text" inputmode="decimal"
+               value="10000000" autocomplete="off">
+      </div>
+      <div class="field" style="margin:0;flex:1;min-width:180px">
+        <label for="seedNote">Note (optional)</label>
+        <input id="seedNote" type="text" autocomplete="off" placeholder="initial liquidity">
+      </div>
+      <button class="btn" type="submit" style="align-self:end">Seed treasury</button>
+    </form>
+  </section>
+
+  <!-- ========================================================= clear data -->
+  <section class="card" style="margin-top:var(--sp-4);border-color:var(--down)">
+    <h3 style="font-size:1rem;margin:0 0 var(--sp-2)">Clear all data</h3>
+    <p class="small muted" style="margin-top:0">
+      Removes every account, wallet, order, trade and ledger entry — for clearing out a
+      round of testing. <strong>Kept:</strong> all settings, your own operator account,
+      the market history the charts read, and the audit log (so this action stays on
+      record). This cannot be undone.
+    </p>
+    <form class="row-wrap" data-wipe-form style="gap:var(--sp-3)">
+      <div class="field" style="margin:0;flex:1;min-width:220px">
+        <label for="wipeConfirm">Type <strong>CLEAR ALL DATA</strong> to confirm</label>
+        <input id="wipeConfirm" type="text" autocomplete="off" placeholder="CLEAR ALL DATA">
+      </div>
+      <button class="btn btn-sell" type="submit" style="align-self:end">Clear everything</button>
+    </form>
   </section>
 
   <!-- ============================================================== ledger -->

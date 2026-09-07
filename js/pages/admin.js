@@ -523,6 +523,16 @@ async function loadUsers(search) {
           + (u.isAdmin
               ? '<button class="btn btn-sm btn-ghost" data-admin-off="' + u.id + '">Remove admin</button>'
               : '<button class="btn btn-sm btn-ghost" data-admin-on="' + u.id + '">Make admin</button>')
+          // Granting is only useful once the account can actually trade, and the
+          // endpoint refuses an unverified one — so it is not offered here either.
+          + (u.kycStatus === 'verified'
+              ? ' <button class="btn btn-sm btn-buy" data-grant="' + u.id + '">Grant ARV</button>'
+              : '')
+          // Offered for everyone; the endpoint is what decides, and it refuses any
+          // account with money history because deleting one breaks reconciliation.
+          + (u.isAdmin
+              ? ''
+              : ' <button class="btn btn-sm btn-ghost" data-del-user="' + u.id + '">Delete</button>')
         + '</td></tr>';
     }).join('');
 
@@ -540,6 +550,34 @@ async function loadUsers(search) {
     bindAction('[data-activate]', async function (b) {
       var r2 = await api.admin.setUserStatus(Number(b.dataset.activate), 'active');
       ui.toast(r2.message || 'Activated.', 'ok');
+      return true;
+    }, reloadUsers);
+
+    bindAction('[data-grant]', async function (b) {
+      var id = Number(b.getAttribute('data-grant'));
+      var units = prompt('How much ARV should the treasury grant to user #' + id + '?\n\n'
+        + 'This moves units out of the treasury — it does not create any.');
+      if (units === null) return false;
+      units = String(units).trim();
+      if (!/^\d{1,12}(\.\d{1,8})?$/.test(units) || Number(units) <= 0) {
+        ui.toastError('Enter an amount of ARV, up to 8 decimal places.');
+        return false;
+      }
+      var note = prompt('Note for the record (optional) — e.g. "referral promo".') || '';
+      if (!confirm('Grant ' + units + ' ARV to user #' + id + '?')) return false;
+      var r2 = await api.admin.grantArv(id, units, note);
+      ui.toast(r2.message || 'Granted.', 'ok');
+      loadTreasury();
+      return true;
+    }, reloadUsers);
+
+    bindAction('[data-del-user]', async function (b) {
+      var id = Number(b.getAttribute('data-del-user'));
+      if (!confirm('Delete user #' + id + ' permanently?\n\n'
+                 + 'Only accounts with no money history can be deleted. If this one has any, '
+                 + 'it will be refused and you can suspend it instead.')) return false;
+      var r2 = await api.admin.deleteUser(id);
+      ui.toast(r2.message || 'Deleted.', 'ok');
       return true;
     }, reloadUsers);
 
@@ -841,9 +879,47 @@ async function load() {
     loadDeposits(), loadWithdrawals(), loadKyc(), loadCoverage(),
     loadUsers(st.userQuery), loadLedger(st.ledgerQuery),
     loadOrders(st.orderStatus, st.orderQuery),
-    loadP2p(st.p2pStatus, st.p2pQuery)
+    loadP2p(st.p2pStatus, st.p2pQuery),
+    loadTreasury()
   ]);
   return true;
+}
+
+/**
+ * Treasury inventory panel.
+ *
+ * "Sellable / grantable" is deliberately not the same number as the free balance:
+ * both a sale and a grant draw from lots via consume_lots(), so units sitting in
+ * the wallet without a lot behind them cannot actually leave. Showing the lower of
+ * the two is what tells an operator whether a grant will really go through.
+ */
+async function loadTreasury() {
+  var badge = ui.el('[data-treasury-badge]');
+  try {
+    var t = await api.admin.treasuryStatus();
+
+    ui.setText('[data-treasury-email]', t.email || 'not set');
+    ui.setText('[data-treasury-free]', t.resolved ? ui.fmtUnits(t.freeUnits, 4) + ' ARV' : '\u2014');
+    ui.setText('[data-treasury-sellable]', t.resolved ? ui.fmtUnits(t.sellableUnits, 4) + ' ARV' : '\u2014');
+
+    if (badge) {
+      if (!t.configured) {
+        badge.textContent = 'no email set';
+        badge.className = 'badge warn';
+      } else if (!t.resolved) {
+        badge.textContent = 'email does not resolve';
+        badge.className = 'badge bad';
+      } else if (!t.enabled) {
+        badge.textContent = 'seeded, matching off';
+        badge.className = 'badge warn';
+      } else {
+        badge.textContent = 'active';
+        badge.className = 'badge ok';
+      }
+    }
+  } catch (_) {
+    if (badge) { badge.textContent = 'unavailable'; badge.className = 'badge muted'; }
+  }
 }
 
 (async function () {
@@ -892,6 +968,55 @@ async function load() {
     e.preventDefault();
     st.userQuery = (ui.el('[data-user-search]').value || '').trim();
     loadUsers(st.userQuery);
+  });
+
+  var seedForm = ui.el('[data-treasury-form]');
+  if (seedForm) seedForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var btn = seedForm.querySelector('button[type=submit]');
+    var units = (ui.el('#seedUnits').value || '').trim();
+    if (!/^\d{1,12}(\.\d{1,8})?$/.test(units) || Number(units) <= 0) {
+      return ui.toastError('Enter an amount of ARV, up to 8 decimal places.');
+    }
+    // Issuing grows the platform's obligation, so the number is spelled out here
+    // rather than left to whatever was in the box.
+    if (!confirm('Issue ' + units + ' ARV into the treasury?\n\n'
+               + 'These units are created, not moved — the platform\u2019s ARV obligation '
+               + 'grows by this amount.')) return;
+    ui.busy(btn, true, 'Seeding\u2026');
+    try {
+      var r = await api.admin.treasurySeed(units, (ui.el('#seedNote').value || '').trim());
+      ui.toast(r.message || 'Treasury seeded.', 'ok');
+      await loadTreasury();
+      await loadUsers(st.userQuery);
+    } catch (err) {
+      ui.toastError(err);
+    } finally {
+      ui.busy(btn, false);
+    }
+  });
+
+  var wipeForm = ui.el('[data-wipe-form]');
+  if (wipeForm) wipeForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var btn = wipeForm.querySelector('button[type=submit]');
+    var phrase = (ui.el('#wipeConfirm').value || '').trim();
+    if (phrase !== 'CLEAR ALL DATA') {
+      return ui.toastError('Type CLEAR ALL DATA exactly to confirm.');
+    }
+    if (!confirm('Clear every account, wallet, order, trade and ledger entry?\n\n'
+               + 'Your operator account and all settings are kept. This cannot be undone.')) return;
+    ui.busy(btn, true, 'Clearing\u2026');
+    try {
+      var r = await api.admin.wipeData(phrase);
+      ui.el('#wipeConfirm').value = '';
+      ui.toast(r.message || 'Data cleared.', 'ok');
+      await load();
+    } catch (err) {
+      ui.toastError(err);
+    } finally {
+      ui.busy(btn, false);
+    }
   });
 
   var ledgerForm = ui.el('[data-ledger-form]');
