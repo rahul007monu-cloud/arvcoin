@@ -208,16 +208,61 @@ export function busy(btn, yes, label) {
 
 /* ============================================================== nav ======= */
 
+/**
+ * The top navigation.
+ *
+ * `auth: true` hides an item from a signed-out visitor. `when(user)` is an
+ * optional extra predicate, so an item can depend on the account's state rather
+ * than being hard-coded into the render loop.
+ *
+ * Deposit and Withdraw are deliberately NOT advertised here any more. Trading is
+ * peer-to-peer: a buyer pays the seller off-platform (api/p2p.php never touches
+ * INR) and the legacy INR-spending buy form is gone from every page, so an
+ * on-platform rupee balance cannot buy anything. Both pages and both endpoints
+ * still exist and still work — deposit.html, withdraw.html and the admin tooling
+ * are untouched, and the Wallet card still links to them — they are simply no
+ * longer primary destinations. To advertise Withdraw again only to accounts that
+ * hold rupees, add:
+ *   { href: 'withdraw.html', label: 'Withdraw', auth: true,
+ *     when: function (u) { var w = u && u.wallet;
+ *       return !!w && (Number(w.inrPaise) || 0) + (Number(w.inrLockedPaise) || 0) > 0; } }
+ */
 var NAV = [
-  { href: 'index.html',        label: 'Overview' },
+  // Overview is the landing page, so it is a destination only while signed out.
+  // Once signed in it is reachable from the brand mark's sibling links and the
+  // footer, and keeping it here alongside a logo that also pointed at it gave
+  // two controls for one page. The bottom tab bar makes the same call.
+  { href: 'index.html',        label: 'Overview',  when: function (u) { return !u; } },
   { href: 'trade.html',        label: 'Trade' },
+  // Orders sits next to Trade: it is where a placed order is watched and where a
+  // matched trade is paid for, confirmed and cancelled.
+  { href: 'orders.html',       label: 'Orders',    auth: true },
   { href: 'dashboard.html',    label: 'Wallet',    auth: true },
   { href: 'portfolio.html',    label: 'Portfolio', auth: true },
-  { href: 'deposit.html',      label: 'Deposit',   auth: true },
-  { href: 'withdraw.html',     label: 'Withdraw',  auth: true },
   { href: 'transactions.html', label: 'History',   auth: true },
   { href: 'referral.html',     label: 'Refer',     auth: true }
 ];
+
+/**
+ * Where the brand mark goes.
+ *
+ * It used to always point at index.html, which meant the logo and the "Overview"
+ * nav item were two controls for one page — and for somebody already signed in,
+ * both led back to the marketing page they had finished with. So the logo now
+ * means "home" in the sense the viewer is in: the landing page while signed out,
+ * and the trading screen once signed in, which is where the product actually
+ * starts. Overview drops out of the nav for a signed-in viewer for the same
+ * reason (see NAV), which removes the duplication rather than hiding it.
+ */
+function brandHref(user) {
+  return user ? 'trade.html' : 'index.html';
+}
+
+/** One place that decides whether a NAV/TABS entry is visible to this viewer. */
+function navVisible(item, user) {
+  if (item.auth && !user) return false;
+  return typeof item.when === 'function' ? !!item.when(user) : true;
+}
 
 function currentPage() {
   var p = location.pathname.split('/').pop();
@@ -243,14 +288,33 @@ var TAB_ICONS = {
   wallet: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h15a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M3 7l0-1a2 2 0 0 1 2-2h11"/><circle cx="16" cy="13" r="1.4"/></svg>',
   portfolio: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M12 3v9l7-4a9 9 0 0 0-7-5z"/></svg>',
   history: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v3h3"/><path d="M12 8v4l3 2"/></svg>',
+  // Orders — a docket: the same 1.6px monochrome stroke style as the others, so
+  // it inherits the tab colour and needs no icon library.
+  orders: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M9.5 9.5h6"/><path d="M9.5 13.5h6"/><path d="M9.5 17.5h3"/></svg>',
   signin: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>'
 };
 
+/*
+ * Adding Orders to the bar meant taking two things out of it, because the bar
+ * must stay at five touch targets (a signed-in user already gets an Account slot
+ * appended) and six labels at .66rem start truncating on a 360px screen.
+ *
+ * Two went, for the same reason: neither is time-critical.
+ *   - Overview is now guest-only. It is the marketing/what-is-ARV page; for a
+ *     signed-in trader home is Trade or Wallet, and Overview is still one tap
+ *     away via the brand mark and the top nav.
+ *   - Portfolio left the bar entirely (it stays in the top nav, the footer and
+ *     the Wallet page's "View full portfolio" pointer). It is a read-only review
+ *     surface — nothing on it expires.
+ * Orders earns a slot precisely because it IS time-critical: a matched trade has
+ * a payment window and a confirm window, and missing either costs money.
+ */
 var TABS = [
-  { href: 'index.html',        label: 'Overview',  icon: 'overview' },
+  { href: 'index.html',        label: 'Overview',  icon: 'overview',
+    when: function (user) { return !user; } },
   { href: 'trade.html',        label: 'Trade',     icon: 'trade' },
+  { href: 'orders.html',       label: 'Orders',    icon: 'orders',    auth: true },
   { href: 'dashboard.html',    label: 'Wallet',    icon: 'wallet',    auth: true },
-  { href: 'portfolio.html',    label: 'Portfolio', icon: 'portfolio', auth: true },
   { href: 'transactions.html', label: 'History',   icon: 'history',   auth: true }
 ];
 
@@ -261,7 +325,7 @@ var TABS = [
  * is ever exposed. The current page is marked .on, reusing currentPage().
  */
 function tabbarMarkup(user, here) {
-  var tabs = TABS.filter(function (t) { return !t.auth || user; });
+  var tabs = TABS.filter(function (t) { return navVisible(t, user); });
 
   var last = user
     ? { href: 'profile.html', label: 'Account', icon: 'wallet' }
@@ -272,7 +336,9 @@ function tabbarMarkup(user, here) {
 
   var items = tabs.map(function (t) {
     var on = t.href === here ? ' on' : '';
-    return '<a class="tab' + on + '" href="' + t.href + '"'
+    // data-tab-href lets the lazily-fetched Orders alert find its own tab
+    // without re-rendering the bar.
+    return '<a class="tab' + on + '" href="' + t.href + '" data-tab-href="' + t.href + '"'
       + (on ? ' aria-current="page"' : '') + '>'
       + '<span class="tab-ic">' + (TAB_ICONS[t.icon] || '') + '</span>'
       + '<span class="tab-l">' + esc(t.label) + '</span></a>';
@@ -286,9 +352,10 @@ export function mountNav(user) {
   if (!host) return;
 
   var here = currentPage();
-  var links = NAV.filter(function (n) { return !n.auth || user; })
+  var links = NAV.filter(function (n) { return navVisible(n, user); })
     .map(function (n) {
-      return '<a href="' + n.href + '"' + (n.href === here ? ' class="on"' : '') + '>'
+      return '<a href="' + n.href + '" data-nav-href="' + n.href + '"'
+           + (n.href === here ? ' class="on"' : '') + '>'
            + n.label + '</a>';
     }).join('')
     // Help lives in the collapsible menu (the mobile "More" overflow) so support
@@ -305,7 +372,7 @@ export function mountNav(user) {
 
   host.innerHTML =
     '<nav class="nav"><div class="wrap">'
-    + '<a href="index.html" class="brand">'
+    + '<a href="' + brandHref(user) + '" class="brand">'
       + '<span class="brand-mark">A</span><span>' + esc(CFG.UI.brand) + '</span></a>'
     + '<div class="nav-links" data-navlinks>' + links + '</div>'
     // The live price is a link to the chart: tapping the ARV price anywhere in
@@ -339,6 +406,71 @@ export function mountNav(user) {
       location.href = 'index.html';
     });
   }
+
+  // The Orders dot. Deliberately AFTER the nav is on screen and never awaited:
+  // the chrome must not wait on a network call, so the dot simply appears a
+  // moment later if there is something to act on.
+  if (user && here !== 'orders.html') pollOrdersAlert();
+}
+
+/* ------------------------------------------------------ orders alert dot -- */
+
+/**
+ * Mark the Orders nav item and tab when a P2P trade is waiting on this user.
+ *
+ * `n` is how many trades need an action; 0 clears the dot. Idempotent, so it can
+ * be called on every poll from the Orders page itself.
+ */
+export function setOrdersAlert(n) {
+  var count = Number(n) || 0;
+  var label = count === 1 ? '1 trade needs your action'
+                          : count + ' trades need your action';
+
+  var link = el('[data-nav-href="orders.html"]');
+  if (link) {
+    var dot = el('.nav-dot', link);
+    if (count > 0 && !dot) {
+      link.insertAdjacentHTML('beforeend',
+        ' <span class="nav-dot" title="' + esc(label) + '"></span>');
+    } else if (count <= 0 && dot) {
+      dot.remove();
+    }
+    if (count > 0) link.setAttribute('aria-label', 'Orders \u2014 ' + label);
+    else link.removeAttribute('aria-label');
+  }
+
+  var tab = el('[data-tab-href="orders.html"]');
+  if (tab) {
+    var ic = el('.tab-ic', tab);
+    var tdot = el('.tab-dot', tab);
+    if (count > 0 && !tdot && ic) {
+      ic.insertAdjacentHTML('beforeend', '<span class="tab-dot"></span>');
+    } else if (count <= 0 && tdot) {
+      tdot.remove();
+    }
+    if (count > 0) tab.setAttribute('aria-label', 'Orders \u2014 ' + label);
+    else tab.removeAttribute('aria-label');
+  }
+}
+
+/** How many of these trades are waiting on the viewer. */
+export function countOrdersAlert(trades) {
+  return (trades || []).filter(function (t) {
+    return t && (t.canUploadProof || t.canConfirm);
+  }).length;
+}
+
+/**
+ * One lazy read of the P2P surface, purely to decide whether to show the dot.
+ *
+ * A failure is silent: an absent dot is a far better outcome than a toast about
+ * a background fetch nobody asked for. The Orders page itself does not use this
+ * — it already polls the same endpoint and calls setOrdersAlert() directly.
+ */
+function pollOrdersAlert() {
+  api.p2p.mine()
+    .then(function (r) { setOrdersAlert(countOrdersAlert(r && r.trades)); })
+    .catch(function () {});
 }
 
 /* ============================================================ footer ====== */

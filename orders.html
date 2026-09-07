@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orders — ARV Coin</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#07070a">
+<link rel="icon" href="favicon.svg?v=4" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/core.css">
+<script src="arv-config.js"></script>
+</head>
+<body>
+
+<div data-nav></div>
+
+<main class="page wrap" style="padding-top:var(--sp-5);padding-bottom:var(--sp-7)">
+
+  <!-- ============================================================= heading -->
+  <div class="row-between row-wrap" style="margin-bottom:var(--sp-5)">
+    <div>
+      <h1 class="serif" style="font-size:1.8rem;margin-bottom:2px">Orders</h1>
+      <div class="small muted">
+        Your resting P2P orders and every trade you are in — pay, confirm and
+        cancel from here.
+      </div>
+    </div>
+    <div class="row row-wrap">
+      <a href="trade.html" class="btn btn-primary">Place an order</a>
+    </div>
+  </div>
+
+  <!-- ================================================== needs your action --
+       The one strip on this page that must be impossible to miss: a trade here
+       is on a clock, and letting it run out either returns the escrow to the
+       seller or sends the trade to support. Rendered only when there is
+       something to do; otherwise the JS leaves it hidden and empty. -->
+  <div class="hidden" data-needs style="margin-bottom:var(--sp-4)"></div>
+
+  <!-- ================================================ nothing here at all -->
+  <div class="card hidden" data-empty style="margin-bottom:var(--sp-4)">
+    <h3 style="font-size:1rem;margin-bottom:var(--sp-2)">No orders yet</h3>
+    <p class="small muted" style="margin-bottom:var(--sp-4)">
+      Nothing is resting and no trade is in flight. A P2P buy matches you with a
+      real seller you pay directly; a P2P sell escrows your ARV until you confirm
+      you were paid. Both start on the trade page.
+    </p>
+    <a href="trade.html" class="btn btn-primary arrow">Go to the trade page</a>
+  </div>
+
+  <!-- ========================================================= open orders -->
+  <section class="card card-flush hidden" data-open-sec style="margin-bottom:var(--sp-4)">
+    <div class="card-head" style="padding:var(--sp-4);margin:0">
+      <h2 style="font-size:1rem">Open orders</h2>
+      <span class="badge" data-open-count></span>
+    </div>
+    <div style="padding:0 var(--sp-4) var(--sp-4)" data-open></div>
+  </section>
+
+  <!-- ====================================================== active trades -->
+  <section class="card card-flush hidden" data-active-sec style="margin-bottom:var(--sp-4)">
+    <div class="card-head" style="padding:var(--sp-4);margin:0">
+      <h2 style="font-size:1rem">Active trades</h2>
+      <span class="badge" data-active-count></span>
+    </div>
+    <div style="padding:0 var(--sp-4) var(--sp-4)" data-active></div>
+  </section>
+
+  <!-- ============================================================ history -->
+  <section class="card card-flush hidden" data-history-sec style="margin-bottom:var(--sp-4)">
+    <details>
+      <summary style="cursor:pointer;padding:var(--sp-4)">
+        <span style="font-weight:620">History</span>
+        <span class="badge" data-history-count style="margin-left:var(--sp-2)"></span>
+      </summary>
+      <div style="padding:0 var(--sp-4) var(--sp-4)" data-history></div>
+    </details>
+  </section>
+
+  <!-- ============================================================ loading -->
+  <div class="card card-tight" data-boot>
+    <div class="empty tiny"><span class="spinner"></span> Loading your orders…</div>
+  </div>
+
+  <div class="tiny muted" style="margin-top:var(--sp-4)">
+    Timers come from the server: an unmatched order rests for up to 24h, a matched
+    buyer has 60 minutes to pay, and a seller then has 4 hours to confirm before
+    the trade goes to support. This page refreshes itself every 20 seconds.
+  </div>
+
+</main>
+
+<div data-footer></div>
+<script type="module" src="js/pages/orders.js"></script>
+</body>
+</html>

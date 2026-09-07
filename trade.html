@@ -177,76 +177,62 @@
       live index price — buying needs a verified KYC, not an INR balance.
     </p>
 
-    <div class="grid g-2" style="align-items:start;gap:var(--sp-4)">
-
-      <!-- P2P order form -->
-      <div class="stack">
-        <div class="side-toggle" data-p2p-side style="margin-bottom:var(--sp-4)">
-          <button data-side="buy" class="on">Buy</button>
-          <button data-side="sell">Sell</button>
-        </div>
-
-        <div class="tabs" data-p2p-type style="margin-bottom:var(--sp-4);width:100%">
-          <button class="tab on" data-otype="market" style="flex:1">Market</button>
-          <button class="tab" data-otype="limit" style="flex:1">Limit</button>
-          <button class="tab" data-otype="stop" style="flex:1">Stop-loss</button>
-          <button class="tab" data-otype="target" style="flex:1">Target</button>
-        </div>
-
-        <div class="row-between small muted" style="margin-bottom:var(--sp-3)">
-          <span data-p2p-avail-label>ARV available</span>
-          <span class="num strong" data-p2p-avail>—</span>
-        </div>
-
-        <div class="field" style="margin-bottom:var(--sp-3)">
-          <label for="p2pUnits">Units of ARV</label>
-          <input id="p2pUnits" class="num-input" type="text" inputmode="decimal"
-                 autocomplete="off" placeholder="0.00000000">
-          <span class="hint" data-p2p-est></span>
-        </div>
-
-        <!-- Quick sell amounts, shown only when selling. -->
-        <div class="quick hidden" data-p2p-quick style="margin-bottom:var(--sp-4)"></div>
-
-        <div class="field hidden" data-p2p-trigger-field style="margin-bottom:var(--sp-4)">
-          <label for="p2pTrigger">Act when ARV reaches</label>
-          <div class="amount-input">
-            <span class="cur">₹</span>
-            <input id="p2pTrigger" class="num-input" type="text" inputmode="decimal"
-                   autocomplete="off" placeholder="0.0000">
-          </div>
-          <span class="hint" data-p2p-trigger-hint></span>
-        </div>
-
-        <!-- Where a seller receives the rupees. Rendered here, next to the sell
-             form, because a sell is refused without a payment method and making
-             someone leave for the profile page to fix that loses the trade. -->
-        <div class="hidden" data-p2p-pay style="margin-bottom:var(--sp-4)"></div>
-
-        <button class="btn btn-primary btn-block btn-lg" data-p2p-submit>Place P2P buy</button>
-        <div class="tiny muted" style="margin-top:var(--sp-3)" data-p2p-note></div>
-        <div class="tiny muted" style="margin-top:var(--sp-3)" data-p2p-depth></div>
+    <!-- Just the place-order form now. The trades and orders lists that used to
+         sit beside it are a page of their own (orders.html): they are on a clock
+         and needed room, and the chart deserves the form next to it without a
+         second surface competing for attention. -->
+    <div class="stack" style="max-width:560px">
+      <div class="side-toggle" data-p2p-side style="margin-bottom:var(--sp-4)">
+        <button data-side="buy" class="on">Buy</button>
+        <button data-side="sell">Sell</button>
       </div>
 
-      <!-- My P2P trades and orders -->
-      <div class="stack">
-        <div class="card card-flush">
-          <div class="card-head" style="padding:var(--sp-4);margin:0">
-            <h4 style="font-size:.95rem">My P2P trades</h4>
-          </div>
-          <div style="padding:0 var(--sp-4) var(--sp-4)" data-p2p-trades>
-            <div class="empty tiny">None yet</div>
-          </div>
-        </div>
+      <div class="tabs" data-p2p-type style="margin-bottom:var(--sp-4);width:100%">
+        <button class="tab on" data-otype="market" style="flex:1">Market</button>
+        <button class="tab" data-otype="limit" style="flex:1">Limit</button>
+        <button class="tab" data-otype="stop" style="flex:1">Stop-loss</button>
+        <button class="tab" data-otype="target" style="flex:1">Target</button>
+      </div>
 
-        <div class="card card-flush">
-          <div class="card-head" style="padding:var(--sp-4);margin:0">
-            <h4 style="font-size:.95rem">My open P2P orders</h4>
-          </div>
-          <div style="padding:0 var(--sp-4) var(--sp-4)" data-p2p-orders>
-            <div class="empty tiny">None</div>
-          </div>
+      <div class="row-between small muted" style="margin-bottom:var(--sp-3)">
+        <span data-p2p-avail-label>ARV available</span>
+        <span class="num strong" data-p2p-avail>—</span>
+      </div>
+
+      <div class="field" style="margin-bottom:var(--sp-3)">
+        <label for="p2pUnits">Units of ARV</label>
+        <input id="p2pUnits" class="num-input" type="text" inputmode="decimal"
+               autocomplete="off" placeholder="0.00000000">
+        <span class="hint" data-p2p-est></span>
+      </div>
+
+      <!-- Quick sell amounts, shown only when selling. -->
+      <div class="quick hidden" data-p2p-quick style="margin-bottom:var(--sp-4)"></div>
+
+      <div class="field hidden" data-p2p-trigger-field style="margin-bottom:var(--sp-4)">
+        <label for="p2pTrigger">Act when ARV reaches</label>
+        <div class="amount-input">
+          <span class="cur">₹</span>
+          <input id="p2pTrigger" class="num-input" type="text" inputmode="decimal"
+                 autocomplete="off" placeholder="0.0000">
         </div>
+        <span class="hint" data-p2p-trigger-hint></span>
+      </div>
+
+      <!-- Where a seller receives the rupees. Rendered here, next to the sell
+           form, because a sell is refused without a payment method and making
+           someone leave for the profile page to fix that loses the trade. -->
+      <div class="hidden" data-p2p-pay style="margin-bottom:var(--sp-4)"></div>
+
+      <button class="btn btn-primary btn-block btn-lg" data-p2p-submit>Place P2P buy</button>
+      <div class="tiny muted" style="margin-top:var(--sp-3)" data-p2p-note></div>
+      <div class="tiny muted" style="margin-top:var(--sp-3)" data-p2p-depth></div>
+
+      <!-- Everything after placement — paying, proof, confirming, cancelling,
+           and the countdowns attached to each — lives on the Orders page. -->
+      <div class="row-between row-wrap" style="margin-top:var(--sp-4);gap:var(--sp-3)">
+        <span class="small muted">Your orders and trades</span>
+        <a href="orders.html" class="btn btn-ghost btn-sm arrow">Orders</a>
       </div>
 
     </div>
