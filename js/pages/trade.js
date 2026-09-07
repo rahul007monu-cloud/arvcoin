@@ -469,6 +469,11 @@ function wireLiveFeed() {
 /* -------------------------------------------------------------------- form -- */
 
 function sideConfig() {
+  // The old deposit-first buy/sell form has been removed — P2P is the primary
+  // interface now. When its markup is not present, these paint helpers have no
+  // DOM to touch, so the whole function short-circuits.
+  if (!ui.el('#amt')) return;
+
   var w = st.user && st.user.wallet;
   var isBuy = st.side === 'buy';
 
@@ -508,6 +513,7 @@ function sideConfig() {
 }
 
 function bindQuick() {
+  if (!ui.el('#amt')) return;
   ui.els('[data-q]').forEach(function (b) {
     b.addEventListener('click', function () {
       ui.el('#amt').value = String(Number(b.dataset.q) / 100);
@@ -540,6 +546,7 @@ function requestQuote() {
 
 async function doQuote() {
   var host = ui.el('[data-quote]');
+  if (!host) return;   // old form removed; P2P is primary
   var btn = ui.el('[data-submit]');
   var err = ui.el('[data-amt-err]');
   var raw = (ui.el('#amt').value || '').replace(/[^\d.]/g, '');
@@ -626,6 +633,7 @@ function sellRows(q) {
 
 async function submit() {
   var btn = ui.el('[data-submit]');
+  if (!btn) return;
   var raw = (ui.el('#amt').value || '').replace(/[^\d.]/g, '');
   var value = parseFloat(raw);
   if (!value) return;
@@ -802,6 +810,7 @@ async function refresh() {
 
 /** Balance only — a full sideConfig would clear what the user is typing. */
 function sideConfigLight() {
+  if (!ui.el('[data-balance]')) return;   // old form removed; P2P is primary
   var w = st.user && st.user.wallet;
   ui.setText('[data-balance]', w
     ? (st.side === 'buy' ? ui.fmtPaise(w.inrPaise) : ui.fmtUnits(w.arvUnits, 4) + ' ARV')
