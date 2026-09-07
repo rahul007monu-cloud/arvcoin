@@ -935,8 +935,10 @@ function handle_p2p_trades(): void
     $params = [];
 
     if ($status === 'active') {
-        $where[] = "p.status IN ('matched','paid')";
-    } elseif (in_array($status, ['matched', 'paid', 'released', 'cancelled'], true)) {
+        // 'active' is the live subset an operator acts on — now including
+        // 'disputed', which is precisely the case that needs a human.
+        $where[] = "p.status IN ('matched','paid','disputed')";
+    } elseif (in_array($status, ['matched', 'paid', 'released', 'cancelled', 'disputed', 'expired'], true)) {
         $where[]  = 'p.status = ?';
         $params[] = $status;
     }
@@ -959,7 +961,7 @@ function handle_p2p_trades(): void
            JOIN users bu ON bu.id = p.buyer_id
            JOIN users su ON su.id = p.seller_id
            {$clause}
-          ORDER BY p.id DESC LIMIT 200", $params
+          ORDER BY (p.status = 'disputed') DESC, p.id DESC LIMIT 200", $params
     )->fetchAll();
 
     json_ok(['trades' => array_map(static function ($t) {
@@ -969,6 +971,7 @@ function handle_p2p_trades(): void
         $pub['buyerEmail']  = $t['buyer_email'];
         $pub['sellerEmail'] = $t['seller_email'];
         $pub['proofImage']  = ($t['proof_image_path'] ?? '') !== '' ? $t['proof_image_path'] : null;
+        $pub['resolvedBy']  = $t['resolved_by'] !== null ? (int)$t['resolved_by'] : null;
         return $pub;
     }, $rows)]);
 }
@@ -978,8 +981,11 @@ function handle_p2p_trades(): void
  *
  * The same money path as the seller's own confirm (p2p_release_core) — units to
  * the buyer, a `trades` row for tax, ledger entries both sides. Allowed for a
- * matched or paid trade so an operator can resolve one the seller has stopped
- * responding to. Use only when the rupees genuinely reached the seller.
+ * matched, paid or DISPUTED trade so an operator can resolve one the seller has
+ * stopped responding to, or one the confirm timer sent to dispute. Use only when
+ * the rupees genuinely reached the seller. The status is re-checked under the row
+ * lock before the core runs, so a trade already released/cancelled/expired by a
+ * racing user action or the cron cannot be released a second time.
  */
 function handle_p2p_release(): void
 {
@@ -992,17 +998,30 @@ function handle_p2p_release(): void
         json_fail(422, 'Which trade?');
     }
 
-    $result = tx(static function (PDO $pdo) use ($id) {
+    $result = tx(static function (PDO $pdo) use ($id, $admin) {
         $st = $pdo->prepare('SELECT * FROM p2p_trades WHERE id = ? FOR UPDATE');
         $st->execute([$id]);
         $t = $st->fetch();
         if (!$t) {
             throw new RuntimeException('Trade not found.');
         }
-        if (!in_array($t['status'], ['matched', 'paid'], true)) {
+        if (!in_array($t['status'], ['matched', 'paid', 'disputed'], true)) {
             throw new RuntimeException('This trade is ' . $t['status'] . ' and cannot be released.');
         }
-        return p2p_release_core($pdo, $t);
+        $wasDisputed = $t['status'] === 'disputed';
+        $r = p2p_release_core($pdo, $t);
+        // Stamp the resolution audit fields on the (now 'released') row. Only a
+        // dispute needs a resolution record, but recording it for any operator
+        // release is harmless and useful.
+        $pdo->prepare(
+            'UPDATE p2p_trades SET resolved_at = UTC_TIMESTAMP(), resolved_by = ?, resolution = ?
+              WHERE id = ?'
+        )->execute([
+            (int)$admin['id'],
+            $wasDisputed ? 'dispute resolved: released to buyer' : 'released to buyer by operator',
+            $id,
+        ]);
+        return $r;
     });
 
     audit('p2p.release.admin', ['entity' => 'p2p_trades', 'entity_id' => (string)$id,
@@ -1013,9 +1032,12 @@ function handle_p2p_release(): void
 /**
  * Operator override: cancel a trade and return the escrow to the seller.
  *
- * The same money path as a user cancel (p2p_cancel_core). Allowed for matched or
- * paid; a reason is required because it is a manual intervention that the audit
- * log should carry.
+ * The same money path as a user cancel (p2p_cancel_core) — the escrow returns to
+ * the seller. Allowed for matched, paid or DISPUTED; a reason is required because
+ * it is a manual intervention that the audit log should carry. This is the arm an
+ * operator uses when the buyer did NOT actually pay. The status is re-checked
+ * under the row lock before the core runs, so a trade already released/cancelled/
+ * expired cannot have its escrow returned a second time.
  */
 function handle_p2p_cancel(): void
 {
@@ -1032,17 +1054,29 @@ function handle_p2p_cancel(): void
         json_fail(422, 'Give a reason — this is a manual intervention and it is logged.');
     }
 
-    $result = tx(static function (PDO $pdo) use ($id, $reason) {
+    $result = tx(static function (PDO $pdo) use ($id, $reason, $admin) {
         $st = $pdo->prepare('SELECT * FROM p2p_trades WHERE id = ? FOR UPDATE');
         $st->execute([$id]);
         $t = $st->fetch();
         if (!$t) {
             throw new RuntimeException('Trade not found.');
         }
-        if (!in_array($t['status'], ['matched', 'paid'], true)) {
+        if (!in_array($t['status'], ['matched', 'paid', 'disputed'], true)) {
             throw new RuntimeException('This trade is ' . $t['status'] . ' and cannot be cancelled.');
         }
-        return p2p_cancel_core($pdo, $t, 'operator: ' . $reason);
+        $wasDisputed = $t['status'] === 'disputed';
+        $r = p2p_cancel_core($pdo, $t, 'operator: ' . $reason);
+        // Record who settled it and how, alongside the cancel_reason the core set.
+        $pdo->prepare(
+            'UPDATE p2p_trades SET resolved_at = UTC_TIMESTAMP(), resolved_by = ?, resolution = ?
+              WHERE id = ?'
+        )->execute([
+            (int)$admin['id'],
+            ($wasDisputed ? 'dispute resolved: escrow returned to seller' : 'cancelled by operator')
+                . ' — ' . $reason,
+            $id,
+        ]);
+        return $r;
     });
 
     audit('p2p.cancel.admin', ['entity' => 'p2p_trades', 'entity_id' => (string)$id,
@@ -1090,6 +1124,8 @@ function handle_save_setting(): void
         'trust_hours',
         'tds_pct', 'tds_pct_no_pan', 'vda_gain_pct', 'cess_pct',
         'tds_threshold_paise', 'tds_threshold_specified_paise',
+        // P2P Phase 2 timers.
+        'p2p_match_ttl_hours', 'p2p_pay_ttl_minutes', 'p2p_confirm_ttl_hours',
         // Support assistant: on/off, and an optional Gemini API key. With no key
         // the assistant still answers from its built-in knowledge base.
         'assistant_enabled', 'gemini_api_key',
@@ -1110,6 +1146,12 @@ function handle_save_setting(): void
         'trust_hours' => [1, 720],
         'vda_gain_pct' => [0, 50], 'cess_pct' => [0, 10],
         'tds_pct' => [0, 30], 'tds_pct_no_pan' => [0, 30],
+        // P2P Phase 2 timers. A too-short window traps money in limbo; a
+        // too-long one lets a vanished counterparty hold escrow hostage — so
+        // both ends are bounded and a change is a decision, not a typo.
+        'p2p_match_ttl_hours' => [1, 168],   // 1 hour … 7 days
+        'p2p_pay_ttl_minutes' => [5, 1440],  // 5 min … 24 hours
+        'p2p_confirm_ttl_hours' => [1, 72],  // 1 hour … 3 days
     ];
     if (isset($numeric[$key])) {
         $n = (float)$value;
