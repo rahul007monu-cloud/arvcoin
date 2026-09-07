@@ -964,7 +964,14 @@ function handle_p2p_trades(): void
           ORDER BY (p.status = 'disputed') DESC, p.id DESC LIMIT 200", $params
     )->fetchAll();
 
-    json_ok(['trades' => array_map(static function ($t) {
+    // The current treasury account's email, so treasury trades (seller =
+    // treasury) can be flagged for the operator: those are the ones the operator
+    // must confirm/release after the COMPANY account has received the buyer's
+    // rupees — no real seller will ever confirm them. Resolved once here rather
+    // than per row. A blank/off treasury simply flags nothing.
+    $treasuryEmail = trim((string)setting('p2p_treasury_email', ''));
+
+    json_ok(['trades' => array_map(static function ($t) use ($treasuryEmail) {
         // -1 viewer id so it is neither buyer nor seller; isAdmin exposes the
         // payment snapshot for dispute handling.
         $pub = p2p_trade_public($t, -1, true);
@@ -972,6 +979,13 @@ function handle_p2p_trades(): void
         $pub['sellerEmail'] = $t['seller_email'];
         $pub['proofImage']  = ($t['proof_image_path'] ?? '') !== '' ? $t['proof_image_path'] : null;
         $pub['resolvedBy']  = $t['resolved_by'] !== null ? (int)$t['resolved_by'] : null;
+        // Treasury-seller trade: no resting sell order and the seller is the
+        // treasury account. Either signal alone is a strong hint; together they
+        // are unambiguous. Surfaced so the operator sees which trades are theirs
+        // to settle once the company account is paid.
+        $pub['isTreasury'] = $treasuryEmail !== ''
+            && strcasecmp((string)$t['seller_email'], $treasuryEmail) === 0
+            && $t['seller_order_id'] === null;
         return $pub;
     }, $rows)]);
 }
@@ -1126,6 +1140,9 @@ function handle_save_setting(): void
         'tds_threshold_paise', 'tds_threshold_specified_paise',
         // P2P Phase 2 timers.
         'p2p_match_ttl_hours', 'p2p_pay_ttl_minutes', 'p2p_confirm_ttl_hours',
+        // P2P Phase 2b: treasury default-liquidity + fee/TDS collected in ARV.
+        'p2p_treasury_email', 'p2p_treasury_enabled', 'p2p_fee_account_email',
+        'p2p_fee_pct', 'p2p_tds_pct',
         // Support assistant: on/off, and an optional Gemini API key. With no key
         // the assistant still answers from its built-in knowledge base.
         'assistant_enabled', 'gemini_api_key',
@@ -1152,6 +1169,12 @@ function handle_save_setting(): void
         'p2p_match_ttl_hours' => [1, 168],   // 1 hour … 7 days
         'p2p_pay_ttl_minutes' => [5, 1440],  // 5 min … 24 hours
         'p2p_confirm_ttl_hours' => [1, 72],  // 1 hour … 3 days
+        // P2P Phase 2b fee model. Both are a percentage of the traded units,
+        // collected in ARV. Bounded so a fat-finger cannot quietly skim a large
+        // slice of every buyer's units. p2p_tds_pct is SEPARATE from the index
+        // tds_pct and defaults to 0 — nothing changes until an operator sets it.
+        'p2p_fee_pct' => [0, 5],             // platform fee, 0–5%
+        'p2p_tds_pct' => [0, 30],            // P2P TDS, 0–30%
     ];
     if (isset($numeric[$key])) {
         $n = (float)$value;
@@ -1176,6 +1199,38 @@ function handle_save_setting(): void
             json_fail(422, 'That does not look like a Google client ID. It ends in '
                          . '.apps.googleusercontent.com and comes from Google Cloud Console '
                          . '→ Credentials → OAuth 2.0 Client IDs. Paste the Client ID, not the secret.');
+        }
+    }
+
+    // The P2P treasury / fee account emails must name an existing user (empty is
+    // allowed — that is how each is turned off / falls back). A validated,
+    // KYC/payment/ARV check happens lazily at match/release time (the account can
+    // gain those later); here we only reject a typo that names nobody, so an
+    // operator gets an error at save time rather than silent no-fill later.
+    if ($key === 'p2p_treasury_email' || $key === 'p2p_fee_account_email') {
+        $value = trim($value);
+        if ($value !== '') {
+            $exists = q1('SELECT id FROM users WHERE email = ? LIMIT 1', [$value]);
+            if (!$exists) {
+                json_fail(422, 'No user account has that email. Create the account first '
+                             . '(a normal signup), complete its KYC and add its payment method, '
+                             . 'then name it here.');
+            }
+        }
+    }
+
+    // Turning the treasury ON is only meaningful if an email is set and resolves
+    // to a usable account — refuse the toggle otherwise so "on" never silently
+    // means "unavailable".
+    if ($key === 'p2p_treasury_enabled' && ($value === '1' || $value === 'true')) {
+        $email = trim((string)setting('p2p_treasury_email', ''));
+        if ($email === '') {
+            json_fail(422, 'Set the treasury account email before turning the treasury on.');
+        }
+        $tu = tx(static fn(PDO $pdo) => p2p_treasury_user_by_email($pdo, $email));
+        if ($tu === null) {
+            json_fail(422, 'That treasury account is not usable yet — it must be an active, '
+                         . 'KYC-verified user with a saved payment method. Fix that, then turn it on.');
         }
     }
 

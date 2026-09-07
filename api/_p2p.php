@@ -95,6 +95,106 @@ function p2p_payment_method_public(array $m): array
     ];
 }
 
+/* ================================================= treasury / fee account = */
+
+/**
+ * The platform "treasury" user, or null when it is not usable.
+ *
+ * The treasury is NOT a special kind of account — it is an ordinary, operator-run
+ * user row that happens to hold ARV and a payment method (the company UPI/bank a
+ * buyer pays). Making it a real user is the whole point: its escrow and
+ * settlement then run through the SAME wallet_apply()/ledger_add()/release/cancel
+ * cores as anyone else, with no special-case money math.
+ *
+ * Returns null — treasury simply unavailable, never an error — when the feature
+ * is off, the email is blank or does not resolve, the account is not active, not
+ * KYC-verified, or has no payment method. The "enough ARV" test is left to the
+ * caller because it depends on the units being matched; everything invariant
+ * about the account is checked here.
+ *
+ * The caller must already be inside a tx() (it passes its $pdo) because the units
+ * check and the escrow that follows must see a consistent, locked view.
+ */
+function p2p_treasury_user(PDO $pdo): ?array
+{
+    if (!setting_b('p2p_treasury_enabled', false)) {
+        return null;
+    }
+    $email = trim((string)setting('p2p_treasury_email', ''));
+    if ($email === '') {
+        return null;
+    }
+    return p2p_treasury_user_by_email($pdo, $email);
+}
+
+/**
+ * Resolve a treasury account by email and return it only if it is USABLE, i.e.
+ * an active, KYC-verified user with a saved payment method. Null otherwise.
+ *
+ * Split out from p2p_treasury_user() so the admin "enable treasury" toggle can
+ * validate a specific email regardless of the (about-to-change) enabled flag,
+ * while the matching path resolves the currently-configured, enabled treasury.
+ * The "enough ARV" test is deliberately NOT here — it depends on the units being
+ * matched and is applied by p2p_treasury_fill_buy().
+ */
+function p2p_treasury_user_by_email(PDO $pdo, string $email): ?array
+{
+    $email = trim($email);
+    if ($email === '') {
+        return null;
+    }
+    $st = $pdo->prepare(
+        'SELECT u.*, k.status AS kyc_status
+           FROM users u
+           LEFT JOIN kyc k ON k.user_id = u.id
+          WHERE u.email = ? LIMIT 1'
+    );
+    $st->execute([$email]);
+    $u = $st->fetch();
+    if (!$u) {
+        return null;
+    }
+    if (($u['status'] ?? '') !== 'active') {
+        return null;
+    }
+    if (($u['kyc_status'] ?? 'none') !== 'verified') {
+        return null;
+    }
+    // A buyer must have somewhere to pay — no payment method, no treasury.
+    if (!p2p_default_payment_method($pdo, (int)$u['id'])) {
+        return null;
+    }
+    return $u;
+}
+
+/**
+ * The fee account user, or null when fee collection is not configured.
+ *
+ * Where the platform fee + P2P TDS accrue, in ARV. Falls back to the treasury
+ * email when its own setting is blank; if BOTH are blank it returns null and the
+ * release path collects no fee (divert = 0) rather than failing. The account only
+ * needs to exist and be active — it merely receives ARV, so it needs neither KYC
+ * nor a payment method here.
+ *
+ * Caller must already be inside a tx() (it passes its $pdo), because the credit
+ * that follows locks this wallet.
+ */
+function p2p_fee_account_user(PDO $pdo): ?array
+{
+    $email = trim((string)setting('p2p_fee_account_email', ''));
+    if ($email === '') {
+        $email = trim((string)setting('p2p_treasury_email', ''));
+    }
+    if ($email === '') {
+        return null;
+    }
+
+    $st = $pdo->prepare('SELECT * FROM users WHERE email = ? AND status = "active" LIMIT 1');
+    $st->execute([$email]);
+    $u = $st->fetch();
+    return $u ?: null;
+}
+
 /* ==================================================== escrow accounting ==== */
 
 /** Units of a sell order still reserved by a live (matched/paid) trade, u8. */
@@ -343,9 +443,143 @@ function p2p_try_match(int $orderId, float $nav): array
             ];
         }
 
+        // Treasury default-liquidity (Phase 2b). If this is a BUY that no real
+        // seller could fully satisfy, and the treasury is enabled/available, let
+        // the remainder fill against the treasury as the seller. Only the BUY
+        // direction is supported here; treasury-as-BUYER is a deliberate TODO
+        // (see p2p_treasury_fill_buy() below).
+        if ($side === 'buy' && $myMatch > 0) {
+            $tt = p2p_treasury_fill_buy($pdo, $o, $myMatch, $nav, $minPaise);
+            if ($tt !== null) {
+                $myMatch -= u8((string)$tt['units']);
+                $out[]    = $tt;
+            }
+        }
+
         return $out;
     });
 }
+
+/**
+ * Fill the unmatched remainder of a P2P BUY against the treasury account.
+ *
+ * Called from inside p2p_try_match's tx() when no (or not enough) real seller
+ * order was available. The treasury is an ordinary user, so this creates a
+ * completely normal escrow trade — the ONLY differences from a user-to-user
+ * match are that the seller side has no resting sell order (seller_order_id is
+ * NULL) and its ARV is escrowed HERE, at trade-creation time, instead of at
+ * sell-placement time. That escrow is the exact same wallet move a sell order
+ * makes (arv_units -> arv_locked_units, a zero-delta 'adjustment' ledger note),
+ * so p2p_release_core()/p2p_cancel_core() then settle it with no special casing:
+ *   • release → the treasury's locked units move to the buyer (its lots supply
+ *     the cost basis, its realised P&L is booked) exactly like any seller;
+ *   • cancel  → wallet_apply(seller, +U free, -U locked) returns the escrow, and
+ *     the seller_order_id-NULL guard in the core simply skips the order sync.
+ *
+ * These treasury trades are confirmed by an OPERATOR from the admin P2P list
+ * once the company account has actually received the buyer's rupees — they are
+ * never auto-confirmed. The buyer pays and uploads proof exactly as normal.
+ *
+ * @return array|null the trade summary, or null if the treasury cannot fill.
+ */
+function p2p_treasury_fill_buy(PDO $pdo, array $buyOrder, int $wantU8, float $nav, int $minPaise): ?array
+{
+    if ($wantU8 <= 0) {
+        return null;
+    }
+
+    $treasury = p2p_treasury_user($pdo);
+    if ($treasury === null) {
+        return null;
+    }
+    $treasuryId = (int)$treasury['id'];
+    $buyerId    = (int)$buyOrder['user_id'];
+
+    // The treasury never trades with itself.
+    if ($treasuryId === $buyerId) {
+        return null;
+    }
+
+    // Lock the treasury wallet and see how much free ARV it actually has. Take
+    // the smaller of what the buyer wants and what the treasury can back; the
+    // rest of the buy simply stays resting.
+    $tw   = wallet_for_update($pdo, $treasuryId);
+    $free = u8((string)$tw['arv_units']);
+    $take = min($wantU8, $free);
+    if ($take <= 0) {
+        return null;   // treasury holds nothing free — unavailable, not an error
+    }
+
+    $amount = u8_to_paise($take, $nav);
+    if ($amount < $minPaise) {
+        // Too small to be a real transfer; leave the buy resting.
+        return null;
+    }
+
+    // The buyer pays the treasury's default payment method (the company UPI/bank).
+    $pm = p2p_default_payment_method($pdo, $treasuryId);
+    if (!$pm) {
+        return null;   // guarded by p2p_treasury_user(), but re-checked defensively
+    }
+
+    // Escrow the treasury's units EXACTLY as a sell order would: arv_units ->
+    // arv_locked_units, with a zero-delta 'adjustment' note so the lock is
+    // visible in the ledger without double-counting units. This must happen
+    // BEFORE the trade row exists so the release/cancel cores find the units
+    // already locked, just like a normal seller's.
+    wallet_apply($pdo, $treasuryId, 0, 0, -$take, $take);
+    ledger_add($pdo, $treasuryId, 'adjustment', 0, 0, [
+        'ref'  => (string)$buyOrder['ref'], 'relatedId' => (int)$buyOrder['id'],
+        'note' => sprintf('%s ARV escrowed for a P2P treasury sell', u8str($take)),
+    ]);
+
+    $ref = ref('P2P');
+    $pdo->prepare(
+        "INSERT INTO p2p_trades
+           (ref, buyer_id, seller_id, buyer_order_id, seller_order_id,
+            units, price_nav, amount_paise,
+            seller_payment_method_id, seller_payment_snapshot,
+            status, matched_at)
+         VALUES (?,?,?,?,NULL,?,?,?,?,?,'matched',UTC_TIMESTAMP())"
+    )->execute([
+        $ref, $buyerId, $treasuryId,
+        (int)$buyOrder['id'],
+        u8str($take), $nav, $amount,
+        (int)$pm['id'], p2p_payment_snapshot($pm),
+    ]);
+    $tradeId = (int)$pdo->lastInsertId();
+
+    // The buy order has consumed this slice (the just-inserted 'matched' row is
+    // visible to the recompute on this connection). There is no sell order to
+    // sync — the treasury has none.
+    p2p_sync_buy_order($pdo, (int)$buyOrder['id']);
+
+    return [
+        'id'          => $tradeId,
+        'ref'         => $ref,
+        'units'       => u8str($take),
+        'priceNav'    => $nav,
+        'amountPaise' => $amount,
+        'buyerId'     => $buyerId,
+        'sellerId'    => $treasuryId,
+        'treasury'    => true,
+    ];
+}
+
+/**
+ * TODO (Phase 2b, deferred): treasury-as-BUYER for an unmatched SELL.
+ *
+ * The mirror direction — a seller with no real buyer selling to the treasury,
+ * with the operator paying the seller from the company account and then
+ * releasing — was intentionally NOT built here. It is more than a mirror: the
+ * "buyer" is an operator-controlled account that would have to pay the seller
+ * off-platform and then either upload proof as the buyer or admin-release, and
+ * getting that choreography wrong risks releasing a seller's escrow before the
+ * company has actually paid them. Rather than implement it half-correctly, it is
+ * left as a documented gap. Treasury-as-SELLER (above) is complete and solid.
+ * When this is built it MUST, like everything else, escrow and settle only
+ * through wallet_apply()/ledger_add()/p2p_release_core()/p2p_cancel_core().
+ */
 
 /* ==================================================== release / cancel ==== */
 
@@ -391,9 +625,47 @@ function p2p_release_core(PDO $pdo, array $t): array
     $tax       = pct_of($gain, setting_f('vda_gain_pct', 30));
     $cess      = pct_of($tax, setting_f('cess_pct', 4));
 
+    /* --------------------------------------------- platform fee + TDS (ARV) */
+    // Phase 2b fee model — collected in ARV, one-sided, units-neutral.
+    //
+    //   feeUnits = round8(U * p2p_fee_pct/100)   (basis-point integer math)
+    //   tdsUnits = round8(U * p2p_tds_pct/100)
+    //   divert   = feeUnits + tdsUnits            (capped so divert < U)
+    //
+    // The BUYER receives U - divert units (they already paid the seller the full
+    // ₹ for U off-platform; the platform's fee + TDS is taken from the ARV they
+    // receive, never from the rupees). The SELLER side is unchanged — they still
+    // release U units, keep their full ₹, and their cost basis / P&L are on U.
+    // The `divert` units are credited to the fee account with their own lot, so
+    // net units balance to zero:  seller −U ; buyer +(U−divert) ; fee +divert.
+    // If no fee account resolves, divert = 0 and the buyer receives the full U.
+    //
+    // Integer u8 throughout: the percentages become integer basis points, so the
+    // only rounding is the final round-to-nearest-u8 of each slice — no float
+    // ever touches a stored unit balance.
+    $feeAcct  = p2p_fee_account_user($pdo);
+    $feeUnits = 0;
+    $tdsUnits = 0;
+    if ($feeAcct !== null) {
+        $feeBps   = (int)round(setting_f('p2p_fee_pct', 1) * 100);   // 1% -> 100 bps
+        $tdsBps   = (int)round(setting_f('p2p_tds_pct', 0) * 100);   // 0% -> 0 bps
+        $feeUnits = $feeBps > 0 ? (int)round($units8 * $feeBps / 10000) : 0;
+        $tdsUnits = $tdsBps > 0 ? (int)round($units8 * $tdsBps / 10000) : 0;
+    }
+    $divert = $feeUnits + $tdsUnits;
+    // Never divert the whole (or more than the whole) trade — the buyer must
+    // receive something. With the 0–5 / 0–30 guardrails this can never trigger
+    // (max 35%), but guard defensively rather than trust the settings.
+    if ($divert >= $units8 || $divert < 0) {
+        $feeUnits = 0;
+        $tdsUnits = 0;
+        $divert   = 0;
+    }
+    $buyerUnits8 = $units8 - $divert;
+
     // Units leave escrow; cost basis released; realised P&L booked. No INR — the
     // rupees were paid off-platform, so nothing on-platform is credited or
-    // withheld (TDS/fee handling in the P2P model is a Phase 2 decision).
+    // withheld on the seller side. The seller always releases the full U.
     wallet_apply($pdo, $sellerId, 0, 0, 0, -$units8, -$costBasis, $pnl);
     ledger_add($pdo, $sellerId, 'sell', 0, -$units8, [
         'nav' => $nav, 'ref' => $tradeRef, 'fy' => $fy, 'relatedId' => (int)$t['id'],
@@ -401,17 +673,45 @@ function p2p_release_core(PDO $pdo, array $t): array
     ]);
 
     /* ----------------------------------------------------------- buyer ---- */
-    // Units in; cost basis = the rupees actually paid to the seller.
-    wallet_apply($pdo, $buyerId, 0, 0, $units8, 0, $amount, 0);
-    ledger_add($pdo, $buyerId, 'buy', 0, $units8, [
+    // Units in (U - divert); cost basis = the full rupees actually paid to the
+    // seller. The buyer paid for U but receives U-divert, so their effective
+    // cost per unit is a little above nav — which is exactly the fee, borne in
+    // ARV, made visible in their own holding.
+    wallet_apply($pdo, $buyerId, 0, 0, $buyerUnits8, 0, $amount, 0);
+    ledger_add($pdo, $buyerId, 'buy', 0, $buyerUnits8, [
         'nav' => $nav, 'ref' => $tradeRef, 'fy' => $fy, 'relatedId' => (int)$t['id'],
-        'note' => sprintf('Bought %s ARV P2P at %.4f (paid off-platform)', u8str($units8), $nav),
+        'note' => $divert > 0
+            ? sprintf('Bought %s ARV P2P at %.4f (paid off-platform; %s ARV platform fee+TDS)',
+                      u8str($buyerUnits8), $nav, u8str($divert))
+            : sprintf('Bought %s ARV P2P at %.4f (paid off-platform)', u8str($buyerUnits8), $nav),
     ]);
+
+    /* ------------------------------------------------- fee account (ARV) -- */
+    // The diverted units accrue to the operator's fee account as a real holding:
+    // arv_units += divert, with its own lot at cost = the ₹ value of those units
+    // at nav (so the account shows coherent, zero-unrealised holdings it can
+    // later sell). Locked LAST — after seller and buyer — so the single fee
+    // account row is a consistent tail lock across concurrent releases.
+    $divertPaise = 0;
+    if ($divert > 0 && $feeAcct !== null) {
+        $feeAcctId   = (int)$feeAcct['id'];
+        $divertPaise = u8_to_paise($divert, $nav);
+        wallet_apply($pdo, $feeAcctId, 0, 0, $divert, 0, $divertPaise, 0);
+        ledger_add($pdo, $feeAcctId, 'buy', 0, $divert, [
+            'nav' => $nav, 'ref' => $tradeRef, 'fy' => $fy, 'relatedId' => (int)$t['id'],
+            'note' => sprintf('P2P platform fee+TDS: %s ARV (fee %s + TDS %s)',
+                              u8str($divert), u8str($feeUnits), u8str($tdsUnits)),
+        ]);
+    }
 
     /* ------------------------------------------------------ trade row ---- */
     // One immutable fill row so the tax statement and history read the same as
-    // an index fill. Fees/GST/TDS are zero in Phase 1 P2P (no on-platform INR);
-    // the seller's 30%+cess is REPORTED, never withheld, exactly as elsewhere.
+    // an index fill. This row is the SELLER's transfer of the full U units for
+    // `amount` — its tax fields (cost basis, realised P&L, 30%+cess) are all the
+    // seller's, unchanged by the fee model. The paise fee/GST/TDS columns stay
+    // zero: the P2P platform fee + TDS are collected in ARV (see the fee account
+    // credit above), not as on-platform rupees. gross_paise = the full amount so
+    // the seller's 194S threshold aggregation (tds_assess) is unaffected.
     $pdo->prepare(
         'INSERT INTO trades
            (ref, buy_order_id, sell_order_id, buyer_id, seller_id, counterparty,
@@ -433,17 +733,32 @@ function p2p_release_core(PDO $pdo, array $t): array
     ]);
     $tradesId = (int)$pdo->lastInsertId();
 
-    // The buyer's lot, linked to that fill.
+    // The buyer's lot, linked to that fill — the units they actually received
+    // (U - divert) at the full rupees they paid.
     $pdo->prepare(
         'INSERT INTO lots (user_id, units, units_remaining, cost_paise, nav, trade_id)
          VALUES (?, ?, ?, ?, ?, ?)'
-    )->execute([$buyerId, u8str($units8), u8str($units8), $amount, $nav, $tradesId]);
+    )->execute([$buyerId, u8str($buyerUnits8), u8str($buyerUnits8), $amount, $nav, $tradesId]);
+
+    // The fee account's lot for the diverted units, at their nav value — so its
+    // holding is coherent (value == cost at receipt) and later sellable through
+    // the ordinary sell/consume_lots path.
+    if ($divert > 0 && $feeAcct !== null) {
+        $pdo->prepare(
+            'INSERT INTO lots (user_id, units, units_remaining, cost_paise, nav, trade_id)
+             VALUES (?, ?, ?, ?, ?, ?)'
+        )->execute([(int)$feeAcct['id'], u8str($divert), u8str($divert), $divertPaise, $nav, $tradesId]);
+    }
 
     /* -------------------------------------------------- state transitions - */
+    // Record the diverted split on the p2p_trades row so the buyer's view can
+    // show it. This is a convenience mirror of the fee account's ledger/lot,
+    // which remain the book of record.
     $pdo->prepare(
-        "UPDATE p2p_trades SET status = 'released', released_at = UTC_TIMESTAMP(), trade_id = ?
+        "UPDATE p2p_trades SET status = 'released', released_at = UTC_TIMESTAMP(),
+                trade_id = ?, fee_units = ?, tds_units = ?
           WHERE id = ?"
-    )->execute([$tradesId, (int)$t['id']]);
+    )->execute([$tradesId, u8str($feeUnits), u8str($tdsUnits), (int)$t['id']]);
 
     // The escrowed units have left the sell order.
     if ($t['seller_order_id'] !== null) {
@@ -464,6 +779,11 @@ function p2p_release_core(PDO $pdo, array $t): array
         'ref'            => (string)$t['ref'],
         'tradeRef'       => $tradeRef,
         'units'          => u8str($units8),
+        'buyerUnits'     => u8str($buyerUnits8),
+        'feeUnits'       => u8str($feeUnits),
+        'tdsUnits'       => u8str($tdsUnits),
+        'divertUnits'    => u8str($divert),
+        'feeAccountId'   => $feeAcct !== null && $divert > 0 ? (int)$feeAcct['id'] : null,
         'amountPaise'    => $amount,
         'priceNav'       => $nav,
         'costBasisPaise' => $costBasis,
@@ -556,6 +876,15 @@ function p2p_trade_public(array $t, int $viewerId, bool $isAdmin = false): array
         'role'        => $role,
         'status'      => $t['status'],
         'units'       => (string)$t['units'],
+        // Phase 2b: the platform fee + TDS diverted (in ARV) on release, and the
+        // units the buyer actually received (units - fee - tds). Zero/units until
+        // released; populated from the p2p_trades row. Shown so the buyer sees
+        // exactly what the platform took.
+        'feeUnits'    => u8str(u8((string)($t['fee_units'] ?? '0'))),
+        'tdsUnits'    => u8str(u8((string)($t['tds_units'] ?? '0'))),
+        'netUnits'    => u8str(max(0, u8((string)$t['units'])
+                          - u8((string)($t['fee_units'] ?? '0'))
+                          - u8((string)($t['tds_units'] ?? '0')))),
         'priceNav'    => (float)$t['price_nav'],
         'amountPaise' => (int)$t['amount_paise'],
         'buyerId'     => (int)$t['buyer_id'],

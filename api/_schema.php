@@ -98,7 +98,25 @@ declare(strict_types=1);
 // unit balance. The escrow itself is still moved ONLY by the Phase-1 cores
 // p2p_release_core()/p2p_cancel_core(); this migration merely makes room for
 // the states those cores and the cron/admin dispute paths record.
-const ARV_SCHEMA_VERSION = 13;
+//
+// 14 is P2P PHASE 2b — treasury default-liquidity + fees/TDS collected in ARV.
+// It is schema/settings-light: it seeds five new operator settings
+// (p2p_treasury_email, p2p_treasury_enabled, p2p_fee_account_email, p2p_fee_pct,
+// p2p_tds_pct) only when absent (never clobbering an operator value), and adds
+// two convenience columns to p2p_trades — fee_units and tds_units — that record
+// the ARV diverted to the platform fee account on release, purely so the buyer's
+// trade view can show the split. The MONEY itself still moves ONLY through the
+// same p2p_release_core()/p2p_cancel_core()/wallet_apply()/ledger_add() cores:
+//   • The treasury is just an ordinary user account whose ARV is escrowed with
+//     wallet_apply() (arv_units -> arv_locked_units) exactly like a real seller's
+//     before a trade row exists, so release/cancel are unchanged.
+//   • The fee/TDS diversion is units-only and one-sided from the buyer: on
+//     release of U units the buyer receives U-divert and the fee account is
+//     credited +divert (with its own lot), so Σ ledger arv_delta == 0 per trade
+//     and wallets still equal the ledger. If no fee account resolves, divert = 0.
+// This migration does NOT touch wallets, lots, the append-only ledger, `trades`,
+// or any existing unit balance; the new columns default to 0.
+const ARV_SCHEMA_VERSION = 14;
 
 function arv_schema(): array
 {
@@ -463,6 +481,15 @@ function arv_schema(): array
         -- paise, fixed at match time.
         amount_paise    BIGINT       NOT NULL,
 
+        -- Phase 2b: the ARV diverted to the platform fee account on release (the
+        -- platform fee and P2P TDS, both collected in ARV out of the buyer's
+        -- units). Zero until released, and zero when no fee account is
+        -- configured. A convenience mirror of the fee account's ledger entry/lot
+        -- — those remain the book of record — so the buyer's view can show the
+        -- split. See p2p_release_core().
+        fee_units       DECIMAL(28,8) NOT NULL DEFAULT 0,
+        tds_units       DECIMAL(28,8) NOT NULL DEFAULT 0,
+
         seller_payment_method_id BIGINT UNSIGNED NULL,
         seller_payment_snapshot  TEXT NULL,
 
@@ -812,6 +839,34 @@ function arv_default_settings(): array
         'p2p_match_ttl_hours'   => '24',
         'p2p_pay_ttl_minutes'   => '60',
         'p2p_confirm_ttl_hours' => '4',
+
+        // P2P Phase 2b — treasury default-liquidity. When a buyer wants ARV but
+        // no real seller order is resting, the buy can still fill against a
+        // platform "treasury" account: an ordinary, KYC-verified user row that
+        // holds ARV and has a payment method (the company UPI/bank the buyer
+        // pays). Off by default; the operator names the account and turns it on.
+        //   email   : the treasury account's login email. Must resolve to a
+        //             verified, active user WITH a payment method AND enough free
+        //             ARV, or the treasury is silently treated as unavailable.
+        //   enabled : master switch. '0' = the treasury never steps in (Phase-2
+        //             behaviour is unchanged).
+        'p2p_treasury_email'    => '',
+        'p2p_treasury_enabled'  => '0',
+
+        // P2P Phase 2b — platform fee + TDS collected in ARV. On every P2P
+        // release the platform diverts a small slice of the ARV the BUYER would
+        // receive into a fee account the operator controls (which it can later
+        // sell). This is one-sided and units-neutral — see p2p_release_core().
+        //   fee account : where the diverted ARV accrues. Blank falls back to
+        //                 p2p_treasury_email; if that is also blank, no fee is
+        //                 collected at all (divert = 0) and nothing breaks.
+        //   fee %       : platform fee as a percentage of the traded units, 0–5.
+        //   tds %       : P2P TDS as a percentage of the traded units, 0–30.
+        //                 SEPARATE from the index tds_pct; defaults to 0 so
+        //                 nothing changes until the operator turns it on.
+        'p2p_fee_account_email' => '',
+        'p2p_fee_pct'           => '1',
+        'p2p_tds_pct'           => '0',
         'buy_fills_from_treasury' => '1',
         'sell_fallback_to_treasury' => '1',
         'sell_fallback_minutes' => '5',
@@ -1477,6 +1532,53 @@ function arv_migrations(PDO $pdo): array
         $done[] = 'schema-13: P2P status ENUM extended (disputed, expired); '
                 . 'seeded pay/confirm/match timer settings (schema/settings only; '
                 . 'no wallet/lot/ledger/unit writes)';
+    }
+
+    // ---------------------------------------------------------------------
+    // Schema 14: P2P Phase 2b — treasury default-liquidity + fees/TDS in ARV.
+    //
+    // Two guarded ADDs and a settings seed, all idempotent and
+    // schema/settings-only. NOTHING here touches wallets, lots, the append-only
+    // ledger, `trades`, or any unit balance. The treasury is just an ordinary
+    // user account whose ARV is escrowed by wallet_apply() at match time; the
+    // fee/TDS diversion is a one-sided, units-neutral credit to a fee account,
+    // moved solely by p2p_release_core(). This migration only:
+    //   (a) adds fee_units + tds_units to p2p_trades (default 0) so the buyer's
+    //       trade view can show what the platform diverted on release — a
+    //       convenience mirror of the fee account's own ledger entry/lot, which
+    //       remain the book of record. Guarded on column existence so the ADD
+    //       runs exactly once even though catch-up is re-entrant.
+    //   (b) seeds the five new operator settings if absent, never clobbering a
+    //       value an operator has already set. setting()/setting_b()/setting_f()
+    //       in the code paths fall back to these same defaults, so an install
+    //       that never runs this still behaves correctly; seeding just makes
+    //       them visible/editable in the admin panel immediately.
+    if (!$hasColumn('p2p_trades', 'fee_units')) {
+        $pdo->exec(
+            "ALTER TABLE p2p_trades
+               ADD COLUMN fee_units DECIMAL(28,8) NOT NULL DEFAULT 0 AFTER amount_paise,
+               ADD COLUMN tds_units DECIMAL(28,8) NOT NULL DEFAULT 0 AFTER fee_units"
+        );
+        $done[] = 'p2p_trades: added fee_units, tds_units (record ARV diverted on release)';
+    }
+
+    if (!setting_b('p2p_phase2b_v14', false)) {
+        foreach ([
+            'p2p_treasury_email'    => '',
+            'p2p_treasury_enabled'  => '0',
+            'p2p_fee_account_email' => '',
+            'p2p_fee_pct'           => '1',
+            'p2p_tds_pct'           => '0',
+        ] as $k => $v) {
+            if (setting($k, null) === null) {
+                setting_set($k, $v);
+            }
+        }
+
+        setting_set('p2p_phase2b_v14', '1');
+        $done[] = 'schema-14: seeded P2P treasury + fee/TDS settings; added '
+                . 'fee_units/tds_units columns (schema/settings only; no '
+                . 'wallet/lot/ledger/unit writes)';
     }
 
     if ($done) {

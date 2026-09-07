@@ -587,6 +587,15 @@ function handle_offers(): void
         $buyU8 += p2p_buy_matchable_u8($pdo, $o);
     }
 
+    // Phase 2b transparency: the platform fee + TDS a buyer will pay (in ARV,
+    // out of the units they receive) on release, and whether the treasury can
+    // supply liquidity when no real seller is resting. `feeCollected` reflects
+    // whether a fee account actually resolves — if not, no fee is taken.
+    $feeAcct  = p2p_fee_account_user($pdo);
+    $feePct   = $feeAcct !== null ? setting_f('p2p_fee_pct', 1) : 0.0;
+    $tdsPct   = $feeAcct !== null ? setting_f('p2p_tds_pct', 0) : 0.0;
+    $treasury = p2p_treasury_user($pdo);
+
     json_ok([
         'price'          => $meta,
         'sellDepthUnits' => u8str(max(0, $sellU8)),
@@ -595,6 +604,13 @@ function handle_offers(): void
         'buyDepthPaise'  => $nav !== null ? u8_to_paise(max(0, $buyU8), (float)$nav) : null,
         'sellOrders'     => count($sells),
         'buyOrders'      => count($buys),
+        'fee'            => [
+            'collected'    => $feeAcct !== null && ($feePct > 0 || $tdsPct > 0),
+            'feePct'       => $feePct,
+            'tdsPct'       => $tdsPct,
+            'totalPct'     => $feePct + $tdsPct,
+        ],
+        'treasuryAvailable' => $treasury !== null,
         'note'           => 'Every P2P trade settles at the live index price. A limit order acts '
                           . 'when the index reaches its level; there is no spread to negotiate.',
     ]);

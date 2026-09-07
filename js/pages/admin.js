@@ -394,6 +394,20 @@ var EDITABLE = [
   ['p2p_confirm_ttl_hours', 'P2P confirm window (hours)', 'number',
    'After proof is uploaded, how long the seller has to confirm before the trade goes to dispute for you to settle. 1\u201372.'],
 
+  // P2P treasury default-liquidity (Phase 2b).
+  ['p2p_treasury_email', 'P2P treasury account email', 'text',
+   'A normal, KYC-verified user account that holds ARV and a payment method (your company UPI/bank). When on, a buyer with no real seller buys from it \u2014 you confirm the trade from the list below once the company account is paid. Leave blank to disable.'],
+  ['p2p_treasury_enabled', 'P2P treasury on', 'bool',
+   'Master switch for treasury default-liquidity. Only turns on if the email above resolves to an active, KYC-verified account with a payment method.'],
+
+  // P2P platform fee + TDS, collected in ARV (Phase 2b).
+  ['p2p_fee_account_email', 'P2P fee account email', 'text',
+   'Where the platform fee + TDS accrue, in ARV, on every P2P release. Blank falls back to the treasury account; if both are blank, no fee is collected. It only receives ARV, so it needs no KYC or payment method.'],
+  ['p2p_fee_pct', 'P2P platform fee %', 'number',
+   'Taken from the ARV the BUYER receives on each P2P trade (the seller keeps their full rupees). 0\u20135. Default 1. Confirm this fee model suits you \u2014 the buyer bears it, in ARV.'],
+  ['p2p_tds_pct', 'P2P TDS %', 'number',
+   'A separate TDS slice, also taken in ARV from the buyer\u2019s units. Independent of the index TDS. 0\u201330. Default 0 \u2014 nothing is taken until you set it.'],
+
   // Sign-in.
   ['google_client_id', 'Google client ID', 'text',
    'Paste to switch Google sign-in on. Ends in .apps.googleusercontent.com. Leave blank to keep it off. This is the Client ID, not the secret — there is no secret in this flow.'],
@@ -705,10 +719,15 @@ async function loadP2p(status, search) {
         ? '<button class="btn btn-sm btn-buy" data-p2p-release="' + t.id + '">Release</button> '
           + '<button class="btn btn-sm btn-ghost" data-p2p-cancel="' + t.id + '">Cancel</button>'
         : '';
-      return '<tr' + (disputed ? ' style="background:rgba(220,38,38,.08)"' : '') + '>'
+      // A treasury-seller trade has no real seller who will ever confirm — it is
+      // yours to release once the company account has the buyer's rupees.
+      var sellerCell = ui.esc(t.sellerEmail || ('#' + t.sellerId))
+        + (t.isTreasury ? ' <span class="badge info" title="Treasury sell \u2014 confirm once the company account is paid">treasury</span>' : '');
+      return '<tr' + (disputed ? ' style="background:rgba(220,38,38,.08)"'
+                    : (t.isTreasury ? ' style="background:rgba(37,99,235,.06)"' : '')) + '>'
         + '<td class="mono tiny">' + ui.esc(t.ref) + '</td>'
         + '<td class="tiny">' + ui.esc(t.buyerEmail || ('#' + t.buyerId)) + '</td>'
-        + '<td class="tiny">' + ui.esc(t.sellerEmail || ('#' + t.sellerId)) + '</td>'
+        + '<td class="tiny">' + sellerCell + '</td>'
         + '<td class="num tiny">' + ui.fmtUnits(t.units, 4) + '</td>'
         + '<td class="num">' + ui.fmtPaise(t.amountPaise) + '</td>'
         + '<td>' + statusCell + '</td>'
