@@ -87,6 +87,36 @@ function syncFormChrome() {
       + (isStop && !isBuy ? ' (Stop-loss: sells to limit your downside.)' : '')
       + (!isStop && !isBuy ? ' (Target: sells to lock in a gain.)' : '');
   }
+
+  // Available balance + quick-% amounts. On a SELL the quick buttons pick a
+  // portion of the ARV you hold (25/50/75/100%); on a BUY there is nothing to
+  // portion (you have not chosen a seller yet), so they are hidden.
+  var w = st.user && st.user.wallet;
+  var avail = w ? (parseFloat(w.arvUnits) || 0) : 0;
+  var availLabel = ui.el('[data-p2p-avail-label]');
+  var availEl = ui.el('[data-p2p-avail]');
+  var quick = ui.el('[data-p2p-quick]');
+  if (availLabel) availLabel.textContent = isBuy ? 'KYC-verified buyers only' : 'ARV available';
+  if (availEl) availEl.textContent = isBuy ? '\u2014' : (w ? ui.fmtUnits(avail, 4) + ' ARV' : '\u2014');
+  if (quick) {
+    if (isBuy) {
+      quick.classList.add('hidden');
+      quick.innerHTML = '';
+    } else {
+      quick.classList.remove('hidden');
+      quick.innerHTML = [25, 50, 75, 100].map(function (pc) {
+        return '<button type="button" class="btn btn-sm" data-p2p-qpct="' + pc + '">' + pc + '%</button>';
+      }).join('');
+      ui.els('[data-p2p-qpct]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          // Floored at 8dp so "100%" never asks for more than is actually held.
+          var u = Math.floor(avail * (Number(b.dataset.qpct) / 100) * 1e8) / 1e8;
+          var inp = ui.el('#p2pUnits');
+          if (inp) { inp.value = String(u); paintEstimate(); }
+        });
+      });
+    }
+  }
   paintEstimate();
 }
 
