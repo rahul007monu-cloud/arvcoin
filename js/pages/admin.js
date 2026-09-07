@@ -16,7 +16,8 @@ var CFG = globalThis.ARV_CONFIG;
 // table back to its unfiltered default.
 var st = {
   overview: null, recon: null,
-  userQuery: '', ledgerQuery: '', orderStatus: 'open', orderQuery: ''
+  userQuery: '', ledgerQuery: '', orderStatus: 'open', orderQuery: '',
+  p2pStatus: 'active', p2pQuery: ''
 };
 
 /* ---------------------------------------------------------------- overview -- */
@@ -639,6 +640,72 @@ async function loadOrders(status, search) {
   }
 }
 
+/* --------------------------------------------------------------------- p2p -- */
+
+/**
+ * Every P2P escrow trade.
+ *
+ * Two operator overrides, both money-critical and audited on the server:
+ * release moves the escrow to the buyer (the seller's own confirm), cancel
+ * returns it to the seller. The status maths is not reinvented here — the server
+ * runs the same p2p_release_core / p2p_cancel_core the users' actions use.
+ */
+async function loadP2p(status, search) {
+  var host = ui.el('[data-p2p-trades]');
+  if (!host) return;
+  try {
+    var r = await api.admin.p2pTrades(status || 'active', search || '');
+    var rows = r.trades || [];
+    if (!rows.length) {
+      host.innerHTML = '<tr><td colspan="8" class="empty">No P2P trades.</td></tr>';
+      return;
+    }
+    host.innerHTML = rows.map(function (t) {
+      var live = t.status === 'matched' || t.status === 'paid';
+      var proof = '';
+      if (t.proofUtr) proof += '<span class="mono tiny">' + ui.esc(t.proofUtr) + '</span>';
+      if (t.proofImage) proof += ' <a href="' + ui.esc(t.proofImage) + '" target="_blank" rel="noopener">img</a>';
+      if (!proof) proof = '\u2014';
+      var actions = live
+        ? '<button class="btn btn-sm btn-buy" data-p2p-release="' + t.id + '">Release</button> '
+          + '<button class="btn btn-sm btn-ghost" data-p2p-cancel="' + t.id + '">Cancel</button>'
+        : '';
+      return '<tr>'
+        + '<td class="mono tiny">' + ui.esc(t.ref) + '</td>'
+        + '<td class="tiny">' + ui.esc(t.buyerEmail || ('#' + t.buyerId)) + '</td>'
+        + '<td class="tiny">' + ui.esc(t.sellerEmail || ('#' + t.sellerId)) + '</td>'
+        + '<td class="num tiny">' + ui.fmtUnits(t.units, 4) + '</td>'
+        + '<td class="num">' + ui.fmtPaise(t.amountPaise) + '</td>'
+        + '<td><span class="badge">' + ui.esc(t.status) + '</span></td>'
+        + '<td class="tiny">' + proof + '</td>'
+        + '<td class="right nowrap">' + actions + '</td>'
+        + '</tr>';
+    }).join('');
+
+    var reload = function () { return loadP2p(st.p2pStatus, st.p2pQuery); };
+
+    bindAction('[data-p2p-release]', async function (b) {
+      var id = Number(b.dataset.p2pRelease);
+      if (!confirm('Release trade #' + id + ' to the buyer?\n\nThis moves the escrowed ARV to the '
+                 + 'buyer and cannot be undone. Only do this once the rupees have reached the seller.')) return false;
+      var r2 = await api.admin.p2pRelease(id);
+      ui.toast(r2.message || 'Released.', 'ok');
+      return true;
+    }, reload);
+
+    bindAction('[data-p2p-cancel]', async function (b) {
+      var id = Number(b.dataset.p2pCancel);
+      var reason = prompt('Why is this being cancelled? Escrow returns to the seller. This is logged.');
+      if (!reason) return false;
+      var r2 = await api.admin.p2pCancel(id, reason);
+      ui.toast(r2.message || 'Cancelled.', 'ok');
+      return true;
+    }, reload);
+  } catch (e) {
+    host.innerHTML = '<tr><td colspan="8" class="empty">' + ui.esc(e.message) + '</td></tr>';
+  }
+}
+
 /* -------------------------------------------------------------------- glue -- */
 
 /**
@@ -719,7 +786,8 @@ async function load() {
   await Promise.all([
     loadDeposits(), loadWithdrawals(), loadKyc(), loadCoverage(),
     loadUsers(st.userQuery), loadLedger(st.ledgerQuery),
-    loadOrders(st.orderStatus, st.orderQuery)
+    loadOrders(st.orderStatus, st.orderQuery),
+    loadP2p(st.p2pStatus, st.p2pQuery)
   ]);
   return true;
 }
@@ -793,6 +861,21 @@ async function load() {
     st.orderStatus = orderStatus.value || 'open';
     st.orderQuery = (ui.el('[data-order-search]').value || '').trim();
     loadOrders(st.orderStatus, st.orderQuery);
+  });
+
+  // P2P trades: search form and immediate status filter.
+  var p2pForm = ui.el('[data-p2p-form]');
+  if (p2pForm) p2pForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    st.p2pStatus = ui.el('[data-p2p-status]').value || 'active';
+    st.p2pQuery = (ui.el('[data-p2p-search]').value || '').trim();
+    loadP2p(st.p2pStatus, st.p2pQuery);
+  });
+  var p2pStatus = ui.el('[data-p2p-status]');
+  if (p2pStatus) p2pStatus.addEventListener('change', function () {
+    st.p2pStatus = p2pStatus.value || 'active';
+    st.p2pQuery = (ui.el('[data-p2p-search]').value || '').trim();
+    loadP2p(st.p2pStatus, st.p2pQuery);
   });
 
   // Queues change when users act, so this refreshes on its own.

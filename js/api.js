@@ -375,6 +375,43 @@ export function submitKyc(data) {
   return request('kyc', 'submit', { data: data });
 }
 
+/* ------------------------------------------------------ payment methods -- */
+
+// Where a seller receives INR in a P2P trade. The platform never touches this
+// money — a buyer pays the seller directly — so these are reference details.
+export var paymentMethods = {
+  list: function () { return request('payment_methods', 'list', { method: 'GET' }); },
+  add: function (data) { return request('payment_methods', 'add', { data: data }); },
+  remove: function (id) { return request('payment_methods', 'delete', { data: { id: id } }); },
+  setDefault: function (id) { return request('payment_methods', 'set_default', { data: { id: id } }); }
+};
+
+/* ------------------------------------------------------------------- p2p -- */
+
+// Peer-to-peer escrow trading. A buy no longer needs an INR balance (the buyer
+// pays the seller off-platform); a sell escrows the seller's ARV until the
+// seller confirms receipt.
+export var p2p = {
+  place: function (data) { return request('p2p', 'place', { data: data }); },
+  mine: function () { return request('p2p', 'mine', { method: 'GET' }); },
+  offers: function () { return request('p2p', 'offers', { method: 'GET' }); },
+  confirm: function (id) { return request('p2p', 'confirm', { data: { id: id } }); },
+  cancelTrade: function (id, reason) { return request('p2p', 'cancel', { data: { id: id, reason: reason || '' } }); },
+  cancelOrder: function (orderId) { return request('p2p', 'cancel_order', { data: { orderId: orderId } }); },
+  // Proof of an off-platform payment: a UTR, a screenshot, or both. Multipart
+  // when a file is attached so it is not base64'd into JSON.
+  proof: function (id, utr, file) {
+    if (file) {
+      var fd = new FormData();
+      fd.set('id', id);
+      fd.set('utr', utr || '');
+      fd.set('screenshot', file);
+      return request('p2p', 'proof', { form: fd, timeoutMs: 60000 });
+    }
+    return request('p2p', 'proof', { data: { id: id, utr: utr } });
+  }
+};
+
 /* --------------------------------------------------------------- referral -- */
 
 export function referralSummary() {
@@ -435,6 +472,9 @@ export var admin = {
   ledger: function (search) { return request('admin', 'ledger', { method: 'GET', query: { q: search } }); },
   ordersAll: function (status, search) { return request('admin', 'orders_all', { method: 'GET', query: { status: status, q: search } }); },
   cancelOrder: function (orderId) { return request('admin', 'cancel_order_admin', { data: { orderId: orderId } }); },
+  p2pTrades: function (status, search) { return request('admin', 'p2p_trades', { method: 'GET', query: { status: status, q: search } }); },
+  p2pRelease: function (id) { return request('admin', 'p2p_release', { data: { id: id } }); },
+  p2pCancel: function (id, reason) { return request('admin', 'p2p_cancel', { data: { id: id, reason: reason } }); },
   settings: function () { return request('admin', 'settings', { method: 'GET' }); },
   saveSetting: function (key, value) { return request('admin', 'save_setting', { data: { key: key, value: value } }); }
 };

@@ -70,7 +70,22 @@ declare(strict_types=1);
 // re-queues the backfill chain from the head so the new BTC asset steps actually
 // run on installs whose chain had already reached 'done'. Candles/scheduling/
 // settings only — no wallet, lot, ledger, or unit writes.
-const ARV_SCHEMA_VERSION = 11;
+//
+// 12 introduces PEER-TO-PEER (P2P) ESCROW TRADING (Phase 1 of the conversion
+// from the deposit-then-index model to a Binance/WazirX-style P2P exchange).
+// It adds two new tables — `payment_methods` (where a seller receives INR
+// off-platform) and `p2p_trades` (one escrow trade between a buyer and a
+// seller) — and one new column, `orders.channel` ENUM('index','p2p'). The
+// channel column is the safety boundary: the existing index/treasury matching
+// engine (_match.php) is guarded to touch ONLY channel='index' rows, so a P2P
+// order placed into the shared `orders` table can never be auto-filled against
+// the treasury. P2P money movement reuses wallet_apply()/ledger_add()/
+// consume_lots() exactly as the index path does; the seller's ARV is escrowed
+// into wallets.arv_locked_units at sell-placement and only leaves on release
+// (to the buyer) or returns on cancel. This migration is schema-only for the
+// new tables/column plus a settings flag — it does NOT touch existing wallets,
+// lots, the append-only ledger, or any unit balance.
+const ARV_SCHEMA_VERSION = 12;
 
 function arv_schema(): array
 {
@@ -277,7 +292,17 @@ function arv_schema(): array
         side            ENUM('buy','sell') NOT NULL,
         otype           ENUM('market','limit') NOT NULL,
 
+        -- Which venue this order belongs to. 'index' is the original
+        -- deposit-then-index/treasury book that _match.php's engine fills;
+        -- 'p2p' is a peer-to-peer escrow order handled entirely by p2p.php and
+        -- _p2p.php. The index matching engine (run_matching / fill_buy_now /
+        -- fill_sell_now / activate_triggers / expire_orders / order_book) is
+        -- guarded to touch only channel='index', so a P2P order sharing this
+        -- table is never auto-filled against the treasury.
+        channel         ENUM('index','p2p') NOT NULL DEFAULT 'index',
+
         -- For buys the user names an amount of rupees; for sells, units.
+        -- (P2P orders always carry `units` — a P2P buy names the units it wants.)
         amount_paise    BIGINT       NULL,
         units           DECIMAL(28,8) NULL,
 
@@ -306,6 +331,8 @@ function arv_schema(): array
         KEY idx_orders_book (status, side, created_at),
         KEY idx_orders_user (user_id, created_at),
         KEY idx_orders_fallback (status, fallback_at),
+        -- The P2P matcher's hot path: resting orders on one channel/side.
+        KEY idx_orders_channel (channel, side, status, created_at),
         CONSTRAINT fk_orders_user FOREIGN KEY (user_id)
             REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
@@ -354,6 +381,104 @@ function arv_schema(): array
         KEY idx_trades_buyer (buyer_id, created_at),
         KEY idx_trades_seller (seller_id, created_at),
         KEY idx_trades_fy (seller_id, fy)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+    /* =============================================== payment methods ====== */
+    //
+    // Where a seller receives INR in a P2P trade. The platform never touches
+    // this money — it is paid buyer-to-seller off-platform — so these are stored
+    // as reference data an operator and a buyer can read, not as a payout rail.
+    //
+    // UPI is validated loosely (a VPA is `name@bank`); bank fields are stored as
+    // given. At match time the seller's chosen method is COPIED into the trade
+    // (p2p_trades.seller_payment_snapshot) so that later editing or deleting a
+    // method never rewrites the details of a trade already in flight.
+    //
+    "CREATE TABLE IF NOT EXISTS payment_methods (
+        id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id         BIGINT UNSIGNED NOT NULL,
+        type            ENUM('upi','bank') NOT NULL,
+        label           VARCHAR(80)  NOT NULL DEFAULT '',
+
+        upi_vpa         VARCHAR(120) NOT NULL DEFAULT '',
+
+        account_name    VARCHAR(120) NOT NULL DEFAULT '',
+        bank_account_no VARCHAR(40)  NOT NULL DEFAULT '',
+        bank_ifsc       VARCHAR(15)  NOT NULL DEFAULT '',
+
+        is_default      TINYINT(1)   NOT NULL DEFAULT 0,
+        created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+        KEY idx_pm_user (user_id, is_default),
+        CONSTRAINT fk_pm_user FOREIGN KEY (user_id)
+            REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+    /* ==================================================== p2p trades ====== */
+    //
+    // One escrow trade between a buyer and a seller, settled at the LIVE index
+    // price at match time. The seller's units are already locked in
+    // wallets.arv_locked_units (by the sell order) before a row here exists; this
+    // row reserves a slice of that escrow. Lifecycle:
+    //
+    //   matched  → a buy and a compatible sell were paired. Units escrowed,
+    //              amount_paise fixed, seller payment details snapshotted.
+    //   paid     → the buyer attached proof (UTR / screenshot) of paying the
+    //              seller off-platform.
+    //   released → the seller confirmed receipt; the escrowed units moved to the
+    //              buyer and a `trades` row was written for tax/history.
+    //   cancelled→ cancelled before payment; escrow returned to the seller.
+    //
+    // The status ENUM deliberately leaves room for Phase 2 ('disputed',
+    // 'expired'); adding them later is an ALTER, not a rethink. This table is
+    // intentionally NOT append-only (unlike ledger/trades) because status is a
+    // mutable lifecycle — the immutable record of the money move is the `trades`
+    // row and the ledger entries written on release.
+    //
+    "CREATE TABLE IF NOT EXISTS p2p_trades (
+        id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        ref             VARCHAR(32)  NOT NULL,
+
+        buyer_id        BIGINT UNSIGNED NOT NULL,
+        seller_id       BIGINT UNSIGNED NOT NULL,
+        buyer_order_id  BIGINT UNSIGNED NULL,
+        seller_order_id BIGINT UNSIGNED NULL,
+
+        units           DECIMAL(28,8) NOT NULL,
+        price_nav       DECIMAL(20,8) NOT NULL,
+        -- What the buyer must pay the seller = round(units × price_nav), integer
+        -- paise, fixed at match time.
+        amount_paise    BIGINT       NOT NULL,
+
+        seller_payment_method_id BIGINT UNSIGNED NULL,
+        seller_payment_snapshot  TEXT NULL,
+
+        status          ENUM('matched','paid','released','cancelled')
+                        NOT NULL DEFAULT 'matched',
+
+        proof_utr        VARCHAR(40)  NOT NULL DEFAULT '',
+        proof_image_path VARCHAR(255) NOT NULL DEFAULT '',
+        cancel_reason    VARCHAR(255) NOT NULL DEFAULT '',
+
+        -- The immutable `trades` row written when this trade releases.
+        trade_id        BIGINT UNSIGNED NULL,
+
+        matched_at      DATETIME     NULL,
+        paid_at         DATETIME     NULL,
+        released_at     DATETIME     NULL,
+        cancelled_at    DATETIME     NULL,
+        created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+        UNIQUE KEY uq_p2p_ref (ref),
+        KEY idx_p2p_buyer (buyer_id, status),
+        KEY idx_p2p_seller (seller_id, status),
+        KEY idx_p2p_status (status),
+        KEY idx_p2p_sell_order (seller_order_id, status),
+        KEY idx_p2p_buy_order (buyer_order_id, status),
+        CONSTRAINT fk_p2p_buyer FOREIGN KEY (buyer_id)
+            REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_p2p_seller FOREIGN KEY (seller_id)
+            REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
     /* ==================================================== deposits ======== */
@@ -1168,6 +1293,87 @@ function arv_migrations(PDO $pdo): array
         $done[] = 'schema-11: ARV chart now derives from BTC asset_candles; re-queued the '
                 . 'backfill chain so BTC gets full asset_candles history at every timeframe '
                 . '(candles/scheduling only; no wallet/lot/ledger/unit writes)';
+    }
+
+    // ---------------------------------------------------------------------
+    // Schema 12: peer-to-peer (P2P) escrow trading, Phase 1.
+    //
+    // Adds the two new tables and the `orders.channel` column. Purely additive
+    // and idempotent: `CREATE TABLE IF NOT EXISTS` for the tables, and a guarded
+    // ALTER for the column that runs only when the column is genuinely absent.
+    // Nothing here touches wallets, lots, the append-only ledger, `trades`, or
+    // any unit balance — it only makes room for the P2P code paths in p2p.php /
+    // _p2p.php to run. The column defaults to 'index', so every pre-existing
+    // order stays on the original engine untouched.
+    if (!$hasColumn('orders', 'channel')) {
+        $pdo->exec("ALTER TABLE orders
+                      ADD COLUMN channel ENUM('index','p2p') NOT NULL DEFAULT 'index' AFTER otype,
+                      ADD KEY idx_orders_channel (channel, side, status, created_at)");
+        $done[] = 'orders: added channel column (index/p2p) + index';
+    }
+
+    // The two new tables. IF NOT EXISTS makes this safe to run every catch-up;
+    // it creates nothing once they exist. Kept here (as well as in arv_schema())
+    // so an existing install gains them without a reinstall.
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS payment_methods (
+            id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            user_id         BIGINT UNSIGNED NOT NULL,
+            type            ENUM('upi','bank') NOT NULL,
+            label           VARCHAR(80)  NOT NULL DEFAULT '',
+            upi_vpa         VARCHAR(120) NOT NULL DEFAULT '',
+            account_name    VARCHAR(120) NOT NULL DEFAULT '',
+            bank_account_no VARCHAR(40)  NOT NULL DEFAULT '',
+            bank_ifsc       VARCHAR(15)  NOT NULL DEFAULT '',
+            is_default      TINYINT(1)   NOT NULL DEFAULT 0,
+            created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_pm_user (user_id, is_default),
+            CONSTRAINT fk_pm_user FOREIGN KEY (user_id)
+                REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS p2p_trades (
+            id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            ref             VARCHAR(32)  NOT NULL,
+            buyer_id        BIGINT UNSIGNED NOT NULL,
+            seller_id       BIGINT UNSIGNED NOT NULL,
+            buyer_order_id  BIGINT UNSIGNED NULL,
+            seller_order_id BIGINT UNSIGNED NULL,
+            units           DECIMAL(28,8) NOT NULL,
+            price_nav       DECIMAL(20,8) NOT NULL,
+            amount_paise    BIGINT       NOT NULL,
+            seller_payment_method_id BIGINT UNSIGNED NULL,
+            seller_payment_snapshot  TEXT NULL,
+            status          ENUM('matched','paid','released','cancelled')
+                            NOT NULL DEFAULT 'matched',
+            proof_utr        VARCHAR(40)  NOT NULL DEFAULT '',
+            proof_image_path VARCHAR(255) NOT NULL DEFAULT '',
+            cancel_reason    VARCHAR(255) NOT NULL DEFAULT '',
+            trade_id        BIGINT UNSIGNED NULL,
+            matched_at      DATETIME     NULL,
+            paid_at         DATETIME     NULL,
+            released_at     DATETIME     NULL,
+            cancelled_at    DATETIME     NULL,
+            created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_p2p_ref (ref),
+            KEY idx_p2p_buyer (buyer_id, status),
+            KEY idx_p2p_seller (seller_id, status),
+            KEY idx_p2p_status (status),
+            KEY idx_p2p_sell_order (seller_order_id, status),
+            KEY idx_p2p_buy_order (buyer_order_id, status),
+            CONSTRAINT fk_p2p_buyer FOREIGN KEY (buyer_id)
+                REFERENCES users(id) ON DELETE CASCADE,
+            CONSTRAINT fk_p2p_seller FOREIGN KEY (seller_id)
+                REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    if (!setting_b('p2p_phase1_v12', false)) {
+        setting_set('p2p_phase1_v12', '1');
+        $done[] = 'schema-12: P2P escrow tables (payment_methods, p2p_trades) ready '
+                . '(schema only; no wallet/lot/ledger/unit writes)';
     }
 
     if ($done) {

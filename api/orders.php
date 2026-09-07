@@ -374,8 +374,11 @@ function handle_mine(): void
         ? 'AND status IN ("open","triggered","partial")'
         : ($status === 'all' ? '' : 'AND status = ' . db()->quote($status));
 
+    // Only the index/treasury book belongs here — P2P orders live in p2p.php and
+    // its own "My P2P trades" surface, and mixing them into this list would show
+    // a user orders they cannot act on from this page.
     $rows = q(
-        "SELECT * FROM orders WHERE user_id = ? {$where} ORDER BY created_at DESC LIMIT 200",
+        "SELECT * FROM orders WHERE user_id = ? AND channel = 'index' {$where} ORDER BY created_at DESC LIMIT 200",
         [$u['id']]
     )->fetchAll();
 

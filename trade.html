@@ -205,9 +205,83 @@
     </div>
   </div>
 
+  <!-- ========================================================= peer-to-peer -->
+  <section class="card" style="margin-top:var(--sp-4)" data-p2p hidden>
+    <div class="card-head">
+      <h3 style="font-size:1rem">Peer-to-peer</h3>
+      <span class="badge metal">escrow · index-priced</span>
+    </div>
+    <p class="tiny muted" style="margin:0 0 var(--sp-4)">
+      Trade directly with another person. A seller's ARV is held in escrow; the
+      buyer pays the seller off-platform (UPI or bank) and uploads proof; the
+      seller confirms receipt and the ARV is released. Every trade settles at the
+      live index price — buying needs a verified KYC, not an INR balance.
+    </p>
+
+    <div class="grid g-2" style="align-items:start;gap:var(--sp-4)">
+
+      <!-- P2P order form -->
+      <div class="stack">
+        <div class="side-toggle" data-p2p-side style="margin-bottom:var(--sp-4)">
+          <button data-side="buy" class="on">Buy</button>
+          <button data-side="sell">Sell</button>
+        </div>
+
+        <div class="tabs" data-p2p-type style="margin-bottom:var(--sp-4);width:100%">
+          <button class="tab on" data-otype="market" style="flex:1">Market</button>
+          <button class="tab" data-otype="limit" style="flex:1">Limit</button>
+        </div>
+
+        <div class="field" style="margin-bottom:var(--sp-3)">
+          <label for="p2pUnits">Units of ARV</label>
+          <input id="p2pUnits" class="num-input" type="text" inputmode="decimal"
+                 autocomplete="off" placeholder="0.00000000">
+          <span class="hint" data-p2p-est></span>
+        </div>
+
+        <div class="field hidden" data-p2p-trigger-field style="margin-bottom:var(--sp-4)">
+          <label for="p2pTrigger">Act when ARV reaches</label>
+          <div class="amount-input">
+            <span class="cur">₹</span>
+            <input id="p2pTrigger" class="num-input" type="text" inputmode="decimal"
+                   autocomplete="off" placeholder="0.0000">
+          </div>
+          <span class="hint" data-p2p-trigger-hint></span>
+        </div>
+
+        <button class="btn btn-primary btn-block btn-lg" data-p2p-submit>Place P2P buy</button>
+        <div class="tiny muted" style="margin-top:var(--sp-3)" data-p2p-note></div>
+        <div class="tiny muted" style="margin-top:var(--sp-3)" data-p2p-depth></div>
+      </div>
+
+      <!-- My P2P trades and orders -->
+      <div class="stack">
+        <div class="card card-flush">
+          <div class="card-head" style="padding:var(--sp-4);margin:0">
+            <h4 style="font-size:.95rem">My P2P trades</h4>
+          </div>
+          <div style="padding:0 var(--sp-4) var(--sp-4)" data-p2p-trades>
+            <div class="empty tiny">None yet</div>
+          </div>
+        </div>
+
+        <div class="card card-flush">
+          <div class="card-head" style="padding:var(--sp-4);margin:0">
+            <h4 style="font-size:.95rem">My open P2P orders</h4>
+          </div>
+          <div style="padding:0 var(--sp-4) var(--sp-4)" data-p2p-orders>
+            <div class="empty tiny">None</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
 </main>
 
 <div data-footer></div>
 <script type="module" src="js/pages/trade.js"></script>
+<script type="module" src="js/pages/p2p.js"></script>
 </body>
 </html>
