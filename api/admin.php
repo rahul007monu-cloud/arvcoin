@@ -959,6 +959,14 @@ function handle_treasury_seed(): void
 
     $note = substr(trim((string)input_str('note')), 0, 120);
 
+    // Resolve the treasury before opening the transaction. Without this the
+    // "no treasury" case throws mid-transaction and reaches the caller as a bare
+    // 500 ("Something went wrong on our side"), hiding the one thing an operator
+    // actually needs to do — set the treasury email in Settings.
+    if (!arv_treasury_inventory_user(db())) {
+        json_fail(422, 'No usable treasury account. Set a treasury email in Settings to an active, KYC-verified account first.');
+    }
+
     $res = tx(static function (PDO $pdo) use ($units8, $meta, $note) {
         $t = arv_treasury_inventory_user($pdo);
         if (!$t) {
@@ -1022,6 +1030,31 @@ function handle_grant_arv(): void
     }
 
     $note = substr(trim((string)input_str('note')), 0, 120);
+
+    // Resolve and sanity-check the treasury before opening the transaction. A
+    // grant moves units OUT of the treasury, so an unconfigured or empty treasury
+    // is the usual reason a grant cannot proceed. Checking here turns both into a
+    // clear, actionable 422 instead of a bare 500 thrown from inside tx().
+    $treasury = arv_treasury_inventory_user(db());
+    if (!$treasury) {
+        json_fail(422, 'No usable treasury account. Set a treasury email in Settings to an active, KYC-verified account, then seed it with ARV before granting.');
+    }
+    // What the treasury can actually hand out is bounded by its lots, not just its
+    // balance — units without a lot cannot be consumed by the grant.
+    $treasuryId = (int)$treasury['id'];
+    $tw       = q1('SELECT arv_units FROM wallets WHERE user_id = ?', [$treasuryId]);
+    $freeU8   = $tw ? u8((string)$tw['arv_units']) : 0;
+    $lotU8    = (int)u8((string)(qval(
+        'SELECT COALESCE(SUM(units_remaining), 0) FROM lots WHERE user_id = ?',
+        [$treasuryId]
+    ) ?? '0'));
+    $sellable = min($freeU8, $lotU8);
+    if ($sellable < $units8) {
+        json_fail(422, sprintf(
+            'The treasury only holds %s ARV to hand out, but you asked to grant %s. Seed it with more ARV first.',
+            u8str($sellable), u8str($units8)
+        ), ['sellableUnits' => u8str($sellable)]);
+    }
 
     $res = tx(static function (PDO $pdo) use ($id, $units8, $meta, $note) {
         $t = arv_treasury_inventory_user($pdo);
