@@ -863,8 +863,13 @@ function sideConfigLight() {
     });
   });
 
-  ui.el('#amt').addEventListener('input', requestQuote);
-  ui.on('[data-submit]', 'click', submit);
+  // The deposit-first form is gone (P2P is the primary flow), so these bindings
+  // are optional. Without the guard, ui.el('#amt') returns null here and the
+  // TypeError aborts the whole boot — which left the ticker showing "—" and the
+  // chart empty, because paintTicker() and loadChart() below never ran.
+  var amtEl = ui.el('#amt');
+  if (amtEl) amtEl.addEventListener('input', requestQuote);
+  if (ui.el('[data-submit]')) ui.on('[data-submit]', 'click', submit);
 
   st.snap = await api.snapshot().catch(function () { return null; });
   paintTicker();

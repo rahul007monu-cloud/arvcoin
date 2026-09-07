@@ -193,12 +193,20 @@
           <button class="tab" data-otype="target" style="flex:1">Target</button>
         </div>
 
+        <div class="row-between small muted" style="margin-bottom:var(--sp-3)">
+          <span data-p2p-avail-label>ARV available</span>
+          <span class="num strong" data-p2p-avail>—</span>
+        </div>
+
         <div class="field" style="margin-bottom:var(--sp-3)">
           <label for="p2pUnits">Units of ARV</label>
           <input id="p2pUnits" class="num-input" type="text" inputmode="decimal"
                  autocomplete="off" placeholder="0.00000000">
           <span class="hint" data-p2p-est></span>
         </div>
+
+        <!-- Quick sell amounts, shown only when selling. -->
+        <div class="quick hidden" data-p2p-quick style="margin-bottom:var(--sp-4)"></div>
 
         <div class="field hidden" data-p2p-trigger-field style="margin-bottom:var(--sp-4)">
           <label for="p2pTrigger">Act when ARV reaches</label>
