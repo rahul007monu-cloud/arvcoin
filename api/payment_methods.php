@@ -16,6 +16,17 @@ declare(strict_types=1);
 require __DIR__ . '/_boot.php';
 require __DIR__ . '/_p2p.php';
 
+// These two MUST be declared before the dispatch below. PHP hoists function
+// declarations but NOT `const` at file scope: a const is only defined once the
+// interpreter reaches that line. When these sat below the switch, every add()
+// call died with "Undefined constant PM_VPA_RE" — a fatal that surfaced to the
+// user as a bare "Something went wrong", so no payment method could be saved.
+//
+// A VPA is name@bank — validated loosely, the same shape the KYC form accepts.
+const PM_VPA_RE  = '/^[\w.\-]{2,}@[a-zA-Z]{2,}$/';
+// An IFSC is four letters, a 0, then six alphanumerics.
+const PM_IFSC_RE = '/^[A-Z]{4}0[A-Z0-9]{6}$/';
+
 $action = $_GET['action'] ?? input_str('action');
 
 switch ($action) {
@@ -26,11 +37,6 @@ switch ($action) {
     default:
         json_fail(400, 'Unknown action.');
 }
-
-// A VPA is name@bank — validated loosely, the same shape the KYC form accepts.
-const PM_VPA_RE  = '/^[\w.\-]{2,}@[a-zA-Z]{2,}$/';
-// An IFSC is four letters, a 0, then six alphanumerics.
-const PM_IFSC_RE = '/^[A-Z]{4}0[A-Z0-9]{6}$/';
 
 /* =============================================================== list ===== */
 

@@ -6,7 +6,7 @@
 <title>Trade ARV — ARV Coin</title>
 <meta name="description" content="Buy and sell ARV. Every fill settles at the index price, so there is no spread. Buys are instant; sells go to a real buyer or to the treasury.">
 <meta name="theme-color" content="#07070a">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.svg?v=4" type="image/svg+xml">
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/core.css">
@@ -217,6 +217,11 @@
           </div>
           <span class="hint" data-p2p-trigger-hint></span>
         </div>
+
+        <!-- Where a seller receives the rupees. Rendered here, next to the sell
+             form, because a sell is refused without a payment method and making
+             someone leave for the profile page to fix that loses the trade. -->
+        <div class="hidden" data-p2p-pay style="margin-bottom:var(--sp-4)"></div>
 
         <button class="btn btn-primary btn-block btn-lg" data-p2p-submit>Place P2P buy</button>
         <div class="tiny muted" style="margin-top:var(--sp-3)" data-p2p-note></div>
