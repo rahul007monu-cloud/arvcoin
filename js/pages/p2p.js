@@ -23,7 +23,12 @@ var st = {
   // Phase 2b: platform fee + TDS (in ARV) the buyer pays on release, from the
   // offers endpoint, plus whether the treasury can supply liquidity.
   fee: null,
-  treasuryAvailable: false
+  treasuryAvailable: false,
+  // Where this seller receives rupees. Loaded lazily the first time the sell
+  // side is opened, then kept in sync as methods are added or removed.
+  methods: null,
+  payKind: 'upi',
+  payOpen: false
 };
 
 /* --------------------------------------------------------------- helpers -- */
@@ -62,6 +67,179 @@ function paintEstimate() {
       + ' ARV</strong>.</span>';
   }
   host.innerHTML = line;
+}
+
+/* -------------------------------------------------- seller payment method -- */
+
+function methodLine(m) {
+  if (m.type === 'upi') return 'UPI · ' + ui.esc(m.upiVpa);
+  var tail = String(m.bankAccountNo || '');
+  tail = tail.length > 4 ? '\u2022\u2022\u2022\u2022' + tail.slice(-4) : tail;
+  return 'Bank · ' + ui.esc(m.accountName || '') + ' · ' + ui.esc(tail)
+    + ' · ' + ui.esc(m.bankIfsc || '');
+}
+
+/**
+ * The sell-side payment block. Three states, in order of what the seller needs:
+ * none saved (an add form, open, explaining the sell is blocked without one),
+ * some saved (the list, with the default marked and a collapsed add form), and
+ * the add form itself. Kept in this panel so a seller never has to leave the
+ * trade page to become able to sell.
+ */
+function paintPayBlock() {
+  var host = ui.el('[data-p2p-pay]');
+  if (!host) return;
+
+  if (st.side !== 'sell') {                 // buyers pay out, they receive nothing
+    host.classList.add('hidden');
+    host.innerHTML = '';
+    return;
+  }
+  host.classList.remove('hidden');
+
+  if (st.methods == null) {                 // still loading
+    host.innerHTML = '<div class="tiny muted">Loading your payment details\u2026</div>';
+    return;
+  }
+
+  var has = st.methods.length > 0;
+  var open = st.payOpen || !has;             // with none saved the form is always open
+  var isUpi = st.payKind === 'upi';
+  var h = '';
+
+  h += '<div class="row-between small" style="margin-bottom:var(--sp-2)">'
+    +    '<strong>Where you get paid</strong>'
+    +    (has ? '<button type="button" class="btn btn-sm" data-p2p-pay-toggle>'
+                 + (open ? 'Close' : 'Add another') + '</button>' : '')
+    +  '</div>';
+
+  if (!has) {
+    h += '<div class="note-box bad tiny" style="margin-bottom:var(--sp-3)">'
+      +    'Add a UPI ID or bank account first \u2014 a P2P buyer pays you directly, '
+      +    'so a sell cannot be listed without it.'
+      +  '</div>';
+  }
+
+  if (has) {
+    h += '<div style="margin-bottom:var(--sp-3)">' + st.methods.map(function (m) {
+      return '<div class="row-between tiny" style="padding:6px 0;border-bottom:1px solid var(--line)">'
+        +      '<span>' + methodLine(m)
+        +        (m.isDefault ? ' <span class="badge">default</span>' : '') + '</span>'
+        +      '<span>'
+        +        (m.isDefault ? '' : '<button type="button" class="btn btn-sm" data-p2p-pay-default="' + m.id + '">Use</button> ')
+        +        '<button type="button" class="btn btn-sm" data-p2p-pay-del="' + m.id + '">Remove</button>'
+        +      '</span>'
+        +    '</div>';
+    }).join('') + '</div>';
+    h += '<div class="tiny muted" style="margin-bottom:var(--sp-3)">'
+      +    'The one marked <strong>default</strong> is what a buyer sees when your sell matches.'
+      +  '</div>';
+  }
+
+  if (open) {
+    h += '<div class="tabs" data-p2p-pay-kind style="margin-bottom:var(--sp-3);width:100%">'
+      +    '<button type="button" class="tab' + (isUpi ? ' on' : '') + '" data-kind="upi" style="flex:1">UPI</button>'
+      +    '<button type="button" class="tab' + (isUpi ? '' : ' on') + '" data-kind="bank" style="flex:1">Bank</button>'
+      +  '</div>';
+
+    if (isUpi) {
+      h += '<div class="field" style="margin-bottom:var(--sp-3)">'
+        +    '<label for="p2pVpa">UPI ID</label>'
+        +    '<input id="p2pVpa" type="text" autocomplete="off" placeholder="yourname@okhdfc">'
+        +    '<span class="hint">Looks like yourname@okhdfc or 9876543210@paytm.</span>'
+        +  '</div>';
+    } else {
+      h += '<div class="field" style="margin-bottom:var(--sp-3)">'
+        +    '<label for="p2pAccName">Account holder name</label>'
+        +    '<input id="p2pAccName" type="text" autocomplete="off" placeholder="As printed in your bank">'
+        +  '</div>'
+        +  '<div class="field" style="margin-bottom:var(--sp-3)">'
+        +    '<label for="p2pAccNo">Account number</label>'
+        +    '<input id="p2pAccNo" type="text" inputmode="numeric" autocomplete="off" placeholder="6 to 20 digits">'
+        +  '</div>'
+        +  '<div class="field" style="margin-bottom:var(--sp-3)">'
+        +    '<label for="p2pIfsc">IFSC</label>'
+        +    '<input id="p2pIfsc" type="text" autocomplete="off" placeholder="HDFC0001234">'
+        +  '</div>';
+    }
+
+    h += '<button type="button" class="btn btn-block" data-p2p-pay-save>Save payment method</button>';
+  }
+
+  host.innerHTML = h;
+  bindPayActions();
+}
+
+function bindPayActions() {
+  ui.on('[data-p2p-pay-toggle]', 'click', function () {
+    st.payOpen = !st.payOpen;
+    paintPayBlock();
+  });
+
+  ui.els('[data-p2p-pay-kind] .tab').forEach(function (b) {
+    b.addEventListener('click', function () {
+      st.payKind = b.dataset.kind;
+      paintPayBlock();
+    });
+  });
+
+  ui.on('[data-p2p-pay-save]', 'click', async function () {
+    var btn = ui.el('[data-p2p-pay-save]');
+    var body = { type: st.payKind };
+
+    if (st.payKind === 'upi') {
+      body.upiVpa = (ui.el('#p2pVpa').value || '').trim();
+      if (!body.upiVpa) return ui.toastError('Enter your UPI ID.');
+    } else {
+      body.accountName   = (ui.el('#p2pAccName').value || '').trim();
+      body.bankAccountNo = (ui.el('#p2pAccNo').value || '').replace(/\s+/g, '');
+      body.bankIfsc      = (ui.el('#p2pIfsc').value || '').trim().toUpperCase();
+      if (!body.accountName || !body.bankAccountNo || !body.bankIfsc) {
+        return ui.toastError('Fill the name, account number and IFSC.');
+      }
+    }
+
+    ui.busy(btn, true, 'Saving\u2026');
+    try {
+      await api.paymentMethods.add(body);
+      st.payOpen = false;
+      await loadMethods();
+      ui.toast('Payment method saved. You can list a sell now.');
+    } catch (e) {
+      ui.toastError(e);
+    } finally {
+      ui.busy(btn, false);
+    }
+  });
+
+  ui.els('[data-p2p-pay-default]').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      try {
+        await api.paymentMethods.setDefault(Number(b.getAttribute('data-p2p-pay-default')));
+        await loadMethods();
+      } catch (e) { ui.toastError(e); }
+    });
+  });
+
+  ui.els('[data-p2p-pay-del]').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      if (!confirm('Remove this payment method? Trades already in flight keep the details they were matched with.')) return;
+      try {
+        await api.paymentMethods.remove(Number(b.getAttribute('data-p2p-pay-del')));
+        await loadMethods();
+      } catch (e) { ui.toastError(e); }
+    });
+  });
+}
+
+async function loadMethods() {
+  try {
+    var r = await api.paymentMethods.list();
+    st.methods = r.methods || [];
+  } catch (_) {
+    st.methods = [];       // render the add form rather than a dead block
+  }
+  paintPayBlock();
 }
 
 /* ------------------------------------------------------------------ form -- */
@@ -122,6 +300,11 @@ function syncFormChrome() {
       });
     }
   }
+  // Selling needs somewhere to be paid, so load that list the first time the
+  // sell side is opened rather than on every page view.
+  if (!isBuy && st.methods == null) loadMethods();
+  paintPayBlock();
+
   paintEstimate();
 }
 
