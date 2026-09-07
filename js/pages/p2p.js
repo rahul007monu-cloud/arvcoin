@@ -109,8 +109,13 @@ function syncFormChrome() {
       }).join('');
       ui.els('[data-p2p-qpct]').forEach(function (b) {
         b.addEventListener('click', function () {
-          // Floored at 8dp so "100%" never asks for more than is actually held.
-          var u = Math.floor(avail * (Number(b.dataset.qpct) / 100) * 1e8) / 1e8;
+          // data-p2p-qpct="..." surfaces as dataset.p2pQpct, not dataset.qpct — the
+          // old key read undefined, Number(undefined) is NaN, and NaN ended up in
+          // the units box on every click. Read the attribute the button actually
+          // has, and floor at 8dp so "100%" never asks for more than is held.
+          var pct = Number(b.getAttribute('data-p2p-qpct'));
+          if (!isFinite(pct)) return;
+          var u = Math.floor(avail * (pct / 100) * 1e8) / 1e8;
           var inp = ui.el('#p2pUnits');
           if (inp) { inp.value = String(u); paintEstimate(); }
         });
