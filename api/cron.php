@@ -161,8 +161,8 @@ function job_p2p_maintenance(): array
 {
     $r = p2p_maintenance();
     cron_record('p2p_maintenance', 'ok', sprintf(
-        '%d orders expired, %d matched auto-cancelled (unpaid), %d sent to dispute (unconfirmed)',
-        $r['ordersExpired'], $r['tradesExpired'], $r['tradesDisputed']
+        '%d orders expired, %d matched auto-cancelled (unpaid), %d sent to dispute (unconfirmed), %d triggers fired',
+        $r['ordersExpired'], $r['tradesExpired'], $r['tradesDisputed'], $r['triggersFired']
     ));
     return $r;
 }

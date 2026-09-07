@@ -78,9 +78,15 @@ function syncFormChrome() {
     : 'Your ARV is escrowed now and released only when you confirm you were paid.');
 
   var hint = ui.el('[data-p2p-trigger-hint]');
-  if (hint) hint.textContent = isBuy
-    ? 'A P2P buy triggers when ARV falls to this level or below.'
-    : 'A P2P sell triggers when ARV rises to this level or above.';
+  if (hint) {
+    // stop = opposite direction to limit/target.
+    var isStop = st.otype === 'stop';
+    var up = isBuy ? isStop : !isStop;   // does it fire when the price RISES?
+    hint.textContent = 'This ' + (isBuy ? 'buy' : 'sell') + ' triggers when ARV '
+      + (up ? 'rises to this level or above' : 'falls to this level or below') + '.'
+      + (isStop && !isBuy ? ' (Stop-loss: sells to limit your downside.)' : '')
+      + (!isStop && !isBuy ? ' (Target: sells to lock in a gain.)' : '');
+  }
   paintEstimate();
 }
 
@@ -93,9 +99,9 @@ async function place() {
   }
 
   var payload = { side: st.side, type: st.otype, units: String(units) };
-  if (st.otype === 'limit') {
+  if (st.otype !== 'market') {
     var trigger = parseFloat((ui.el('#p2pTrigger').value || '').replace(/[^\d.]/g, ''));
-    if (!trigger) { ui.toast('Enter the price the order should act at.', 'warn'); return; }
+    if (!trigger) { ui.toast('Enter the price the order should trigger at.', 'warn'); return; }
     payload.triggerNav = String(trigger);
   }
 
@@ -368,7 +374,7 @@ async function refresh() {
       b.classList.add('on');
       st.otype = b.dataset.otype;
       var f = ui.el('[data-p2p-trigger-field]');
-      if (f) f.classList.toggle('hidden', st.otype !== 'limit');
+      if (f) f.classList.toggle('hidden', st.otype === 'market');
       syncFormChrome();
     });
   });
