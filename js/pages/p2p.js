@@ -19,7 +19,11 @@ var st = {
   side: 'buy',
   otype: 'market',
   nav: null,
-  user: null
+  user: null,
+  // Phase 2b: platform fee + TDS (in ARV) the buyer pays on release, from the
+  // offers endpoint, plus whether the treasury can supply liquidity.
+  fee: null,
+  treasuryAvailable: false
 };
 
 /* --------------------------------------------------------------- helpers -- */
@@ -44,8 +48,20 @@ function paintEstimate() {
       : '';
     return;
   }
-  host.innerHTML = (st.side === 'buy' ? 'You pay the seller about ' : 'You receive about ')
+  var line = (st.side === 'buy' ? 'You pay the seller about ' : 'You receive about ')
     + '<strong>' + ui.fmtPaise(paise) + '</strong> at ' + ui.fmtPrice(st.nav) + ' per ARV.';
+
+  // On a buy, the platform fee + TDS come out of the ARV you receive (never your
+  // rupees), so surface it up front. Uses the live pct from the offers endpoint.
+  if (st.side === 'buy' && st.fee && st.fee.collected && st.fee.totalPct > 0) {
+    var u = parseFloat(units);
+    var net = u * (1 - st.fee.totalPct / 100);
+    line += '<br><span class="tiny muted">Platform fee ' + st.fee.feePct + '%'
+      + (st.fee.tdsPct > 0 ? ' + TDS ' + st.fee.tdsPct + '%' : '')
+      + ' is deducted in ARV \u2014 you receive about <strong>' + ui.fmtUnits(net, 4)
+      + ' ARV</strong>.</span>';
+  }
+  host.innerHTML = line;
 }
 
 /* ------------------------------------------------------------------ form -- */
@@ -191,6 +207,17 @@ function tradeCard(t) {
       + '</div>';
   }
 
+  // Buyer, released: show exactly what the platform took, in ARV, and what
+  // landed in the wallet — the fee is borne by the buyer, in ARV, so it should
+  // be transparent after the fact as well as up front on the form.
+  if (t.role === 'buyer' && t.status === 'released'
+      && (parseFloat(t.feeUnits) > 0 || parseFloat(t.tdsUnits) > 0)) {
+    extra += '<div class="tiny muted" style="margin-top:8px">Platform fee '
+      + ui.fmtUnits(t.feeUnits, 4) + ' ARV'
+      + (parseFloat(t.tdsUnits) > 0 ? ' \u00b7 TDS ' + ui.fmtUnits(t.tdsUnits, 4) + ' ARV' : '')
+      + ' \u00b7 you received <strong>' + ui.fmtUnits(t.netUnits, 4) + ' ARV</strong>.</div>';
+  }
+
   return '<div class="asset-row" style="display:block;padding:10px 0;border-bottom:1px solid var(--line)">'
     + head + body + extra + '</div>';
 }
@@ -301,6 +328,8 @@ async function refresh() {
   try {
     var o = await api.p2p.offers();
     if (o.price && o.price.nav != null) st.nav = o.price.nav;
+    if (o.fee) st.fee = o.fee;
+    st.treasuryAvailable = !!o.treasuryAvailable;
     paintDepth(o);
     paintEstimate();
   } catch (_) {}
