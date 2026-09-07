@@ -1163,3 +1163,166 @@ function p2p_maintenance(): array
         'triggersFired'  => $triggersFired,
     ];
 }
+
+
+/* ==================================================== treasury inventory === */
+
+/**
+ * Resolve the treasury account for INVENTORY work (seeding and grants).
+ *
+ * Deliberately a lighter check than p2p_treasury_user(): that one gates the
+ * matching path, so it also demands the enabled flag, KYC and a saved payment
+ * method — a buyer matched against the treasury needs somewhere to pay. Seeding
+ * and granting move inventory around and never ask anyone to pay the treasury,
+ * so requiring a payment method there would only produce a confusing refusal
+ * before the operator had finished setting the account up.
+ *
+ * Still requires an active account, so a suspended one cannot be used as a
+ * source. Returns null when the email is unset or does not resolve.
+ */
+function arv_treasury_inventory_user(PDO $pdo): ?array
+{
+    $email = trim((string)setting('p2p_treasury_email', ''));
+    if ($email === '') {
+        return null;
+    }
+    $st = $pdo->prepare('SELECT * FROM users WHERE email = ? LIMIT 1');
+    $st->execute([$email]);
+    $u = $st->fetch();
+    if (!$u || ($u['status'] ?? '') !== 'active') {
+        return null;
+    }
+    return $u;
+}
+
+/**
+ * Bring ARV inventory into existence in the treasury.
+ *
+ * This ISSUES units — they are not moved from another account — so the platform's
+ * obligation grows by exactly this amount. That is the point: the treasury is the
+ * inventory a new buyer matches against when no real seller exists yet, and the
+ * budget a promotional grant is paid out of. It is an explicit operator action
+ * rather than a migration for that reason: an operator should choose to create a
+ * liability, not discover that a deploy did.
+ *
+ * The lot is not optional. consume_lots() is what a sale (and a grant) draws
+ * from, so units credited without one would leave the treasury holding ARV it
+ * could never sell or hand out — the shortfall guard would refuse every attempt.
+ * Its cost basis is the units' value at the current index price, which keeps the
+ * account coherent (value == cost at creation, so no fictional profit on day one)
+ * and gives later sales a sensible reference to measure against.
+ *
+ * Caller supplies the $pdo and must already be inside a tx().
+ */
+function arv_treasury_seed_core(PDO $pdo, array $treasury, int $units8, float $nav, string $note): array
+{
+    if ($units8 <= 0) {
+        throw new RuntimeException('Seed refused: the amount must be more than zero.');
+    }
+    if ($nav <= 0) {
+        throw new RuntimeException('Seed refused: no usable index price to value the inventory at.');
+    }
+
+    $treasuryId = (int)$treasury['id'];
+    $costPaise  = u8_to_paise($units8, $nav);
+
+    wallet_apply($pdo, $treasuryId, 0, 0, $units8, 0, $costPaise, 0);
+
+    $pdo->prepare(
+        'INSERT INTO lots (user_id, units, units_remaining, cost_paise, nav)
+         VALUES (?, ?, ?, ?, ?)'
+    )->execute([$treasuryId, u8str($units8), u8str($units8), $costPaise, $nav]);
+
+    // Keeps the reconcile identity intact: wallet units and ledger arv_delta grow
+    // by the same amount, so sum(wallets) still equals sum(ledger).
+    ledger_add($pdo, $treasuryId, 'adjustment', 0, $units8, [
+        'nav'  => $nav,
+        'ref'  => ref('SEED'),
+        'note' => substr('Treasury inventory issued: ' . u8str($units8) . ' ARV. ' . $note, 0, 255),
+    ]);
+
+    return ['units' => u8str($units8), 'costPaise' => $costPaise, 'nav' => $nav];
+}
+
+/**
+ * Hand ARV from the treasury to a user, so they can list a P2P sell.
+ *
+ * The reason this exists: a brand-new buyer has nobody to match against. Someone
+ * has to be holding ARV first. It is also how a promotional grant is paid ("refer
+ * five people, get X ARV").
+ *
+ * Units-NEUTRAL by construction — the treasury loses exactly what the recipient
+ * gains, on both the wallet and the ledger side, so no new obligation is created
+ * here and the reconcile identity is untouched. Creating supply is a separate,
+ * deliberate act (arv_treasury_seed_core), which keeps "give someone ARV" and
+ * "print ARV" from being the same button.
+ *
+ * The treasury's own cost basis leaves with the units (consume_lots), and the
+ * recipient's lot is written at the units' value now — the fair value of what
+ * they received, which is the right basis for whatever they do with it next.
+ * Nothing is booked to realised P&L: a giveaway is a promotional cost, not a
+ * trade, and putting it there would quietly corrupt trading performance.
+ *
+ * Lock order is treasury lots -> treasury wallet -> recipient wallet, matching
+ * the seller-then-buyer order p2p_release_core() uses, so the two cannot deadlock
+ * against each other. Caller supplies the $pdo and must already be inside a tx().
+ */
+function arv_grant_core(PDO $pdo, array $treasury, int $recipientId, int $units8, float $nav, string $note): array
+{
+    if ($units8 <= 0) {
+        throw new RuntimeException('Grant refused: the amount must be more than zero.');
+    }
+    if ($nav <= 0) {
+        throw new RuntimeException('Grant refused: no usable index price to value the grant at.');
+    }
+
+    $treasuryId = (int)$treasury['id'];
+    if ($treasuryId === $recipientId) {
+        throw new RuntimeException('Grant refused: the treasury cannot grant to itself.');
+    }
+
+    // Take the units out of the treasury's own lots first. consume_lots() does not
+    // throw on a shortfall, it reports one — so this check is what stands between
+    // a grant and handing out ARV the treasury does not actually hold.
+    $take = consume_lots($pdo, $treasuryId, $units8);
+    if ($take['shortfall8'] > 0) {
+        throw new RuntimeException(sprintf(
+            'Grant refused: the treasury is short by %s ARV. Seed it first.',
+            u8str($take['shortfall8'])
+        ));
+    }
+    $costBasis = (int)$take['costPaise'];
+
+    // Treasury: units and their cost basis leave. wallet_apply() refuses to make
+    // any balance negative, so this is also the guard against over-granting.
+    wallet_apply($pdo, $treasuryId, 0, 0, -$units8, 0, -$costBasis, 0);
+
+    // Recipient: units arrive, valued at the index price now.
+    $valuePaise = u8_to_paise($units8, $nav);
+    wallet_apply($pdo, $recipientId, 0, 0, $units8, 0, $valuePaise, 0);
+
+    // Without this lot the recipient could hold the ARV but never sell it, which
+    // would defeat the entire purpose of the grant.
+    $pdo->prepare(
+        'INSERT INTO lots (user_id, units, units_remaining, cost_paise, nav)
+         VALUES (?, ?, ?, ?, ?)'
+    )->execute([$recipientId, u8str($units8), u8str($units8), $valuePaise, $nav]);
+
+    $ref = ref('GRANT');
+    ledger_add($pdo, $treasuryId, 'adjustment', 0, -$units8, [
+        'nav' => $nav, 'ref' => $ref, 'relatedId' => $recipientId,
+        'note' => substr('Granted ' . u8str($units8) . ' ARV to user #' . $recipientId . '. ' . $note, 0, 255),
+    ]);
+    ledger_add($pdo, $recipientId, 'adjustment', 0, $units8, [
+        'nav' => $nav, 'ref' => $ref, 'relatedId' => $treasuryId,
+        'note' => substr('Received ' . u8str($units8) . ' ARV from the treasury. ' . $note, 0, 255),
+    ]);
+
+    return [
+        'units'            => u8str($units8),
+        'valuePaise'       => $valuePaise,
+        'treasuryCostOut'  => $costBasis,
+        'nav'              => $nav,
+        'ref'              => $ref,
+    ];
+}

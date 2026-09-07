@@ -39,6 +39,11 @@ switch ($action) {
     case 'users':             handle_users();           break;
     case 'set_user_status':   handle_set_user_status(); break;
     case 'set_user_admin':    handle_set_user_admin();  break;
+    case 'delete_user':       handle_delete_user();     break;
+    case 'treasury_status':   handle_treasury_status(); break;
+    case 'treasury_seed':     handle_treasury_seed();   break;
+    case 'grant_arv':         handle_grant_arv();       break;
+    case 'wipe_data':         handle_wipe_data();       break;
     case 'ledger':            handle_ledger();          break;
     case 'orders_all':        handle_orders_all();      break;
     case 'cancel_order_admin':handle_cancel_order_admin(); break;
@@ -790,6 +795,322 @@ function handle_set_user_admin(): void
                          'detail' => ['from' => (int)$u['is_admin'], 'to' => $isAdmin]]);
 
     json_ok(['message' => $isAdmin ? 'Operator access granted.' : 'Operator access removed.']);
+}
+
+/* ============================================== delete a user account ===== */
+
+/**
+ * Hard-delete a user, but only one that has no money history.
+ *
+ * The restriction is not caution for its own sake, it is what keeps the books
+ * intact. On a delete the wallet row cascades away (wallets has ON DELETE
+ * CASCADE) while the ledger does NOT, because the ledger deliberately carries no
+ * foreign key to users — it is the book of record and has to outlive an account.
+ * Delete somebody who ever moved money and sum(wallets) drops while
+ * sum(ledger) does not, so the reconcile identity the operator relies on is
+ * broken permanently, with no way to tell later what it was broken by.
+ *
+ * So: an account with no ledger rows, no trades and empty balances contributed
+ * nothing to either side of that identity and is safe to remove — that is the
+ * abandoned signup or the throwaway test account this is actually for. Anything
+ * else is refused, with suspend offered instead, which is reversible and keeps
+ * the record.
+ */
+function handle_delete_user(): void
+{
+    require_method('POST');
+    require_csrf();
+    $me = require_admin();
+
+    $id = input_int('userId');
+    if ($id <= 0) {
+        json_fail(422, 'Which user?');
+    }
+    if ($id === (int)$me['id']) {
+        json_fail(422, 'You cannot delete your own account.');
+    }
+
+    $u = q1('SELECT id, email, is_admin FROM users WHERE id = ?', [$id]);
+    if (!$u) {
+        json_fail(404, 'User not found.');
+    }
+    if ((int)$u['is_admin'] === 1) {
+        json_fail(422, 'Remove operator access first, then delete the account.');
+    }
+
+    // What would make this delete unsafe or lossy.
+    $ledgerRows = (int)(qval('SELECT COUNT(*) FROM ledger WHERE user_id = ?', [$id]) ?? 0);
+    $tradeRows  = (int)(qval('SELECT COUNT(*) FROM trades WHERE buyer_id = ? OR seller_id = ?', [$id, $id]) ?? 0);
+    $w          = q1('SELECT * FROM wallets WHERE user_id = ?', [$id]);
+
+    $heldInr   = $w ? (int)$w['inr_paise'] + (int)$w['inr_locked_paise'] : 0;
+    $heldUnits = $w ? u8((string)$w['arv_units']) + u8((string)$w['arv_locked_units']) : 0;
+
+    $blockers = [];
+    if ($ledgerRows > 0) {
+        $blockers[] = $ledgerRows . ' ledger entries';
+    }
+    if ($tradeRows > 0) {
+        $blockers[] = $tradeRows . ' trades';
+    }
+    if ($heldInr > 0) {
+        $blockers[] = money_note($heldInr) . ' held';
+    }
+    if ($heldUnits > 0) {
+        $blockers[] = u8str($heldUnits) . ' ARV held';
+    }
+
+    if ($blockers) {
+        json_fail(409,
+            'This account has money history (' . implode(', ', $blockers) . ') so deleting it would '
+            . 'break reconciliation: its wallet would be removed but its ledger entries would remain. '
+            . 'Suspend it instead — that is reversible and keeps the record.',
+            ['blockers' => $blockers, 'suggest' => 'suspend']);
+    }
+
+    // Everything hanging off the account cascades (wallets, lots, orders, kyc,
+    // payment_methods, deposits, withdrawals, referrals, p2p_trades). The
+    // audit_log entry survives on purpose, so the deletion itself stays on record.
+    tx(static function (PDO $pdo) use ($id) {
+        $pdo->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
+    });
+
+    audit('user.delete', ['entity' => 'users', 'entity_id' => (string)$id,
+                          'detail' => ['email' => $u['email']]]);
+
+    json_ok(['message' => 'Account deleted.', 'email' => $u['email']]);
+}
+
+/* ================================================ treasury and grants ===== */
+
+/** Treasury inventory at a glance: is it usable, and what is it holding? */
+function handle_treasury_status(): void
+{
+    require_method('GET');
+    require_admin();
+
+    $email = trim((string)setting('p2p_treasury_email', ''));
+    $meta  = arv_nav_meta();
+
+    $out = [
+        'email'        => $email,
+        'configured'   => $email !== '',
+        'enabled'      => setting_b('p2p_treasury_enabled', false),
+        'nav'          => $meta['nav'],
+        'navStale'     => (bool)$meta['stale'],
+        'resolved'     => false,
+        'userId'       => null,
+        'freeUnits'    => '0',
+        'lockedUnits'  => '0',
+        'sellableUnits'=> '0',
+    ];
+
+    if ($email !== '') {
+        $pdo = db();
+        $t = arv_treasury_inventory_user($pdo);
+        if ($t) {
+            $w = q1('SELECT * FROM wallets WHERE user_id = ?', [(int)$t['id']]);
+            // What it can actually hand out or sell is bounded by its lots, not
+            // just its balance — units without a lot cannot be consumed.
+            $lotUnits = (int)u8((string)(qval(
+                'SELECT COALESCE(SUM(units_remaining), 0) FROM lots WHERE user_id = ?',
+                [(int)$t['id']]
+            ) ?? '0'));
+
+            $free = $w ? u8((string)$w['arv_units']) : 0;
+            $out['resolved']      = true;
+            $out['userId']        = (int)$t['id'];
+            $out['freeUnits']     = u8str($free);
+            $out['lockedUnits']   = u8str($w ? u8((string)$w['arv_locked_units']) : 0);
+            $out['sellableUnits'] = u8str(min($free, $lotUnits));
+        }
+    }
+
+    json_ok($out);
+}
+
+/**
+ * Issue ARV inventory into the treasury.
+ *
+ * An explicit operator action rather than a migration default, because it creates
+ * a liability: these units are issued, not moved, so the platform's obligation
+ * grows by the amount. An operator should choose that, not find that a deploy did
+ * it. The UI pre-fills the intended figure so it is still one click.
+ */
+function handle_treasury_seed(): void
+{
+    require_method('POST');
+    require_csrf();
+    require_admin();
+
+    $units = trim((string)input_str('units'));
+    if (!preg_match('/^\d{1,12}(\.\d{1,8})?$/', $units)) {
+        json_fail(422, 'Enter an amount of ARV, up to 8 decimal places.');
+    }
+    $units8 = u8($units);
+    if ($units8 <= 0) {
+        json_fail(422, 'The amount must be more than zero.');
+    }
+
+    $meta = arv_nav_meta();
+    if ($meta['nav'] === null || (float)$meta['nav'] <= 0) {
+        json_fail(503, 'No usable index price right now, so the inventory cannot be valued. Try again once the feed is live.');
+    }
+
+    $note = substr(trim((string)input_str('note')), 0, 120);
+
+    $res = tx(static function (PDO $pdo) use ($units8, $meta, $note) {
+        $t = arv_treasury_inventory_user($pdo);
+        if (!$t) {
+            throw new RuntimeException('No usable treasury account. Set a treasury email in Settings to an active account first.');
+        }
+        return arv_treasury_seed_core($pdo, $t, $units8, (float)$meta['nav'], $note);
+    });
+
+    audit('treasury.seed', ['entity' => 'wallets',
+                            'detail' => ['units' => $res['units'], 'nav' => $res['nav']]]);
+
+    json_ok(['message' => 'Treasury credited with ' . $res['units'] . ' ARV.', 'seed' => $res]);
+}
+
+/**
+ * Grant ARV from the treasury to a user, so they can list a P2P sell.
+ *
+ * Units-neutral: the treasury loses exactly what the recipient gains. Creating
+ * supply is the separate seed action, so "give someone ARV" and "print ARV" are
+ * never the same button.
+ */
+function handle_grant_arv(): void
+{
+    require_method('POST');
+    require_csrf();
+    require_admin();
+
+    $id = input_int('userId');
+    if ($id <= 0) {
+        json_fail(422, 'Which user?');
+    }
+
+    $units = trim((string)input_str('units'));
+    if (!preg_match('/^\d{1,12}(\.\d{1,8})?$/', $units)) {
+        json_fail(422, 'Enter an amount of ARV, up to 8 decimal places.');
+    }
+    $units8 = u8($units);
+    if ($units8 <= 0) {
+        json_fail(422, 'The amount must be more than zero.');
+    }
+
+    $u = q1('SELECT u.id, u.email, u.status, k.status AS kyc_status
+               FROM users u LEFT JOIN kyc k ON k.user_id = u.id
+              WHERE u.id = ?', [$id]);
+    if (!$u) {
+        json_fail(404, 'User not found.');
+    }
+    if (($u['status'] ?? '') !== 'active') {
+        json_fail(422, 'That account is not active.');
+    }
+    // Granting so somebody can sell only makes sense once they are verified —
+    // an unverified account is one step short of being able to trade anyway.
+    if (($u['kyc_status'] ?? 'none') !== 'verified') {
+        json_fail(422, 'Verify this account first — a grant is for an account that can already trade.',
+                  ['kycStatus' => $u['kyc_status'] ?? 'none']);
+    }
+
+    $meta = arv_nav_meta();
+    if ($meta['nav'] === null || (float)$meta['nav'] <= 0) {
+        json_fail(503, 'No usable index price right now, so the grant cannot be valued. Try again once the feed is live.');
+    }
+
+    $note = substr(trim((string)input_str('note')), 0, 120);
+
+    $res = tx(static function (PDO $pdo) use ($id, $units8, $meta, $note) {
+        $t = arv_treasury_inventory_user($pdo);
+        if (!$t) {
+            throw new RuntimeException('No usable treasury account. Set a treasury email in Settings to an active account first.');
+        }
+        return arv_grant_core($pdo, $t, $id, $units8, (float)$meta['nav'], $note);
+    });
+
+    audit('treasury.grant', ['entity' => 'users', 'entity_id' => (string)$id,
+                             'detail' => ['units' => $res['units'], 'email' => $u['email'],
+                                          'nav' => $res['nav'], 'ref' => $res['ref']]]);
+
+    json_ok([
+        'message' => $res['units'] . ' ARV granted to ' . $u['email'] . '.',
+        'grant'   => $res,
+    ]);
+}
+
+/* ==================================================== clear test data ===== */
+
+/**
+ * Wipe the platform back to an empty state, keeping configuration and the
+ * operator running it.
+ *
+ * This is for clearing out a round of testing. It is the one operation here that
+ * can destroy real money records, so it asks for the phrase to be typed rather
+ * than relying on a dialog somebody clicks through by reflex.
+ *
+ * TRUNCATE is used deliberately: the ledger and trades carry append-only triggers
+ * that refuse a DELETE, and TRUNCATE does not fire row triggers, so this is the
+ * only way to clear them without dropping the guarantee that protects them during
+ * normal running. Foreign key checks are suspended for the duration because the
+ * tables reference each other and there is no ordering that satisfies every
+ * constraint at once.
+ *
+ * Kept on purpose: settings (the whole configuration), the acting operator's own
+ * account and wallet (otherwise this locks them out of the panel they just used),
+ * the market history in arv_candles/asset_candles/fx_rates (it is not test data,
+ * and discarding it would force a full backfill before a chart worked again), and
+ * audit_log — so the wipe itself stays on the record.
+ */
+function handle_wipe_data(): void
+{
+    require_method('POST');
+    require_csrf();
+    $me = require_admin();
+
+    $confirm = trim((string)input_str('confirm'));
+    if ($confirm !== 'CLEAR ALL DATA') {
+        json_fail(422, 'Type CLEAR ALL DATA exactly to confirm.', ['needs' => 'confirm']);
+    }
+
+    $meId = (int)$me['id'];
+
+    // Everything that represents activity. Market history and settings are absent
+    // from this list on purpose (see the docblock).
+    $wipe = [
+        'ledger', 'trades', 'lots', 'orders', 'p2p_trades', 'payment_methods',
+        'deposits', 'withdrawals', 'kyc', 'referrals', 'otps', 'rate_limits',
+        'wallets',
+    ];
+
+    $counts = [];
+    foreach ($wipe as $t) {
+        $counts[$t] = (int)(qval('SELECT COUNT(*) FROM ' . $t) ?? 0);
+    }
+    $counts['users'] = (int)(qval('SELECT COUNT(*) FROM users WHERE id <> ?', [$meId]) ?? 0);
+
+    $pdo = db();
+    $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+    try {
+        foreach ($wipe as $t) {
+            $pdo->exec('TRUNCATE TABLE ' . $t);
+        }
+        // Every other account goes; this one stays so the panel is still reachable.
+        $pdo->prepare('DELETE FROM users WHERE id <> ?')->execute([$meId]);
+        // wallets was truncated, so give the surviving operator theirs back.
+        $pdo->prepare('INSERT INTO wallets (user_id) VALUES (?)')->execute([$meId]);
+    } finally {
+        $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+    }
+
+    audit('data.wipe', ['detail' => ['keptUserId' => $meId, 'cleared' => $counts]]);
+
+    json_ok([
+        'message' => 'Data cleared. Your operator account and all settings were kept.',
+        'cleared' => $counts,
+    ]);
 }
 
 /* ============================================================= ledger ===== */
