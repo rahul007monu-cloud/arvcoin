@@ -245,21 +245,84 @@ function handle_confirm_deposit(): void
                     $amount = min($cap, pct_of($paise, $pct));
 
                     if ($amount > 0) {
+                        // The commission is EARNED in rupees (a percentage of the
+                        // referred deposit) but PAID in ARV, converted at the index
+                        // price at this moment.
+                        //
+                        // It used to be credited to the rupee balance, and that
+                        // balance no longer has a use: trading is peer-to-peer, so
+                        // a buyer pays the seller off-platform and api/p2p.php never
+                        // touches INR. A rupee commission therefore just accumulated
+                        // with no way to spend it. Paying in ARV puts it into the
+                        // one thing the account can actually hold and sell.
+                        //
+                        // NOTE for the operator: these units are ISSUED, not moved
+                        // from another account, so the platform's ARV obligation
+                        // grows by the commission. That is the real cost of the
+                        // referral programme. Funding it from the fee/treasury
+                        // account instead would be units-neutral, but would make
+                        // referrals fail silently whenever that account ran dry.
+                        $navMeta = arv_nav_meta();
+                        $nav     = $navMeta['nav'];
+                        $units8  = ($nav !== null && (float)$nav > 0)
+                            ? paise_to_u8($amount, (float)$nav)
+                            : 0;
+
+                        // Only call it paid once the ARV is actually credited. With
+                        // no usable price (a cold or long-stale feed) the row is
+                        // recorded as 'pending' instead, so the commission is
+                        // preserved and visible rather than silently dropped — and
+                        // the deposit confirmation itself still succeeds.
+                        $didPay = $units8 > 0;
+
                         $pdo->prepare(
                             'INSERT INTO referrals (referrer_id, referee_id, trigger_deposit_id,
                                                     base_paise, commission_paise, commission_pct,
                                                     status, paid_at)
-                             VALUES (?, ?, ?, ?, ?, ?, "paid", UTC_TIMESTAMP())'
-                        )->execute([(int)$referrer, $userId, (int)$d['id'], $paise, $amount, $pct]);
-
-                        wallet_apply($pdo, (int)$referrer, $amount);
-                        // Recorded as its own kind so it never contaminates the
-                        // VDA cost basis — commission is income, not a capital gain.
-                        ledger_add($pdo, (int)$referrer, 'referral_commission', $amount, 0, [
-                            'ref' => $ref, 'relatedId' => $userId,
-                            'note' => sprintf('%s%% referral commission on a referred first deposit', $pct),
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ' . ($didPay ? 'UTC_TIMESTAMP()' : 'NULL') . ')'
+                        )->execute([
+                            (int)$referrer, $userId, (int)$d['id'], $paise, $amount, $pct,
+                            $didPay ? 'paid' : 'pending',
                         ]);
-                        $commission = ['referrerId' => (int)$referrer, 'paise' => $amount, 'pct' => $pct];
+
+                        if ($didPay) {
+                            // Credit the units and carry the rupee value as the cost
+                            // basis, so value == cost at receipt (unrealised P&L
+                            // starts at zero) and a later sale measures the gain from
+                            // there.
+                            wallet_apply($pdo, (int)$referrer, 0, 0, $units8, 0, $amount, 0);
+
+                            // A lot is not optional: consume_lots() is what a sale
+                            // draws from, and units credited without one would make
+                            // the referrer's next sell fail on a shortfall.
+                            $pdo->prepare(
+                                'INSERT INTO lots (user_id, units, units_remaining, cost_paise, nav)
+                                 VALUES (?, ?, ?, ?, ?)'
+                            )->execute([
+                                (int)$referrer, u8str($units8), u8str($units8), $amount, $nav,
+                            ]);
+
+                            // Still its own ledger kind, so the income never reads as
+                            // a capital gain — the delta is now in ARV, and the rupee
+                            // value it was earned at is in the note and on the
+                            // referrals row.
+                            ledger_add($pdo, (int)$referrer, 'referral_commission', 0, $units8, [
+                                'nav' => $nav, 'ref' => $ref, 'relatedId' => $userId,
+                                'note' => sprintf(
+                                    '%s%% referral commission on a referred first deposit — %s paid as ARV at %s',
+                                    $pct, money_note($amount), money_note((int)round((float)$nav * 100))
+                                ),
+                            ]);
+                        }
+
+                        $commission = [
+                            'referrerId' => (int)$referrer,
+                            'paise'      => $amount,
+                            'pct'        => $pct,
+                            'arvUnits'   => u8str($units8),
+                            'nav'        => $nav,
+                            'status'     => $didPay ? 'paid' : 'pending',
+                        ];
                     }
                 }
             }
