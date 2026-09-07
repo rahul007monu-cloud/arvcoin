@@ -1652,3 +1652,184 @@ table.data tfoot td {
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--warn); box-shadow: 0 0 0 2px rgba(7, 7, 10, .94);
 }
+
+
+/* ============================================================================
+   The 3D ARV coin
+   ----------------------------------------------------------------------------
+   Geometry and motion for js/coin3d.js. Deliberately not a 3D library: the old
+   hero scene cost ~1.3 MB before a balance was readable. This is a handful of
+   divs on the compositor, so it costs nothing measurable.
+
+   Every animation below touches only transform and opacity — never a property
+   that lays out — so the whole thing stays on the GPU. The parts are nested so
+   each owns one movement (float, wobble, spin, orbit, shadow) and they run at
+   different periods; that is what stops it reading as one rigid rotating object.
+   ============================================================================ */
+
+.wallet-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 250px;
+  gap: var(--sp-5);
+  align-items: center;
+}
+
+.coin3d-stage {
+  --coin-px: 0deg;
+  --coin-py: 0deg;
+  --coin-scale: 1;
+  position: relative;
+  height: 230px;
+  display: grid; place-items: center;
+  /* The vanishing point sits slightly above centre, which is where a held object
+     is actually viewed from. Dead centre looks like a diagram. */
+  perspective: 1000px;
+  perspective-origin: 50% 42%;
+}
+
+/* Pointer parallax. Transitioned rather than animated so it eases back to rest
+   when the pointer leaves instead of snapping. */
+.coin3d-parallax {
+  position: relative;
+  transform-style: preserve-3d;
+  transform: scale(var(--coin-scale)) rotateY(var(--coin-px)) rotateX(var(--coin-py));
+  transition: transform .5s var(--ease-out);
+}
+
+.coin3d-float  { position: relative; transform-style: preserve-3d; animation: coin3dFloat 6.5s ease-in-out infinite; will-change: transform; }
+.coin3d-wobble { position: relative; transform-style: preserve-3d; animation: coin3dWobble 11s ease-in-out infinite; }
+
+@keyframes coin3dFloat  { 0%, 100% { transform: translateY(-9px); }  50% { transform: translateY(9px); } }
+@keyframes coin3dWobble { 0%, 100% { transform: rotateX(-20deg); }   50% { transform: rotateX(-7deg); } }
+
+/* The coin body. The spin is the only linear animation here — a coin turning at
+   an eased rate looks broken. */
+.coin3d {
+  position: relative;
+  width: 124px; height: 124px;
+  transform-style: preserve-3d;
+  animation: coin3dSpin 15s linear infinite;
+  will-change: transform;
+}
+@keyframes coin3dSpin { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+
+/* Faces, set apart on Z so the rim has something to close against. */
+.coin3d-face {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,.9), transparent 46%),
+    var(--brushed);
+  /* Inner ring + contact shading: what makes it read as a struck coin rather
+     than a silver circle. */
+  box-shadow:
+    inset 0 0 0 2px rgba(255,255,255,.42),
+    inset 0 0 0 7px rgba(12,12,16,.16),
+    inset 0 -10px 22px rgba(12,12,16,.34),
+    inset 0 10px 18px rgba(255,255,255,.28);
+  backface-visibility: hidden;
+}
+.coin3d-front { transform: translateZ(8px); }
+.coin3d-back  { transform: rotateY(180deg) translateZ(8px); }
+
+.coin3d-mark {
+  font-family: var(--serif);
+  font-size: 2rem; font-weight: 600; letter-spacing: .06em;
+  color: #14141b;
+  text-shadow: 0 1px 0 rgba(255,255,255,.65), 0 -1px 1px rgba(0,0,0,.28);
+}
+.coin3d-mark-sm { font-size: 2.4rem; }
+
+/* A specular band sweeping the face, so the metal has a moving hotspot. */
+.coin3d-sheen {
+  position: absolute; inset: -30%;
+  background: conic-gradient(from 0deg,
+    transparent 0deg, rgba(255,255,255,.62) 32deg,
+    transparent 84deg, transparent 250deg,
+    rgba(255,255,255,.34) 300deg, transparent 344deg);
+  animation: coin3dSheen 7s linear infinite;
+  pointer-events: none;
+}
+@keyframes coin3dSheen { to { transform: rotate(360deg); } }
+
+/* The rim: quads laid around the circumference by coin3d.js. Alternating shade
+   gives the edge visible milling as it turns. */
+.coin3d-rim { position: absolute; inset: 0; transform-style: preserve-3d; }
+.coin3d-rim i {
+  position: absolute; top: 50%; left: 50%;
+  width: 16px; height: 15px;          /* width becomes depth after rotateY(90deg) */
+  margin: -7.5px 0 0 -8px;
+  background: var(--brushed-dim);
+}
+.coin3d-rim i:nth-child(even) { background: linear-gradient(180deg, #9aa0ae, #6f7482); }
+
+/* Orbit rings, tilted into ellipses and counter-rotating. */
+.coin3d-rings { position: absolute; inset: 0; transform-style: preserve-3d; pointer-events: none; }
+.coin3d-ring {
+  position: absolute; border-radius: 50%;
+  border: 1px solid var(--line-3);
+  transform-style: preserve-3d;
+}
+.coin3d-ring.r1 { inset: -26px; animation: coin3dRing1 10s linear infinite; }
+.coin3d-ring.r2 { inset: -46px; border-style: dashed; border-color: var(--line-2); animation: coin3dRing2 16s linear infinite; }
+
+@keyframes coin3dRing1 { from { transform: rotateX(74deg) rotateZ(0deg); }   to { transform: rotateX(74deg) rotateZ(360deg); } }
+@keyframes coin3dRing2 { from { transform: rotateX(62deg) rotateZ(360deg); } to { transform: rotateX(62deg) rotateZ(0deg); } }
+
+/* A bead riding each ring, to make the orbit legible. */
+.coin3d-bead {
+  position: absolute; top: -3px; left: 50%;
+  width: 6px; height: 6px; margin-left: -3px;
+  border-radius: 50%;
+  background: var(--s-0);
+  box-shadow: 0 0 10px 2px rgba(223, 226, 233, .5);
+}
+
+/* Ambient light behind the coin, so it sits in the card instead of on it. */
+.coin3d-glow {
+  position: absolute; inset: 50% 50% auto auto;
+  width: 210px; height: 210px; transform: translate(50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(214,217,224,.14), transparent 68%);
+  pointer-events: none;
+}
+
+/* Contact shadow, breathing in time with the float. */
+.coin3d-shadow {
+  position: absolute; left: 50%; bottom: -6px;
+  width: 118px; height: 15px; margin-left: -59px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.6), transparent 72%);
+  filter: blur(5px);
+  animation: coin3dShadow 6.5s ease-in-out infinite;
+}
+@keyframes coin3dShadow {
+  0%, 100% { transform: scale(.88); opacity: .42; }
+  50%      { transform: scale(1.08); opacity: .72; }
+}
+
+@media (max-width: 1100px) { .wallet-hero { grid-template-columns: minmax(0, 1fr) 210px; } }
+
+@media (max-width: 980px) {
+  /* Stacks under the balances rather than above them — the numbers are why the
+     page exists, so they stay first. */
+  .wallet-hero { grid-template-columns: minmax(0, 1fr); }
+  .coin3d-stage { height: 190px; --coin-scale: .82; order: 2; }
+}
+@media (max-width: 560px) {
+  .coin3d-stage { height: 168px; --coin-scale: .7; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Genuinely still, and parked at a three-quarter angle so the object still
+     reads as dimensional rather than as a flat disc. */
+  .coin3d-float, .coin3d-wobble, .coin3d, .coin3d-sheen,
+  .coin3d-ring, .coin3d-shadow { animation: none !important; }
+  .coin3d-wobble { transform: rotateX(-18deg); }
+  .coin3d { transform: rotateY(-28deg); }
+  .coin3d-ring.r1 { transform: rotateX(74deg); }
+  .coin3d-ring.r2 { transform: rotateX(62deg); }
+  .coin3d-parallax { transition: none; }
+}
