@@ -10,6 +10,7 @@ import * as ui from '../ui.js';
 import * as api from '../api.js';
 import * as feed from '../feed.js';
 import { reveal } from '../ui.js';
+import * as coin3d from '../coin3d.js';
 
 var CFG = globalThis.ARV_CONFIG;
 
@@ -97,11 +98,6 @@ function paintPrice(snap) {
     ui.setHtml('[data-ath]', ui.fmtDual(snap.stats.allTimeHigh));
     ui.setHtml('[data-atl]', ui.fmtDual(snap.stats.allTimeLow));
 
-    var l = ui.el('[data-hero-launch]');
-    if (l) {
-      l.textContent = ui.fmtPct(snap.stats.sinceLaunchPct);
-      l.className = 'strong ' + ui.direction(snap.stats.sinceLaunchPct);
-    }
   }
 
   var idx = snap.index || {};
@@ -170,7 +166,13 @@ async function loadChart() {
       bottomColor: 'rgba(223,226,233,.01)',
       lineWidth: 1.5,
       priceLineVisible: false,
-      priceFormat: { type: 'price', precision: CFG.INDEX.priceDecimals, minMove: 0.0001 }
+      // minMove must track the precision, or the axis labels round to a step the
+      // series never actually moves in.
+      priceFormat: {
+        type: 'price',
+        precision: CFG.INDEX.priceDecimals,
+        minMove: Math.pow(10, -CFG.INDEX.priceDecimals)
+      }
     });
     series.setData(st.candles.map(function (k) {
       return { time: Math.floor(k.t / 1000), value: k.c };
@@ -393,6 +395,10 @@ async function loadTiers() {
 (async function () {
   paintStatic();
   paintHeroCandles(null);          // something in the hero from the first frame
+
+  // The hero showpiece. Decorative, so it goes up before any await and never
+  // waits on data — the hero is complete on the first frame either way.
+  coin3d.mount(document.querySelector('[data-coin3d]'), { radius: 76, thickness: 20 });
 
   await ui.boot({ feed: false });  // the landing page reads the server snapshot
 
