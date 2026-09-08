@@ -268,7 +268,13 @@ async function loadChart() {
         topColor: 'rgba(223,226,233,.18)',
         bottomColor: 'rgba(223,226,233,.01)',
         lineWidth: 2,
-        priceFormat: { type: 'price', precision: CFG.INDEX.priceDecimals, minMove: 0.0001 }
+        // minMove tracks the precision, or the axis rounds to a step the series
+        // never moves in.
+        priceFormat: {
+          type: 'price',
+          precision: CFG.INDEX.priceDecimals,
+          minMove: Math.pow(10, -CFG.INDEX.priceDecimals)
+        }
       });
 
       if (typeof ResizeObserver !== 'undefined') {
