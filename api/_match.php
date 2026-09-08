@@ -306,12 +306,12 @@ function execute_fill(
         if ($buyerFee > 0) {
             ledger_add($pdo, (int)$buyer['id'], 'fee', 0, 0,
                 ['ref' => $tradeRef, 'fy' => $fy,
-                 'note' => sprintf('Entry fee %s%% — %s', $bf['entryPct'], money_note($buyerFee))]);
+                 'note' => sprintf('Buy fee %s%% — %s', $bf['entryPct'], money_note($buyerFee))]);
         }
         if ($buyerGst > 0) {
             ledger_add($pdo, (int)$buyer['id'], 'gst', 0, 0,
                 ['ref' => $tradeRef, 'fy' => $fy,
-                 'note' => sprintf('GST on entry fee — %s', money_note($buyerGst))]);
+                 'note' => sprintf('GST on buy fee — %s', money_note($buyerGst))]);
         }
     }
 

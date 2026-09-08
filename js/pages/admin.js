@@ -393,8 +393,10 @@ var SETTINGS_GROUPS = [
   ]],
 
   ['Fees & tax', [
-    ['entry_fee_pct', 'Entry fee %', 'number'],
-    ['exit_fee_pct', 'Exit fee %', 'number']
+    ['entry_fee_pct', 'Buy fee %', 'number',
+     'Legacy index path only. Peer-to-peer trades do not charge this \u2014 a P2P buyer pays "P2P platform fee %" below, in ARV. Changing this does not affect what a customer pays today.'],
+    ['exit_fee_pct', 'Sell fee %', 'number',
+     'Legacy index path only, and GST below applies to these two fees. A P2P seller pays no platform fee.']
   ]],
 
   ['Selling & fallback', [
