@@ -106,22 +106,6 @@ function paintPrice(snap) {
     ui.setText('[data-btc-usd]', '$' + Math.round(idx.btcUsd).toLocaleString('en-US'));
   }
 
-  // The identity. Both percentages side by side, and the panel says whether they
-  // agree rather than leaving a reader to compare two decimals.
-  var wrap = ui.el('.identity');
-  if (wrap && idx.btcChangePct != null && idx.arvChangePct != null) {
-    var b = ui.el('[data-id-btc]'), a = ui.el('[data-id-arv]');
-    b.textContent = ui.fmtPct(idx.btcChangePct);
-    b.className = 'v ' + ui.direction(idx.btcChangePct);
-    a.textContent = ui.fmtPct(idx.arvChangePct);
-    a.className = 'v ' + ui.direction(idx.arvChangePct);
-
-    var agrees = Math.abs(idx.btcChangePct - idx.arvChangePct) < 0.01;
-    wrap.classList.toggle('agrees', agrees);
-    wrap.classList.toggle('diverges', !agrees);
-    ui.el('.identity-eq').textContent = agrees ? '\u2261' : '\u2260';
-  }
-
   var dot = ui.el('[data-hero-dot]');
   if (dot) dot.className = 'live-dot ' + (snap.price.stale ? 'stale' : '');
 }
