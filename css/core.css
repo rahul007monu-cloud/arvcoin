@@ -1699,6 +1699,9 @@ table.data tfoot td {
   background: var(--warn-dim); color: var(--warn);
 }
 .admin-tab.is-active .admin-tab-count { background: rgba(0, 0, 0, .18); color: var(--k-0); }
+/* An author-level display beats the UA rule behind the `hidden` attribute, so
+   without this the count sits there reading "0" when there is nothing waiting. */
+.admin-tab-count[hidden] { display: none; }
 
 .admin-panel { animation: adminPanelIn .2s var(--ease-out); }
 .admin-panel[hidden] { display: none; }
