@@ -76,9 +76,6 @@ function paintTicker() {
     ui.paintChange('[data-change]', s.change24hPct);
     ui.setHtml('[data-high]', ui.fmtDual(s.high24h));
     ui.setHtml('[data-low]', ui.fmtDual(s.low24h));
-    var l = ui.el('[data-launch]');
-    l.textContent = ui.fmtPct(s.sinceLaunchPct);
-    l.className = 'num ' + ui.direction(s.sinceLaunchPct);
   }
 
   var idx = st.snap.index || {};
@@ -282,7 +279,9 @@ async function loadChart() {
     });
 
     var dp = assetPriceDecimals();
-    var minMove = coin ? 0.01 : 0.0001;
+    // Derived rather than hardcoded, so the axis step always matches the number
+    // of decimals actually displayed for this asset.
+    var minMove = Math.pow(10, -dp);
 
     if (st.ctype === 'candles') {
       st.series = st.chart.addCandlestickSeries({
@@ -962,20 +961,6 @@ function paintStatsFallback() {
     });
     if (isFinite(hi) && s.high24h == null) ui.setHtml('[data-high]', ui.fmtDual(hi));
     if (isFinite(lo) && s.low24h == null)  ui.setHtml('[data-low]', ui.fmtDual(lo));
-  }
-
-  // Since launch. NAV_launch == arvBaseInr by definition of the index, so this is
-  // exactly the server's own formula, evaluated against the live price.
-  if (s.sinceLaunchPct == null) {
-    var nav = (st.snap && st.snap.price && st.snap.price.nav != null)
-      ? st.snap.price.nav : liveArvPrice();
-    var base = CFG.INDEX.arvBaseInr;
-    var l = ui.el('[data-launch]');
-    if (l && nav != null && base > 0) {
-      var pct = ((nav - base) / base) * 100;
-      l.textContent = ui.fmtPct(pct);
-      l.className = 'num ' + ui.direction(pct);
-    }
   }
 
   // The BTC reference, from the live feed the chart is already using.

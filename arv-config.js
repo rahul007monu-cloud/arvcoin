@@ -121,7 +121,11 @@
     baseUsd: { BTC: 277.89 },
     baseFxUsdInr: 63.50,
     rebalance: 'drift',
-    priceDecimals: 4,
+    // Two, because ARV now trades in the thousands of rupees. Four made sense
+    // when a unit was ₹1.78 and the fourth decimal still carried information; at
+    // ₹7,500 it is noise on every screen. Display only — the money path keeps
+    // full precision (integer paise, DECIMAL(28,8) units) regardless.
+    priceDecimals: 2,
     unitDecimals: 8
   };
 
