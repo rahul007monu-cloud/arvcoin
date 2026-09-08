@@ -43,7 +43,12 @@ function paintStatic() {
   ui.setText('[data-launch]', new Date(CFG.INDEX.launchMs).toLocaleDateString(CFG.UI.locale, {
     day: 'numeric', month: 'long', year: 'numeric'
   }));
-  ui.setText('[data-fallback]', CFG.MARKET.sellFallbackMinutes + ' minutes');
+  // The formula's anchor, from config rather than typed into the markup — it read
+  // ₹1 for a long time after the index was retuned, so the formula contradicted
+  // the price printed directly above it.
+  ui.setText('[data-base-price]', ui.fmtPrice(CFG.INDEX.arvBaseInr));
+  // [data-fallback] is gone with the treasury-exit copy: a peer-to-peer sell waits
+  // for a buyer, and there is no timed fallback that buys it.
 }
 
 /**
@@ -280,80 +285,6 @@ async function loadWatchlist() {
   reveal.observe(host);
 }
 
-/* ---------------------------------------------------------------- examples -- */
-
-/**
- * Worked fee and tax examples.
- *
- * Computed client-side from the live price using the same percentages the server
- * uses, so the landing page cannot quietly advertise a cheaper fee than the trade
- * screen charges.
- */
-function paintExamples() {
-  var snap = st.snap;
-  if (!snap || !snap.price || snap.price.nav == null) return;
-
-  var nav = snap.price.nav;
-  var f = CFG.FEES, t = CFG.TAX;
-  var gross = 10000000;                        // ₹1,00,000 in paise
-
-  var fee = Math.round(gross * f.entryPct / 100);
-  var gst = Math.round(fee * f.gstPct / 100);
-  var net = gross - fee - gst;
-  var execNav = nav * (1 + f.slippagePct / 100);
-  var units = Math.floor((net / 100 / execNav) * 1e8) / 1e8;
-  var effective = units > 0 ? (gross / 100) / units : 0;
-
-  ui.setHtml('[data-buy-example]', rows([
-    ['You pay', gross, 'gross'],
-    ['Entry fee (' + f.entryPct + '%)', -fee, 'charge'],
-    ['GST on the fee (' + f.gstPct + '%)', -gst, 'charge',
-     'GST applies to the fee only, never to the amount invested'],
-    ['Invested', net, 'net'],
-    [null],
-    ['Units at ' + ui.fmtPrice(execNav), null, 'info', null, ui.fmtUnits(units)],
-    ['Your cost per unit', null, 'info',
-     'ARV has to reach ' + ui.fmtPrice(effective) + ' before this is in profit, because charges are paid up front',
-     ui.fmtPrice(effective)]
-  ]));
-
-  // Sell side, on a 50% rise.
-  var sellNav = nav * 1.5 * (1 - f.slippagePct / 100);
-  var sGross = Math.floor(units * sellNav * 100);
-  var sFee = Math.round(sGross * f.exitPct / 100);
-  var sGst = Math.round(sFee * f.gstPct / 100);
-  var tds = Math.round(sGross * t.tdsPct / 100);
-  var cost = net;
-  var pnl = sGross - cost;
-  var payout = sGross - sFee - sGst - tds;
-
-  ui.setHtml('[data-sell-example]', rows([
-    ['Gross sale value', sGross, 'gross'],
-    ['Exit fee (' + f.exitPct + '%)', -sFee, 'charge'],
-    ['GST on the fee', -sGst, 'charge'],
-    ['TDS withheld (' + t.tdsPct + '%, s.194S)', -tds, 'tds',
-     'Withheld now and credited against your liability — it appears in Form 26AS'],
-    ['Credited to your balance', payout, 'net'],
-    [null],
-    ['Cost of acquisition', cost, 'info'],
-    ['Realised gain', pnl, 'pnl']
-  ]));
-
-  function rows(list) {
-    return list.map(function (r) {
-      if (!r[0]) return '<div class="ledger-divider"></div>';
-      var amount = r[4] != null
-        ? r[4]
-        : (r[1] != null ? (r[1] < 0 ? '\u2212' : '') + ui.fmtPaise(Math.abs(r[1])) : '');
-      return '<div class="ledger-row k-' + (r[2] || 'info') + '">'
-        + '<span class="l">' + ui.esc(r[0]) + '</span>'
-        + (amount ? '<span class="a">' + amount + '</span>' : '')
-        + (r[3] ? '<span class="note">' + ui.esc(r[3]) + '</span>' : '')
-        + '</div>';
-    }).join('');
-  }
-}
-
 /* ------------------------------------------------------------------- tiers -- */
 
 async function loadTiers() {
@@ -389,7 +320,6 @@ async function loadTiers() {
   try {
     st.snap = await api.snapshot();
     paintPrice(st.snap);
-    paintExamples();
     ui.paintNavTicker(st.snap);
     ui.paintServerFeed(st.snap);
   } catch (e) {
@@ -406,7 +336,6 @@ async function loadTiers() {
   api.poll(async function () {
     st.snap = await api.snapshot();
     paintPrice(st.snap);
-    paintExamples();
     ui.paintNavTicker(st.snap);
     ui.paintServerFeed(st.snap);
   }, 30000);
