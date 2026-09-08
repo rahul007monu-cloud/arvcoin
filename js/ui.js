@@ -479,7 +479,7 @@ export function mountFooter() {
   var host = el('[data-footer]');
   if (!host) return;
 
-  var f = CFG.FEES, t = CFG.TAX;
+  var t = CFG.TAX;
   var launch = new Date(CFG.INDEX.launchMs).toLocaleDateString(locale, {
     day: 'numeric', month: 'long', year: 'numeric'
   });
@@ -503,7 +503,7 @@ export function mountFooter() {
       + '<div><h5>Market</h5><ul>'
         + '<li><a href="trade.html">Trade</a></li>'
         + '<li><a href="index.html#how">How the price works</a></li>'
-        + '<li><a href="index.html#costs">Fees and tax</a></li>'
+        + '<li><a href="legal.html#terms">Fees</a></li>'
       + '</ul></div>'
       + '<div><h5>Account</h5><ul>'
         + '<li><a href="dashboard.html">Wallet</a></li>'
@@ -527,8 +527,12 @@ export function mountFooter() {
       + '</ul></div>'
     + '</div>'
     + '<div class="foot-bottom">'
-      + '<span>Entry ' + f.entryPct + '% \u00b7 Exit ' + f.exitPct + '% \u00b7 GST '
-        + f.gstPct + '% on fees</span>'
+      // No fee percentages here. This strip carried "Entry x% · Exit y% · GST z%"
+      // on every page, which advertised a deduction to people who were only
+      // reading, and quoted the LEGACY index rates that a peer-to-peer trade does
+      // not even charge. The rates that actually apply are itemised on the order
+      // itself, before it is confirmed, and stated in the terms.
+      + '<span>Every fee is itemised on the order before you confirm it.</span>'
       + '<span class="feed-status" data-feed-status>'
         + '<span class="live-dot off"></span><span>connecting\u2026</span></span>'
     + '</div>'

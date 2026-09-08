@@ -213,10 +213,10 @@ function user_fees(array $user): array
 function arv_reward_tiers(): array
 {
     return [
-        ['id' => 'bronze',   'label' => 'Bronze',   'metric' => 'ratio', 'threshold' => 1,         'entryFeePct' => 0,    'exitFeePct' => null, 'days' => 30,   'perk' => 'Entry fee waived for 30 days'],
-        ['id' => 'silver',   'label' => 'Silver',   'metric' => 'ratio', 'threshold' => 5,         'entryFeePct' => 0.25, 'exitFeePct' => null, 'days' => null, 'perk' => 'Entry fee 0.25%, permanently'],
-        ['id' => 'gold',     'label' => 'Gold',     'metric' => 'ratio', 'threshold' => 10,        'entryFeePct' => 0.25, 'exitFeePct' => 0.25, 'days' => null, 'perk' => 'Entry and exit fee 0.25%'],
-        ['id' => 'platinum', 'label' => 'Platinum', 'metric' => 'ratio', 'threshold' => 100,       'entryFeePct' => 0,    'exitFeePct' => 0.25, 'days' => null, 'perk' => 'No entry fee, exit 0.25%'],
+        ['id' => 'bronze',   'label' => 'Bronze',   'metric' => 'ratio', 'threshold' => 1,         'entryFeePct' => 0,    'exitFeePct' => null, 'days' => 30,   'perk' => 'Buy fee waived for 30 days'],
+        ['id' => 'silver',   'label' => 'Silver',   'metric' => 'ratio', 'threshold' => 5,         'entryFeePct' => 0.25, 'exitFeePct' => null, 'days' => null, 'perk' => 'Buy fee 0.25%, permanently'],
+        ['id' => 'gold',     'label' => 'Gold',     'metric' => 'ratio', 'threshold' => 10,        'entryFeePct' => 0.25, 'exitFeePct' => 0.25, 'days' => null, 'perk' => 'Buy and sell fee 0.25%'],
+        ['id' => 'platinum', 'label' => 'Platinum', 'metric' => 'ratio', 'threshold' => 100,       'entryFeePct' => 0,    'exitFeePct' => 0.25, 'days' => null, 'perk' => 'No buy fee, sell 0.25%'],
         ['id' => 'sterling', 'label' => 'Sterling', 'metric' => 'paise', 'threshold' => 10000000,  'entryFeePct' => 0,    'exitFeePct' => 0.25, 'days' => null, 'perk' => 'Priority withdrawal'],
         ['id' => 'obsidian', 'label' => 'Obsidian', 'metric' => 'paise', 'threshold' => 100000000, 'entryFeePct' => 0,    'exitFeePct' => 0,    'days' => null, 'perk' => 'Zero fees and a dedicated line'],
     ];
@@ -440,7 +440,7 @@ function quote_sell(array $user, int $unitsU8, float $nav, int $costBasisPaise, 
  * its own movement would double-count it and break the rule that the ledger sums
  * to the wallet.
  *
- * But an entry that says only "Entry fee 0.5%" leaves the holder to work out what
+ * But an entry that says only "Buy fee 0.5%" leaves the holder to work out what
  * they were actually charged, from a percentage of a number that is not on the
  * row. So the amount goes in the note: it is a statement of fact rather than a
  * movement, which is exactly what these rows are.

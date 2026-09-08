@@ -3,8 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ARV Coin — one rupee, one unit, Bitcoin's every move</title>
-<meta name="description" content="ARV is an index unit priced at ₹1 at launch that tracks Bitcoin one for one. Live candles, an order book that settles at the index price, and Indian VDA tax computed on every sale.">
+<title>ARV Coin — one unit, priced in rupees, Bitcoin's every move</title>
+<!-- No launch price quoted here on purpose: it is a setting, and a number hardcoded
+     in a meta tag goes stale silently the moment the anchor is retuned. -->
+<meta name="description" content="ARV is an index unit priced in rupees that tracks Bitcoin one for one. Live candles, peer-to-peer trades settled at the index price with the units held in escrow, and Indian VDA tax computed on every sale.">
 <meta name="theme-color" content="#07070a">
 <link rel="icon" href="favicon.svg?v=4" type="image/svg+xml">
 <link rel="manifest" href="manifest.json">
@@ -129,28 +131,15 @@
       </p>
     </div>
 
+    <!-- The anchor is filled from config rather than typed in: it was still reading
+         ₹1 long after the index was retuned, which made the formula on the page
+         disagree with the price above it. -->
     <div class="formula" data-reveal>
       <span class="arv">ARV(t)</span>
-      <span class="op">=</span> <span class="arv">₹1</span>
+      <span class="op">=</span> <span class="arv" data-base-price>—</span>
       <span class="op">×</span> <span class="btc">BTC(t)</span>
       <span class="op">÷</span> <span class="btc">BTC(launch)</span>
     </div>
-
-    <div class="identity" data-reveal style="--reveal-delay:120ms;margin-top:var(--sp-4)">
-      <div class="identity-side">
-        <div class="k">Bitcoin since launch</div>
-        <div class="v" data-id-btc>—</div>
-      </div>
-      <div class="identity-eq">≡</div>
-      <div class="identity-side">
-        <div class="k">ARV since launch</div>
-        <div class="v" data-id-arv>—</div>
-      </div>
-    </div>
-    <p class="tiny muted center" data-reveal style="margin-top:var(--sp-3)">
-      The same number by construction. If these ever diverge, the index is
-      misconfigured — which is why both are on screen rather than just one.
-    </p>
 
     <hr class="rule">
 
@@ -167,18 +156,19 @@
       <div class="card card-lift" data-reveal>
         <h4>Quoted in rupees, deliberately</h4>
         <p class="small" style="margin:0">
-          You deposit rupees and the treasury holds Bitcoin, so ARV is quoted in
-          rupees — which means its printed change is what your money actually did,
-          currency movement included. Quote it in dollars and the headline would
-          stop matching your statement.
+          You pay in rupees and Bitcoin backs the unit, so ARV is quoted in rupees —
+          which means its printed change is what your money actually did, currency
+          movement included. Quote it in dollars and the headline would stop matching
+          your bank statement.
         </p>
       </div>
       <div class="card card-lift" data-reveal>
-        <h4>Every fill at the index price</h4>
+        <h4>Every trade at the index price</h4>
         <p class="small" style="margin:0">
-          There is an order book, but it is a queue rather than an auction. No
-          spread to cross, no haggling. A limit order is a trigger — act when ARV
-          reaches this level — not an offer somebody has to accept.
+          Orders are a queue, not an auction. No spread to cross and no haggling over
+          price — whoever you are matched with, it settles at the index. A limit order
+          is a trigger — act when ARV reaches this level — not an offer somebody has
+          to accept.
         </p>
       </div>
     </div>
@@ -188,89 +178,60 @@
   <section class="section wrap">
     <div class="section-head">
       <div class="section-num" data-reveal>02 — Buying and selling</div>
-      <h2 class="underline-draw" data-reveal>Buy instantly. Sell to a real buyer, or to us.</h2>
+      <h2 class="underline-draw" data-reveal>You trade with a holder. The units sit in escrow.</h2>
+      <p data-reveal>
+        Rupees move directly between you and the person on the other side. The units
+        never do — they are held by us from the moment you match until the payment is
+        confirmed, so neither side has to trust the other.
+      </p>
     </div>
 
     <div class="grid g-2" data-reveal-group>
       <div class="card" data-reveal>
         <div class="row" style="gap:10px;margin-bottom:var(--sp-3)">
-          <span class="badge ok">Buy</span><span class="strong">Always instant</span>
+          <span class="badge ok">Buy</span><span class="strong">Pay the seller, get the units</span>
         </div>
         <p class="small">
-          A buy fills against anyone waiting to sell, and the treasury covers the
-          rest. You never queue for a seller to appear.
+          You are matched with someone holding ARV. Their units go into escrow
+          straight away, and you are shown where to pay them — their UPI ID or bank
+          account. You pay from your own bank, enter the reference, and the escrow is
+          released to you.
         </p>
         <p class="small" style="margin:0">
-          Pay by UPI into your rupee balance first, then buy with it — the same way
-          an exchange works. Money never moves between users' bank accounts.
+          The price is the index price at the moment you matched. The seller does not
+          set it and there is nothing to negotiate.
         </p>
       </div>
 
       <div class="card" data-reveal>
         <div class="row" style="gap:10px;margin-bottom:var(--sp-3)">
-          <span class="badge warn">Sell</span><span class="strong">Buyer first, then the guarantee</span>
+          <span class="badge warn">Sell</span><span class="strong">Paid into your own account</span>
         </div>
         <p class="small">
-          A sell goes to a real buyer if one is waiting. If none is, it rests in the
-          book — and after <strong data-fallback>60 minutes</strong> the treasury
-          buys it at the index price.
+          Your units move into escrow when a buyer matches, so they cannot be spent
+          twice. The buyer pays the UPI ID or bank account you saved, you check the
+          money has arrived, and you confirm the release.
         </p>
         <p class="small" style="margin:0">
-          That fallback exists because in a falling market everyone wants out and
-          nobody wants in. Without it, holders would be stuck. With it, there is
-          always an exit.
+          A sell waits until a buyer takes it — there is no guaranteed instant exit.
+          If a matched buyer does not pay inside the window, the escrow returns to you
+          automatically and the order can be placed again.
         </p>
       </div>
     </div>
-  </section>
 
-  <!-- ============================================================== costs -->
-  <section class="section wrap" id="costs">
-    <div class="section-head">
-      <div class="section-num" data-reveal>03 — What it costs</div>
-      <h2 class="underline-draw" data-reveal>Every deduction, before you commit</h2>
-      <p data-reveal>
-        Worked on ₹1,00,000 at the live price. The same arithmetic runs on the trade
-        screen and again in the ledger — one implementation, so what you agree to is
-        what gets recorded.
-      </p>
-    </div>
-
-    <div class="grid g-2" style="align-items:start" data-reveal-group>
-      <div class="card card-flush" data-reveal>
-        <div class="card-head" style="padding:var(--sp-4);margin:0">
-          <h4>Buying ₹1,00,000</h4><span class="badge">live</span>
-        </div>
-        <div class="ledger-list" data-buy-example>
-          <div class="ledger-row"><span class="l muted">Loading…</span></div>
-        </div>
-      </div>
-
-      <div class="card card-flush" data-reveal>
-        <div class="card-head" style="padding:var(--sp-4);margin:0">
-          <h4>Selling after a 50% rise</h4><span class="badge warn">tax applies</span>
-        </div>
-        <div class="ledger-list" data-sell-example>
-          <div class="ledger-row"><span class="l muted">Loading…</span></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="note-box warn" data-reveal style="margin-top:var(--sp-5)">
-      <strong>The 30% is not taken from your payout.</strong>
-      Only the exit fee, GST and 1% TDS are withheld when you sell. The 30% plus 4%
-      cess on your gain is your own liability at filing — the TDS already withheld
-      counts against it. And losses on virtual digital assets cannot be set off
-      against gains or carried forward, so two trades that cancel out can still
-      leave tax owing. All of it is itemised before you confirm, and again in your
-      <a href="tax.html">tax statement</a>.
+    <div class="note-box" data-reveal style="margin-top:var(--sp-5)">
+      <strong>Nothing is released on a promise.</strong>
+      A seller confirms only after the money is in their account, and if they do not,
+      the trade goes to us to settle rather than resolving itself in either
+      direction. Proof of payment is attached to the trade and kept with it.
     </div>
   </section>
 
   <!-- ============================================================== refer -->
   <section class="section wrap">
     <div class="section-head">
-      <div class="section-num" data-reveal>04 — Refer</div>
+      <div class="section-num" data-reveal>03 — Refer</div>
       <h2 class="underline-draw" data-reveal>5% of what you bring in, once</h2>
       <p data-reveal>
         Share your code. When someone you referred makes their first deposit, 5% of
@@ -288,8 +249,7 @@
     <div class="card" data-reveal style="text-align:center;padding:var(--sp-8) var(--sp-5)">
       <h2 class="serif" style="margin-bottom:var(--sp-3)">Start with ₹100</h2>
       <p style="max-width:46ch;margin:0 auto var(--sp-5)">
-        Pay by UPI, hold units, watch them against Bitcoin trade by trade, and sell
-        back to rupees whenever you choose.
+        Pay a seller by UPI, hold units, and watch them track Bitcoin trade by trade.
       </p>
       <div class="row" style="justify-content:center;flex-wrap:wrap">
         <a href="signup.html" class="btn btn-primary btn-lg">Open an account</a>

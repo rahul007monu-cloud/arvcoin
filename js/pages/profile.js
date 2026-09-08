@@ -132,8 +132,8 @@ function paintFees() {
   }
 
   host.innerHTML =
-    '<div class="ledger-row"><span class="l">Entry fee</span><span class="a">' + entry + '%</span></div>'
-    + '<div class="ledger-row"><span class="l">Exit fee</span><span class="a">' + exit + '%</span></div>'
+    '<div class="ledger-row"><span class="l">Buy fee</span><span class="a">' + entry + '%</span></div>'
+    + '<div class="ledger-row"><span class="l">Sell fee</span><span class="a">' + exit + '%</span></div>'
     + '<div class="ledger-row"><span class="l">GST on the fee</span><span class="a">'
       + CFG.FEES.gstPct + '%</span></div>'
     + '<div class="ledger-row"><span class="l">Deposit and withdrawal</span>'

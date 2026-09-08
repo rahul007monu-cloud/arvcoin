@@ -315,10 +315,10 @@
   // problem and a promise the treasury cannot keep. A fee discount is real
   // value, funded out of the platform's own margin, and honest to describe.
   var REWARD_TIERS = [
-    { id: 'bronze',   label: 'Bronze',   metric: 'ratio',  threshold: 1,        entryFeePct: 0,    exitFeePct: null, days: 30,   perk: 'Entry fee waived for 30 days' },
-    { id: 'silver',   label: 'Silver',   metric: 'ratio',  threshold: 5,        entryFeePct: 0.25, exitFeePct: null, days: null, perk: 'Entry fee 0.25%, permanently' },
-    { id: 'gold',     label: 'Gold',     metric: 'ratio',  threshold: 10,       entryFeePct: 0.25, exitFeePct: 0.25, days: null, perk: 'Entry and exit fee 0.25%' },
-    { id: 'platinum', label: 'Platinum', metric: 'ratio',  threshold: 100,      entryFeePct: 0,    exitFeePct: 0.25, days: null, perk: 'No entry fee, exit 0.25%' },
+    { id: 'bronze',   label: 'Bronze',   metric: 'ratio',  threshold: 1,        entryFeePct: 0,    exitFeePct: null, days: 30,   perk: 'Buy fee waived for 30 days' },
+    { id: 'silver',   label: 'Silver',   metric: 'ratio',  threshold: 5,        entryFeePct: 0.25, exitFeePct: null, days: null, perk: 'Buy fee 0.25%, permanently' },
+    { id: 'gold',     label: 'Gold',     metric: 'ratio',  threshold: 10,       entryFeePct: 0.25, exitFeePct: 0.25, days: null, perk: 'Buy and sell fee 0.25%' },
+    { id: 'platinum', label: 'Platinum', metric: 'ratio',  threshold: 100,      entryFeePct: 0,    exitFeePct: 0.25, days: null, perk: 'No buy fee, sell 0.25%' },
     { id: 'sterling', label: 'Sterling', metric: 'paise',  threshold: 10000000, entryFeePct: 0,    exitFeePct: 0.25, days: null, perk: 'Priority withdrawal \u2014 the 5 minute band' },
     { id: 'obsidian', label: 'Obsidian', metric: 'paise',  threshold: 100000000, entryFeePct: 0,   exitFeePct: 0,    days: null, perk: 'Zero fees and a dedicated line' }
   ];

@@ -57,20 +57,85 @@ function paintEstimate() {
       : '';
     return;
   }
-  var line = (st.side === 'buy' ? 'You pay the seller about ' : 'You receive about ')
+  // Kept to one plain sentence. The deductions are itemised in the summary block
+  // above the confirm button rather than crammed into a form hint.
+  host.innerHTML = (st.side === 'buy' ? 'You pay the seller about ' : 'You receive about ')
     + '<strong>' + ui.fmtPaise(paise) + '</strong> at ' + ui.fmtPrice(st.nav) + ' per ARV.';
+}
 
-  // On a buy, the platform fee + TDS come out of the ARV you receive (never your
-  // rupees), so surface it up front. Uses the live pct from the offers endpoint.
-  if (st.side === 'buy' && st.fee && st.fee.collected && st.fee.totalPct > 0) {
-    var u = parseFloat(units);
-    var net = u * (1 - st.fee.totalPct / 100);
-    line += '<br><span class="tiny muted">Platform fee ' + st.fee.feePct + '%'
-      + (st.fee.tdsPct > 0 ? ' + TDS ' + st.fee.tdsPct + '%' : '')
-      + ' is deducted in ARV \u2014 you receive about <strong>' + ui.fmtUnits(net, 4)
-      + ' ARV</strong>.</span>';
+/**
+ * The itemised order summary, shown directly above the confirm button.
+ *
+ * Fee rates are no longer advertised on the marketing pages — a percentage shown
+ * to somebody who is only reading tells them nothing useful and ages badly. This
+ * is where a number earns its place: against a real quantity, at the moment the
+ * order is about to be agreed to.
+ *
+ * On a BUY the platform fee and TDS are taken out of the ARV received, never out
+ * of the rupees sent, so the rupee line and the unit line have to be shown
+ * separately — the seller is paid in full and the deduction happens on the other
+ * side of the trade. A SELLER pays no platform fee, so their summary says so
+ * rather than leaving a blank where a charge would be.
+ */
+function paintSummary() {
+  var host = ui.el('[data-p2p-summary]');
+  if (!host) return;
+
+  var raw = (ui.el('#p2pUnits').value || '').replace(/[^\d.]/g, '');
+  var units = parseFloat(raw);
+  var paise = estimatePaise(raw);
+
+  if (!isFinite(units) || units <= 0 || paise == null) {
+    host.classList.add('hidden');
+    host.innerHTML = '';
+    return;
   }
-  host.innerHTML = line;
+
+  function row(label, amount, kind, note) {
+    return '<div class="ledger-row k-' + (kind || 'info') + '">'
+      + '<span class="l">' + ui.esc(label) + '</span>'
+      + (amount != null ? '<span class="a">' + amount + '</span>' : '')
+      + (note ? '<span class="note">' + ui.esc(note) + '</span>' : '')
+      + '</div>';
+  }
+
+  var out = '';
+  var fee = st.fee;
+  var charged = st.side === 'buy' && fee && fee.collected && fee.totalPct > 0;
+
+  if (st.side === 'buy') {
+    out += row('You pay the seller', ui.fmtPaise(paise), 'gross',
+               'Paid from your own bank to theirs. Nothing is deducted from this amount.');
+    out += row('Price per ARV', ui.fmtPrice(st.nav), 'info',
+               'The index price at the moment you match, not a price the seller sets.');
+
+    if (charged) {
+      var feeUnits = units * (fee.feePct / 100);
+      out += row('Platform fee (' + fee.feePct + '%)',
+                 '\u2212' + ui.fmtUnits(feeUnits, 4) + ' ARV', 'charge',
+                 'Taken in ARV, not rupees.');
+      if (fee.tdsPct > 0) {
+        out += row('TDS (' + fee.tdsPct + '%)',
+                   '\u2212' + ui.fmtUnits(units * (fee.tdsPct / 100), 4) + ' ARV', 'tds',
+                   'Withheld in ARV and reported.');
+      }
+      out += row('You receive', ui.fmtUnits(units * (1 - fee.totalPct / 100), 4) + ' ARV', 'net');
+    } else {
+      out += row('You receive', ui.fmtUnits(units, 4) + ' ARV', 'net',
+                 'No platform fee applies to this order.');
+    }
+  } else {
+    out += row('You receive', ui.fmtPaise(paise), 'gross',
+               'Paid by the buyer straight into the account you saved.');
+    out += row('Price per ARV', ui.fmtPrice(st.nav), 'info',
+               'The index price at the moment a buyer matches.');
+    out += row('Units held in escrow', ui.fmtUnits(units, 4) + ' ARV', 'info',
+               'Locked when a buyer matches, released once you confirm the money arrived.');
+    out += row('Platform fee', 'None', 'net', 'A seller pays no platform fee.');
+  }
+
+  host.innerHTML = out;
+  host.classList.remove('hidden');
 }
 
 /* -------------------------------------------------- seller payment method -- */
@@ -317,6 +382,7 @@ function syncFormChrome() {
           if (!isFinite(u) || u <= 0) return;   // never write NaN into the field
           inp.value = String(u);
           paintEstimate();
+          paintSummary();
         });
       });
     }
@@ -327,6 +393,7 @@ function syncFormChrome() {
   paintPayBlock();
 
   paintEstimate();
+  paintSummary();
 }
 
 async function place() {
@@ -391,6 +458,7 @@ async function refresh() {
     st.treasuryAvailable = !!o.treasuryAvailable;
     paintDepth(o);
     paintEstimate();
+    paintSummary();
   } catch (_) {}
 
   // No api.p2p.mine() call here any more: nothing on this page renders trades or
@@ -441,7 +509,7 @@ async function refresh() {
   });
 
   var unitsEl = ui.el('#p2pUnits');
-  if (unitsEl) unitsEl.addEventListener('input', paintEstimate);
+  if (unitsEl) unitsEl.addEventListener('input', function () { paintEstimate(); paintSummary(); });
   ui.on('[data-p2p-submit]', 'click', place);
 
   syncFormChrome();

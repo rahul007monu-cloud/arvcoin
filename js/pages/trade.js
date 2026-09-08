@@ -522,10 +522,10 @@ function sideConfig() {
   btn.textContent = isBuy ? 'Buy ARV' : 'Sell ARV';
   btn.className = 'btn btn-block btn-lg ' + (isBuy ? 'btn-primary' : 'btn-sell');
 
-  ui.setText('[data-side-note]', isBuy
-    ? 'Fills immediately \u2014 against anyone selling, and the treasury for the rest.'
-    : 'Goes to a real buyer first. If none is waiting, the treasury buys it after '
-      + CFG.MARKET.sellFallbackMinutes + ' minutes.');
+  // [data-side-note] no longer exists in trade.html — the legacy index form was
+  // removed when trading became peer-to-peer, and the note it used to carry
+  // ("fills immediately... the treasury for the rest") described that path.
+  // Left out rather than rewritten: the P2P panel states its own terms.
 
   // Quick amounts. Rupees for a buy, portions of the holding for a sell.
   var quick = ui.el('[data-quick]');
@@ -744,12 +744,16 @@ async function loadBook() {
         '<div class="row-between tiny" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">'
           + '<span class="down strong">Waiting to sell</span>'
           + '<span class="num">' + ui.fmtUnits(b.sellDepthUnits, 2) + ' ARV</span></div>'
+        // No treasury-buyback line: treasury-as-BUYER is an explicit TODO in
+        // api/_p2p.php, so a sell genuinely waits for a real buyer and saying
+        // otherwise would promise an exit the code cannot deliver.
         + '<div class="tiny muted" style="margin-top:3px">' + n + (n === 1 ? ' order' : ' orders')
-          + ' \u00b7 the treasury buys any left after ' + CFG.MARKET.sellFallbackMinutes + ' min</div>';
+          + ' waiting for a buyer</div>';
     } else {
       html +=
         '<div class="tiny muted" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">'
-          + 'No orders waiting \u2014 buys and sells fill right away at the price above.</div>';
+          + 'Nothing resting right now \u2014 an order you place waits here until '
+          + 'someone takes the other side.</div>';
     }
 
     host.innerHTML = html;
