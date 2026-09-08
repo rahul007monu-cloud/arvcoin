@@ -13,6 +13,7 @@ import * as api from '../api.js';
 import * as feed from '../feed.js';
 import { TF_MINUTES } from '../feed.js';
 import { reveal } from '../ui.js';
+import * as coin3d from '../coin3d.js';
 
 var CFG = globalThis.ARV_CONFIG;
 
@@ -453,6 +454,10 @@ async function refresh() {
 
 (async function () {
   buildRangeTabs();
+
+  // Decorative, so it is mounted before the awaits below and never blocks — the
+  // page is readable whether or not it ever paints.
+  coin3d.mount(document.querySelector('[data-coin3d]'));
 
   await ui.boot({ feed: false });
   var user = await api.requireUser();
