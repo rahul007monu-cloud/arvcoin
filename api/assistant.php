@@ -89,7 +89,14 @@ function assistant_facts(): array
         'tdsNoPanPct'   => rtrim(rtrim(number_format(setting_f('tds_pct_no_pan', 20), 2, '.', ''), '0'), '.'),
         'minOrder'      => fmt_paise((int)setting_f('min_order_paise', 10000)),
         'minWithdraw'   => fmt_paise((int)setting_f('min_withdraw_paise', 10000)),
-        'fallbackMin'   => (int)setting_f('sell_fallback_minutes', 60),
+        // Peer-to-peer is how trading actually happens now, so the numbers the
+        // assistant quotes have to be the P2P ones. entry_fee_pct/exit_fee_pct above
+        // belong to the legacy index path, which no longer has a form on any page.
+        'p2pFeePct'     => rtrim(rtrim(number_format(setting_f('p2p_fee_pct', 1), 2, '.', ''), '0'), '.'),
+        'p2pTdsPct'     => rtrim(rtrim(number_format(setting_f('p2p_tds_pct', 0), 2, '.', ''), '0'), '.'),
+        'p2pPayMin'     => (int)setting_f('p2p_pay_ttl_minutes', 60),
+        'p2pConfirmHrs' => (int)setting_f('p2p_confirm_ttl_hours', 4),
+        'p2pOpenHrs'    => (int)setting_f('p2p_match_ttl_hours', 24),
         'trustHours'    => (int)setting_f('trust_hours', 720),
         'launchDate'    => date('j F Y', strtotime($launch) ?: time()),
         'support'       => SUPPORT_EMAIL,
@@ -125,41 +132,54 @@ function assistant_kb(array $f): array
         [
             'keys'  => ['how to buy', 'buy arv', 'purchase', 'invest', 'buying'],
             'title' => 'Buying ARV',
-            'answer' => "To buy: add rupees to your balance (deposit by UPI), open Trade, enter an "
-                . "amount and confirm. A buy fills instantly — against anyone who is selling, and the "
-                . "treasury for the rest — at the live index price. You pay a {$f['entryFeePct']}% entry "
-                . "fee plus {$f['gstPct']}% GST on that fee. The minimum order is {$f['minOrder']}.",
+            'answer' => "Trading is peer-to-peer, so you pay a seller directly — you do not need a "
+                . "rupee balance on the platform first. Open Trade, enter the amount and confirm; you are "
+                . "matched with someone holding ARV at the live index price and their units go into "
+                . "escrow. You then pay their UPI ID or bank account from your own bank, enter the "
+                . "reference, and the escrow is released to you. You have {$f['p2pPayMin']} minutes to pay "
+                . "after matching. A platform fee of {$f['p2pFeePct']}% is taken from the ARV you receive, "
+                . "never from your rupees, and it is shown before you confirm. The minimum order is "
+                . "{$f['minOrder']}.",
         ],
         [
             'keys'  => ['how to sell', 'sell arv', 'selling', 'cash out', 'exit'],
             'title' => 'Selling ARV',
-            'answer' => "To sell: open Trade, switch to Sell, enter the units and confirm. Your sell "
-                . "goes to a real buyer first; if none is waiting, the treasury buys it at the index "
-                . "price after {$f['fallbackMin']} minutes, so you are never left unable to exit. A sale "
-                . "has a {$f['exitFeePct']}% exit fee + {$f['gstPct']}% GST on the fee, and {$f['tdsPct']}% "
-                . "TDS is withheld (see tax).",
+            'answer' => "To sell you need a payment method saved (your UPI ID or bank account) so a "
+                . "buyer knows where to pay. Open Trade, switch to Sell, enter the units and confirm. Your "
+                . "units go into escrow and the order waits for a buyer — it stays open for up to "
+                . "{$f['p2pOpenHrs']} hours, and if nobody takes it the escrow returns to you. When a "
+                . "buyer matches, they pay you directly and you confirm once the money is actually in "
+                . "your account; you have {$f['p2pConfirmHrs']} hours to do that. Be aware there is no "
+                . "guaranteed instant exit — a sell needs a buyer. Tax still applies to the sale (see "
+                . "tax).",
         ],
         [
             'keys'  => ['deposit', 'add money', 'add funds', 'upi', 'put money', 'fund'],
             'title' => 'Deposits',
-            'answer' => "Add rupees by UPI to the payment address shown on the Deposit page, then submit "
-                . "your UTR / reference (or screenshot). Money is credited only once an operator matches "
-                . "your payment — it is never credited automatically just because a QR was shown, which "
-                . "keeps everyone's balance honest. It usually clears within a few minutes.",
+            'answer' => "You do not need to deposit anything to buy ARV — trading is peer-to-peer, so "
+                . "you pay the seller directly from your own bank and the units come to you from escrow. "
+                . "There is no step where you fund a balance here first. If you already hold a rupee "
+                . "balance on the platform from earlier, it stays yours and you can withdraw it.",
         ],
         [
             'keys'  => ['withdraw', 'withdrawal', 'take out', 'payout', 'bank', 'redeem'],
             'title' => 'Withdrawals',
-            'answer' => "Request a withdrawal from the Withdraw page; it is paid to your bank after an "
-                . "operator approves it. The minimum withdrawal is {$f['minWithdraw']}. A pending request "
-                . "stays visible until it is approved and paid — that is normal, not an error.",
+            'answer' => "Selling ARV does not pay into a platform balance any more — a peer-to-peer "
+                . "buyer pays your own UPI ID or bank account directly, so the money arrives in your bank "
+                . "without a withdrawal step. Withdrawals only apply to a rupee balance you already hold "
+                . "here from earlier: request it from the Withdraw page and it is paid after an operator "
+                . "approves it, with a minimum of {$f['minWithdraw']}. A pending request stays visible "
+                . "until it is paid — that is normal, not an error.",
         ],
         [
             'keys'  => ['fee', 'fees', 'charge', 'charges', 'commission', 'gst', 'cost to trade'],
             'title' => 'Fees',
-            'answer' => "Entry fee: {$f['entryFeePct']}% on a buy. Exit fee: {$f['exitFeePct']}% on a sell. "
-                . "GST of {$f['gstPct']}% applies to the fee only — never to the amount you invest. Every "
-                . "fee and tax is itemised on the quote before you confirm, so there are no hidden charges.",
+            'answer' => "On a peer-to-peer buy the platform fee is {$f['p2pFeePct']}%"
+                . ((float)$f['p2pTdsPct'] > 0 ? " plus {$f['p2pTdsPct']}% TDS" : "")
+                . ", and it is taken out of the ARV you receive rather than your rupees — the seller gets "
+                . "the full amount you send them. A seller pays no platform fee. Nothing is deducted from "
+                . "the money leaving your bank, and the exact figures are itemised on the order before you "
+                . "confirm it, so there are no hidden charges.",
         ],
         [
             'keys'  => ['tax', 'taxes', 'tds', 'vda', 'capital gain', '30%', 'cess', 'pan'],
@@ -197,10 +217,11 @@ function assistant_kb(array $f): array
         [
             'keys'  => ['order book', 'market', 'spread', 'depth', 'open order'],
             'title' => 'Orders & the market',
-            'answer' => "There is no bid/ask spread — every trade settles at the index price. Buys fill "
-                . "instantly, so they never rest. A sell rests only until a buyer takes it or the treasury "
-                . "does (after {$f['fallbackMin']} minutes). 'Your open orders' shows only your own pending "
-                . "orders; it says 'None open' when you have none.",
+            'answer' => "There is no bid/ask spread — every trade settles at the index price, so there is "
+                . "nothing to negotiate. An order rests until someone on the other side takes it, for up to "
+                . "{$f['p2pOpenHrs']} hours, after which it expires and any escrow returns. Once matched it "
+                . "becomes a trade with its own payment and confirmation window. The Orders page shows your "
+                . "own resting orders and every trade you are in; it says 'None open' when you have none.",
         ],
         [
             'keys'  => ['contact', 'support', 'help', 'email', 'reach', 'complaint', 'problem'],
@@ -250,12 +271,32 @@ function assistant_system_prompt(array $f, array $kb): string
 {
     $facts = "LIVE FACTS (use these exact numbers):\n"
         . "- Launch date: {$f['launchDate']}. ARV price = Bitcoin's percentage move since launch, in rupees.\n"
-        . "- Entry fee {$f['entryFeePct']}%, exit fee {$f['exitFeePct']}%, GST {$f['gstPct']}% on the fee only.\n"
+        // These are the facts the model answers from, so they describe the flow that
+        // actually exists. Previously this block still said buys fill instantly and
+        // sells fall back to the treasury, which is the legacy index path — the model
+        // was being handed stale facts and was confidently telling customers to fund
+        // a rupee balance that cannot buy anything.
+        . "- Trading is PEER-TO-PEER and settles at the index price. A buyer is matched with a holder, "
+        . "the holder's units go into escrow, the buyer pays that holder DIRECTLY (UPI/bank) from their "
+        . "own bank, enters the reference, and the escrow is then released to the buyer.\n"
+        . "- A buyer does NOT need an on-platform rupee balance. Never tell anyone to deposit before "
+        . "buying. Rupees move bank-to-bank between the two people; the platform holds only the units.\n"
+        . "- A seller must have a payment method saved (UPI/bank) to receive payment.\n"
+        . "- P2P platform fee {$f['p2pFeePct']}%"
+        . ((float)$f['p2pTdsPct'] > 0 ? " plus {$f['p2pTdsPct']}% TDS" : "")
+        . ", deducted from the ARV the BUYER receives, never from rupees. Sellers pay no platform fee. "
+        . "GST {$f['gstPct']}% and the entry/exit fees apply only to the legacy index path, which has no "
+        . "form on any page — do not quote them as what a user will pay.\n"
+        . "- Timers: an unmatched order rests up to {$f['p2pOpenHrs']}h; a matched buyer has "
+        . "{$f['p2pPayMin']} minutes to pay; the seller then has {$f['p2pConfirmHrs']}h to confirm before "
+        . "the trade goes to support to settle. Unpaid matches return the escrow to the seller.\n"
+        . "- There is NO guaranteed instant exit on a sell: it waits for a buyer. Do not promise that the "
+        . "platform or treasury will buy it back.\n"
         . "- Tax: {$f['vdaGainPct']}% + {$f['cessPct']}% cess on gains (s.115BBH); {$f['tdsPct']}% TDS per sale "
         . "(s.194S), {$f['tdsNoPanPct']}% without PAN; FIFO cost basis; losses not set off.\n"
         . "- Minimum order {$f['minOrder']}, minimum withdrawal {$f['minWithdraw']}.\n"
-        . "- Sells fall back to the treasury after {$f['fallbackMin']} minutes. Buys fill instantly. No spread.\n"
-        . "- Deposits (UPI) are credited only after an operator matches the payment. Trusted device ~"
+        . "- Deposit/withdraw still exist but only for a rupee balance held from earlier; they are not "
+        . "part of buying or selling. Trusted device ~"
         . round($f['trustHours'] / 24) . " days.\n"
         . "- Not registered with SEBI/RBI; not a blockchain token; no capital protection. Support: {$f['support']}.\n";
 
