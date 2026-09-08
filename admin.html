@@ -35,7 +35,9 @@
 
   <div data-warnings style="margin-bottom:var(--sp-4)"></div>
 
-  <!-- ============================================================== queues -->
+  <!-- ==================================================== persistent queues -->
+  <!-- The at-a-glance status strip stays visible on every tab, so an operator
+       always sees what is waiting without having to hunt for it. -->
   <div class="grid g-4" style="margin-bottom:var(--sp-4)">
     <div class="card card-tight"><div class="stat">
       <span class="stat-k">Deposits waiting</span>
@@ -59,367 +61,407 @@
     </div></div>
   </div>
 
-  <!-- ======================================================= overview stats -->
-  <section class="card" style="margin-bottom:var(--sp-4)">
-    <div class="card-head">
-      <h3 style="font-size:1rem">At a glance</h3>
-      <span class="badge">live from the database</span>
-    </div>
-    <div class="grid g-4" data-overview-stats>
-      <div class="empty">Loading…</div>
-    </div>
-    <p class="tiny muted" style="margin:var(--sp-4) 0 0">
-      GST and TDS are liabilities held on behalf of others, never revenue. Only the
-      platform fee line is income.
-    </p>
-  </section>
+  <!-- ========================================================= tab switcher -->
+  <nav class="admin-tabs" role="tablist" aria-label="Admin sections">
+    <button class="admin-tab is-active" type="button" role="tab" data-tab="overview">Overview</button>
+    <button class="admin-tab" type="button" role="tab" data-tab="approvals">Approvals<span class="admin-tab-count" data-tab-count="approvals" hidden>0</span></button>
+    <button class="admin-tab" type="button" role="tab" data-tab="users">Users</button>
+    <button class="admin-tab" type="button" role="tab" data-tab="treasury">Treasury</button>
+    <button class="admin-tab" type="button" role="tab" data-tab="trades">Ledger &amp; trades</button>
+    <button class="admin-tab" type="button" role="tab" data-tab="market">Market</button>
+    <button class="admin-tab" type="button" role="tab" data-tab="settings">Settings</button>
+  </nav>
 
-  <!-- ====================================================== reconciliation -->
-  <section class="card" style="margin-bottom:var(--sp-4)">
-    <div class="card-head">
-      <div>
-        <h3 style="font-size:1.05rem;margin:0">Treasury reconciliation</h3>
-        <div class="tiny muted">
-          What the ledger says must be held, against what is actually held
-        </div>
-      </div>
-      <span class="badge warn">check daily</span>
-    </div>
+  <!-- ============================================================= overview -->
+  <div class="admin-panel is-active" data-panel="overview">
 
-    <div class="grid g-2" style="gap:var(--sp-5);align-items:start">
-      <div>
-        <div class="ledger-list" data-obligation></div>
+    <!-- ===================================================== overview stats -->
+    <section class="card" style="margin-bottom:var(--sp-4)">
+      <div class="card-head">
+        <h3 style="font-size:1rem">At a glance</h3>
+        <span class="badge">live from the database</span>
       </div>
-      <div>
-        <div class="field" style="margin-bottom:var(--sp-4)">
-          <label for="held">Bitcoin actually held (BTC)</label>
-          <input id="held" class="num-input" type="text" inputmode="decimal"
-                 placeholder="0.00000000" autocomplete="off">
-          <span class="hint">
-            Read this off the exchange or wallet the treasury sits in.
-          </span>
-        </div>
-        <div class="ledger-list" data-diff></div>
-        <div class="ledger-list" data-ledger-check style="margin-top:var(--sp-3)"></div>
+      <div class="grid g-4" data-overview-stats>
+        <div class="empty">Loading…</div>
       </div>
-    </div>
-
-    <p class="tiny muted" style="margin:var(--sp-4) 0 0">
-      Under half a percent of the requirement is ordinary execution drift. More than
-      that needs correcting before the next redemption, because the shortfall is
-      paid for by whoever exits last — and it compounds quietly.
-    </p>
-  </section>
-
-  <div class="grid g-2" style="gap:var(--sp-4);align-items:start">
-
-    <!-- ========================================================= deposits -->
-    <section class="card card-flush">
-      <div class="card-head" style="padding:var(--sp-4);margin:0">
-        <h3 style="font-size:1rem">Deposits awaiting confirmation</h3>
-      </div>
-      <div class="table-wrap">
-        <table class="data">
-          <thead><tr>
-            <th>Who</th><th class="num">Amount</th><th>UTR</th><th>Waiting</th><th></th>
-          </tr></thead>
-          <tbody data-deposits><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
-        </table>
-      </div>
-      <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
-        Match the UTR against the bank statement before confirming. Units are issued
-        at the price at the moment of confirmation, not when the QR was shown.
-      </div>
+      <p class="tiny muted" style="margin:var(--sp-4) 0 0">
+        GST and TDS are liabilities held on behalf of others, never revenue. Only the
+        platform fee line is income.
+      </p>
     </section>
 
-    <!-- ====================================================== withdrawals -->
-    <section class="card card-flush">
-      <div class="card-head" style="padding:var(--sp-4);margin:0">
-        <h3 style="font-size:1rem">Withdrawals to pay</h3>
+    <!-- ================================================================ money -->
+    <section class="card">
+      <div class="card-head">
+        <h3 style="font-size:1rem">Money held on behalf of others</h3>
+        <span class="badge warn">liabilities, not revenue</span>
       </div>
-      <div class="table-wrap">
-        <table class="data">
-          <thead><tr>
-            <th>Who</th><th class="num">Amount</th><th>UPI ID</th><th>Waiting</th><th></th>
-          </tr></thead>
-          <tbody data-withdrawals><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
-        </table>
-      </div>
-      <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
-        Amounts are already net of exit fee, GST and TDS. Send the UPI payment, then
-        mark it paid with the UTR so it is traceable.
+      <div class="grid g-4" data-money></div>
+      <div class="note-box warn" style="margin-top:var(--sp-4)">
+        TDS collected under section 194S is not income. It is holders' money that must
+        be deposited with the department and reported so it appears in each holder's
+        Form 26AS. GST on fees is likewise a liability. Only the platform fee line is
+        actual revenue.
       </div>
     </section>
 
   </div>
 
-  <!-- =================================================================== KYC -->
-  <section class="card card-flush" style="margin-top:var(--sp-4)">
-    <div class="card-head" style="padding:var(--sp-4);margin:0">
-      <h3 style="font-size:1rem">KYC to review</h3>
-    </div>
-    <div class="table-wrap">
-      <table class="data">
-        <thead><tr>
-          <th>Who</th><th>Name</th><th>PAN</th><th>DOB</th>
-          <th>Address</th><th>Waiting</th><th></th>
-        </tr></thead>
-        <tbody data-kyc><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
-      </table>
-    </div>
-  </section>
+  <!-- ============================================================ approvals -->
+  <div class="admin-panel" data-panel="approvals" hidden>
 
-  <!-- ================================================================= money -->
-  <section class="card" style="margin-top:var(--sp-4)">
-    <div class="card-head">
-      <h3 style="font-size:1rem">Money held on behalf of others</h3>
-      <span class="badge warn">liabilities, not revenue</span>
-    </div>
-    <div class="grid g-4" data-money></div>
-    <div class="note-box warn" style="margin-top:var(--sp-4)">
-      TDS collected under section 194S is not income. It is holders' money that must
-      be deposited with the department and reported so it appears in each holder's
-      Form 26AS. GST on fees is likewise a liability. Only the platform fee line is
-      actual revenue.
-    </div>
-  </section>
+    <div class="grid g-2" style="gap:var(--sp-4);align-items:start">
 
-  <!-- =============================================================== users -->
-  <section class="card card-flush" style="margin-top:var(--sp-4)">
-    <div class="card-head row-wrap" style="padding:var(--sp-4);margin:0">
-      <div>
-        <h3 style="font-size:1rem;margin:0">Users</h3>
-        <div class="tiny muted">Search by email, name or referral code</div>
+      <!-- ======================================================= deposits -->
+      <section class="card card-flush">
+        <div class="card-head" style="padding:var(--sp-4);margin:0">
+          <h3 style="font-size:1rem">Deposits awaiting confirmation</h3>
+        </div>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr>
+              <th>Who</th><th class="num">Amount</th><th>UTR</th><th>Waiting</th><th></th>
+            </tr></thead>
+            <tbody data-deposits><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
+          Match the UTR against the bank statement before confirming. Units are issued
+          at the price at the moment of confirmation, not when the QR was shown.
+        </div>
+      </section>
+
+      <!-- ==================================================== withdrawals -->
+      <section class="card card-flush">
+        <div class="card-head" style="padding:var(--sp-4);margin:0">
+          <h3 style="font-size:1rem">Withdrawals to pay</h3>
+        </div>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr>
+              <th>Who</th><th class="num">Amount</th><th>UPI ID</th><th>Waiting</th><th></th>
+            </tr></thead>
+            <tbody data-withdrawals><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
+          Amounts are already net of exit fee, GST and TDS. Send the UPI payment, then
+          mark it paid with the UTR so it is traceable.
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ================================================================= KYC -->
+    <section class="card card-flush" style="margin-top:var(--sp-4)">
+      <div class="card-head" style="padding:var(--sp-4);margin:0">
+        <h3 style="font-size:1rem">KYC to review</h3>
       </div>
-      <form class="row" data-user-form style="margin:0">
-        <input data-user-search type="search" placeholder="email, name or ref code"
-               autocomplete="off" style="max-width:280px">
-        <button class="btn btn-sm btn-ghost" type="submit">Search</button>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr>
+            <th>Who</th><th>Name</th><th>PAN</th><th>DOB</th>
+            <th>Address</th><th>Waiting</th><th></th>
+          </tr></thead>
+          <tbody data-kyc><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ================================================================ users -->
+  <div class="admin-panel" data-panel="users" hidden>
+    <section class="card card-flush">
+      <div class="card-head row-wrap" style="padding:var(--sp-4);margin:0">
+        <div>
+          <h3 style="font-size:1rem;margin:0">Users</h3>
+          <div class="tiny muted">Search by email, name or referral code</div>
+        </div>
+        <form class="row" data-user-form style="margin:0">
+          <input data-user-search type="search" placeholder="email, name or ref code"
+                 autocomplete="off" style="max-width:280px">
+          <button class="btn btn-sm btn-ghost" type="submit">Search</button>
+        </form>
+      </div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr>
+            <th>Who</th><th>Status</th><th>KYC</th><th class="num">₹ balance</th>
+            <th class="num">ARV</th><th class="num">Invested</th>
+            <th>Joined</th><th>Last login</th><th></th>
+          </tr></thead>
+          <tbody data-users><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
+        Suspending a user blocks their sign-in at once. Balances are never edited here
+        — money only ever moves through the ledger. <strong>Grant ARV</strong> moves units
+        out of the treasury, so it needs the treasury seeded on the <strong>Treasury</strong>
+        tab first. <strong>Delete</strong> is only offered for an account with no money
+        history; anything else must be suspended instead, so reconciliation stays intact.
+      </div>
+    </section>
+  </div>
+
+  <!-- ============================================================= treasury -->
+  <div class="admin-panel" data-panel="treasury" hidden>
+
+    <!-- =================================================== reconciliation -->
+    <section class="card" style="margin-bottom:var(--sp-4)">
+      <div class="card-head">
+        <div>
+          <h3 style="font-size:1.05rem;margin:0">Treasury reconciliation</h3>
+          <div class="tiny muted">
+            What the ledger says must be held, against what is actually held
+          </div>
+        </div>
+        <span class="badge warn">check daily</span>
+      </div>
+
+      <div class="grid g-2" style="gap:var(--sp-5);align-items:start">
+        <div>
+          <div class="ledger-list" data-obligation></div>
+        </div>
+        <div>
+          <div class="field" style="margin-bottom:var(--sp-4)">
+            <label for="held">Bitcoin actually held (BTC)</label>
+            <input id="held" class="num-input" type="text" inputmode="decimal"
+                   placeholder="0.00000000" autocomplete="off">
+            <span class="hint">
+              Read this off the exchange or wallet the treasury sits in.
+            </span>
+          </div>
+          <div class="ledger-list" data-diff></div>
+          <div class="ledger-list" data-ledger-check style="margin-top:var(--sp-3)"></div>
+        </div>
+      </div>
+
+      <p class="tiny muted" style="margin:var(--sp-4) 0 0">
+        Under half a percent of the requirement is ordinary execution drift. More than
+        that needs correcting before the next redemption, because the shortfall is
+        paid for by whoever exits last — and it compounds quietly.
+      </p>
+    </section>
+
+    <!-- ================================================== treasury inventory -->
+    <section class="card">
+      <div class="row-between" style="margin-bottom:var(--sp-3)">
+        <h3 style="font-size:1rem;margin:0">Treasury inventory</h3>
+        <span class="badge" data-treasury-badge>—</span>
+      </div>
+      <p class="small muted" style="margin-top:0">
+        The ARV a new buyer matches against when nobody is selling yet, and the budget a
+        promotional grant is paid from. Set the treasury email in the <strong>Settings</strong>
+        tab first, then seed it here.
+      </p>
+
+      <div class="grid g-3" style="margin:var(--sp-4) 0">
+        <div class="stat">
+          <div class="stat-k">Account</div>
+          <div class="stat-v tiny" data-treasury-email>—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-k">Free ARV</div>
+          <div class="stat-v num" data-treasury-free>—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-k">Sellable / grantable</div>
+          <div class="stat-v num" data-treasury-sellable>—</div>
+        </div>
+      </div>
+
+      <div class="note-box tiny" style="margin-bottom:var(--sp-3)">
+        Seeding <strong>issues</strong> units — they are not moved from anywhere, so the
+        platform's ARV obligation grows by the amount. Granting is units-neutral: the
+        treasury loses exactly what the recipient gains.
+      </div>
+
+      <form class="row-wrap" data-treasury-form style="gap:var(--sp-3)">
+        <div class="field" style="margin:0;flex:1;min-width:180px">
+          <label for="seedUnits">ARV to issue into the treasury</label>
+          <input id="seedUnits" class="num-input" type="text" inputmode="decimal"
+                 value="10000000" autocomplete="off">
+        </div>
+        <div class="field" style="margin:0;flex:1;min-width:180px">
+          <label for="seedNote">Note (optional)</label>
+          <input id="seedNote" type="text" autocomplete="off" placeholder="initial liquidity">
+        </div>
+        <button class="btn" type="submit" style="align-self:end">Seed treasury</button>
       </form>
-    </div>
-    <div class="table-wrap">
-      <table class="data">
-        <thead><tr>
-          <th>Who</th><th>Status</th><th>KYC</th><th class="num">₹ balance</th>
-          <th class="num">ARV</th><th class="num">Invested</th>
-          <th>Joined</th><th>Last login</th><th></th>
-        </tr></thead>
-        <tbody data-users><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
-      </table>
-    </div>
-    <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
-      Suspending a user blocks their sign-in at once. Balances are never edited here
-      — money only ever moves through the ledger. <strong>Grant ARV</strong> moves units
-      out of the treasury, so it needs the treasury seeded below. <strong>Delete</strong>
-      is only offered for an account with no money history; anything else must be
-      suspended instead, so reconciliation stays intact.
-    </div>
-  </section>
+    </section>
 
-  <!-- ==================================================== treasury inventory -->
-  <section class="card" style="margin-top:var(--sp-4)">
-    <div class="row-between" style="margin-bottom:var(--sp-3)">
-      <h3 style="font-size:1rem;margin:0">Treasury inventory</h3>
-      <span class="badge" data-treasury-badge>—</span>
-    </div>
-    <p class="small muted" style="margin-top:0">
-      The ARV a new buyer matches against when nobody is selling yet, and the budget a
-      promotional grant is paid from. Set the treasury email in Settings first.
-    </p>
+  </div>
 
-    <div class="grid g-3" style="margin:var(--sp-4) 0">
-      <div class="stat">
-        <div class="stat-k">Account</div>
-        <div class="stat-v tiny" data-treasury-email>—</div>
-      </div>
-      <div class="stat">
-        <div class="stat-k">Free ARV</div>
-        <div class="stat-v num" data-treasury-free>—</div>
-      </div>
-      <div class="stat">
-        <div class="stat-k">Sellable / grantable</div>
-        <div class="stat-v num" data-treasury-sellable>—</div>
-      </div>
-    </div>
+  <!-- ====================================================== ledger & trades -->
+  <div class="admin-panel" data-panel="trades" hidden>
 
-    <div class="note-box tiny" style="margin-bottom:var(--sp-3)">
-      Seeding <strong>issues</strong> units — they are not moved from anywhere, so the
-      platform's ARV obligation grows by the amount. Granting is units-neutral: the
-      treasury loses exactly what the recipient gains.
-    </div>
-
-    <form class="row-wrap" data-treasury-form style="gap:var(--sp-3)">
-      <div class="field" style="margin:0;flex:1;min-width:180px">
-        <label for="seedUnits">ARV to issue into the treasury</label>
-        <input id="seedUnits" class="num-input" type="text" inputmode="decimal"
-               value="10000000" autocomplete="off">
+    <!-- ============================================================ ledger -->
+    <section class="card card-flush">
+      <div class="card-head row-wrap" style="padding:var(--sp-4);margin:0">
+        <div>
+          <h3 style="font-size:1rem;margin:0">Ledger</h3>
+          <div class="tiny muted">The book of record — append-only, most recent first</div>
+        </div>
+        <form class="row" data-ledger-form style="margin:0">
+          <input data-ledger-search type="search" placeholder="email or user id"
+                 autocomplete="off" style="max-width:280px">
+          <button class="btn btn-sm btn-ghost" type="submit">Search</button>
+        </form>
       </div>
-      <div class="field" style="margin:0;flex:1;min-width:180px">
-        <label for="seedNote">Note (optional)</label>
-        <input id="seedNote" type="text" autocomplete="off" placeholder="initial liquidity">
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr>
+            <th>When</th><th>Who</th><th>Kind</th><th class="num">₹</th>
+            <th class="num">ARV</th><th>Ref</th><th>Note</th><th>FY</th>
+          </tr></thead>
+          <tbody data-ledger><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+        </table>
       </div>
-      <button class="btn" type="submit" style="align-self:end">Seed treasury</button>
-    </form>
-  </section>
-
-  <!-- ========================================================= clear data -->
-  <section class="card" style="margin-top:var(--sp-4);border-color:var(--down)">
-    <h3 style="font-size:1rem;margin:0 0 var(--sp-2)">Clear all data</h3>
-    <p class="small muted" style="margin-top:0">
-      Removes every account, wallet, order, trade and ledger entry — for clearing out a
-      round of testing. <strong>Kept:</strong> all settings, your own operator account,
-      the market history the charts read, and the audit log (so this action stays on
-      record). This cannot be undone.
-    </p>
-    <form class="row-wrap" data-wipe-form style="gap:var(--sp-3)">
-      <div class="field" style="margin:0;flex:1;min-width:220px">
-        <label for="wipeConfirm">Type <strong>CLEAR ALL DATA</strong> to confirm</label>
-        <input id="wipeConfirm" type="text" autocomplete="off" placeholder="CLEAR ALL DATA">
+      <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
+        Read-only by design and by database trigger. A correction is a new
+        compensating entry, never an edit or deletion of a past one.
       </div>
-      <button class="btn btn-sell" type="submit" style="align-self:end">Clear everything</button>
-    </form>
-  </section>
+    </section>
 
-  <!-- ============================================================== ledger -->
-  <section class="card card-flush" style="margin-top:var(--sp-4)">
-    <div class="card-head row-wrap" style="padding:var(--sp-4);margin:0">
-      <div>
-        <h3 style="font-size:1rem;margin:0">Ledger</h3>
-        <div class="tiny muted">The book of record — append-only, most recent first</div>
+    <!-- ============================================================ orders -->
+    <section class="card card-flush" style="margin-top:var(--sp-4)">
+      <div class="card-head row-wrap" style="padding:var(--sp-4);margin:0">
+        <div>
+          <h3 style="font-size:1rem;margin:0">Orders</h3>
+          <div class="tiny muted">All orders across users, most recent first</div>
+        </div>
+        <form class="row" data-order-form style="margin:0">
+          <select data-order-status style="max-width:150px">
+            <option value="open">Open</option>
+            <option value="filled">Filled</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="all">All</option>
+          </select>
+          <input data-order-search type="search" placeholder="email or user id"
+                 autocomplete="off" style="max-width:240px">
+          <button class="btn btn-sm btn-ghost" type="submit">Search</button>
+        </form>
       </div>
-      <form class="row" data-ledger-form style="margin:0">
-        <input data-ledger-search type="search" placeholder="email or user id"
-               autocomplete="off" style="max-width:280px">
-        <button class="btn btn-sm btn-ghost" type="submit">Search</button>
-      </form>
-    </div>
-    <div class="table-wrap">
-      <table class="data">
-        <thead><tr>
-          <th>When</th><th>Who</th><th>Kind</th><th class="num">₹</th>
-          <th class="num">ARV</th><th>Ref</th><th>Note</th><th>FY</th>
-        </tr></thead>
-        <tbody data-ledger><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
-      </table>
-    </div>
-    <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
-      Read-only by design and by database trigger. A correction is a new
-      compensating entry, never an edit or deletion of a past one.
-    </div>
-  </section>
-
-  <!-- ============================================================== orders -->
-  <section class="card card-flush" style="margin-top:var(--sp-4)">
-    <div class="card-head row-wrap" style="padding:var(--sp-4);margin:0">
-      <div>
-        <h3 style="font-size:1rem;margin:0">Orders</h3>
-        <div class="tiny muted">All orders across users, most recent first</div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr>
+            <th>Who</th><th>Side</th><th>Type</th><th class="num">Units</th>
+            <th class="num">Filled</th><th>Status</th><th class="num">Trigger</th>
+            <th>Created</th><th></th>
+          </tr></thead>
+          <tbody data-orders><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+        </table>
       </div>
-      <form class="row" data-order-form style="margin:0">
-        <select data-order-status style="max-width:150px">
-          <option value="open">Open</option>
-          <option value="filled">Filled</option>
-          <option value="cancelled">Cancelled</option>
-          <option value="all">All</option>
-        </select>
-        <input data-order-search type="search" placeholder="email or user id"
-               autocomplete="off" style="max-width:240px">
-        <button class="btn btn-sm btn-ghost" type="submit">Search</button>
-      </form>
-    </div>
-    <div class="table-wrap">
-      <table class="data">
-        <thead><tr>
-          <th>Who</th><th>Side</th><th>Type</th><th class="num">Units</th>
-          <th class="num">Filled</th><th>Status</th><th class="num">Trigger</th>
-          <th>Created</th><th></th>
-        </tr></thead>
-        <tbody data-orders><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
-      </table>
-    </div>
-    <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
-      Cancelling an open order releases only its unfilled remainder to the holder,
-      the same way their own cancel does. Filled portions are completed trades and
-      are never reversed.
-    </div>
-  </section>
-
-  <!-- ============================================================ P2P trades -->
-  <section class="card card-flush" style="margin-top:var(--sp-4)">
-    <div class="card-head row-wrap" style="padding:var(--sp-4);margin:0">
-      <div>
-        <h3 style="font-size:1rem;margin:0">P2P escrow trades</h3>
-        <div class="tiny muted">Peer-to-peer trades — release to the buyer or return escrow to the seller</div>
+      <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
+        Cancelling an open order releases only its unfilled remainder to the holder,
+        the same way their own cancel does. Filled portions are completed trades and
+        are never reversed.
       </div>
-      <form class="row" data-p2p-form style="margin:0">
-        <select data-p2p-status style="max-width:150px">
-          <option value="active">Active (+disputes)</option>
-          <option value="disputed">Disputed</option>
-          <option value="matched">Matched</option>
-          <option value="paid">Paid</option>
-          <option value="released">Released</option>
-          <option value="cancelled">Cancelled</option>
-          <option value="expired">Expired</option>
-          <option value="all">All</option>
-        </select>
-        <input data-p2p-search type="search" placeholder="email or user id"
-               autocomplete="off" style="max-width:240px">
-        <button class="btn btn-sm btn-ghost" type="submit">Search</button>
-      </form>
-    </div>
-    <div class="table-wrap">
-      <table class="data">
-        <thead><tr>
-          <th>Ref</th><th>Buyer</th><th>Seller</th><th class="num">Units</th>
-          <th class="num">Amount</th><th>Status</th><th>Proof</th><th></th>
-        </tr></thead>
-        <tbody data-p2p-trades><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
-      </table>
-    </div>
-    <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
-      Releasing moves the escrowed ARV to the buyer and writes an immutable trade
-      row for tax; cancelling returns the escrow to the seller. Both go through the
-      same money path as the users' own actions and are logged. Only release once
-      the rupees genuinely reached the seller.
-    </div>
-  </section>
+    </section>
 
-  <!-- ============================================================== history -->
-  <section class="card" style="margin-top:var(--sp-4)">
-    <div class="card-head">
-      <h3 style="font-size:1rem">Price history</h3>
-    </div>
-    <div class="table-wrap" style="margin-bottom:var(--sp-4)">
-      <table class="data">
-        <thead><tr><th>Timeframe</th><th class="num">Candles</th><th>From</th><th>To</th></tr></thead>
-        <tbody data-coverage><tr><td colspan="4" class="empty">—</td></tr></tbody>
-      </table>
-    </div>
-    <div class="row row-wrap">
-      <button class="btn btn-sm" data-backfill="1D">Backfill daily (5 years)</button>
-      <button class="btn btn-sm" data-backfill="1h">Backfill hourly (90 days)</button>
-      <button class="btn btn-sm" data-backfill="1m">Backfill minute (7 days)</button>
-    </div>
-    <p class="tiny muted" style="margin:var(--sp-3) 0 0">
-      Run these once after setup. Each paces its own requests to avoid being
-      rate-limited, so the daily one takes a couple of minutes.
-    </p>
-  </section>
+    <!-- ======================================================== P2P trades -->
+    <section class="card card-flush" style="margin-top:var(--sp-4)">
+      <div class="card-head row-wrap" style="padding:var(--sp-4);margin:0">
+        <div>
+          <h3 style="font-size:1rem;margin:0">P2P escrow trades</h3>
+          <div class="tiny muted">Peer-to-peer trades — release to the buyer or return escrow to the seller</div>
+        </div>
+        <form class="row" data-p2p-form style="margin:0">
+          <select data-p2p-status style="max-width:150px">
+            <option value="active">Active (+disputes)</option>
+            <option value="disputed">Disputed</option>
+            <option value="matched">Matched</option>
+            <option value="paid">Paid</option>
+            <option value="released">Released</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="expired">Expired</option>
+            <option value="all">All</option>
+          </select>
+          <input data-p2p-search type="search" placeholder="email or user id"
+                 autocomplete="off" style="max-width:240px">
+          <button class="btn btn-sm btn-ghost" type="submit">Search</button>
+        </form>
+      </div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr>
+            <th>Ref</th><th>Buyer</th><th>Seller</th><th class="num">Units</th>
+            <th class="num">Amount</th><th>Status</th><th>Proof</th><th></th>
+          </tr></thead>
+          <tbody data-p2p-trades><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
+        Releasing moves the escrowed ARV to the buyer and writes an immutable trade
+        row for tax; cancelling returns the escrow to the seller. Both go through the
+        same money path as the users' own actions and are logged. Only release once
+        the rupees genuinely reached the seller.
+      </div>
+    </section>
+
+  </div>
+
+  <!-- =============================================================== market -->
+  <div class="admin-panel" data-panel="market" hidden>
+    <section class="card">
+      <div class="card-head">
+        <h3 style="font-size:1rem">Price history</h3>
+      </div>
+      <div class="table-wrap" style="margin-bottom:var(--sp-4)">
+        <table class="data">
+          <thead><tr><th>Timeframe</th><th class="num">Candles</th><th>From</th><th>To</th></tr></thead>
+          <tbody data-coverage><tr><td colspan="4" class="empty">—</td></tr></tbody>
+        </table>
+      </div>
+      <div class="row row-wrap">
+        <button class="btn btn-sm" data-backfill="1D">Backfill daily (5 years)</button>
+        <button class="btn btn-sm" data-backfill="1h">Backfill hourly (90 days)</button>
+        <button class="btn btn-sm" data-backfill="1m">Backfill minute (7 days)</button>
+      </div>
+      <p class="tiny muted" style="margin:var(--sp-3) 0 0">
+        Run these once after setup. Each paces its own requests to avoid being
+        rate-limited, so the daily one takes a couple of minutes.
+      </p>
+    </section>
+  </div>
 
   <!-- ============================================================= settings -->
-  <section class="card" style="margin-top:var(--sp-4)">
-    <div class="card-head">
-      <h3 style="font-size:1rem">Settings</h3>
-      <span class="badge">server-side source of truth</span>
-    </div>
-    <div class="grid g-3" data-settings></div>
-    <p class="tiny muted" style="margin:var(--sp-4) 0 0">
-      These decide money — the front-end config is only a copy for quoting. Loss
-      set-off and fee deductibility are deliberately not editable: the law does not
-      permit either, and a toggle for them would produce a wrong tax statement for
-      every user.
-    </p>
-  </section>
+  <div class="admin-panel" data-panel="settings" hidden>
+
+    <section class="card">
+      <div class="card-head">
+        <h3 style="font-size:1rem">Settings</h3>
+        <span class="badge">server-side source of truth</span>
+      </div>
+      <div data-settings class="stack-lg"></div>
+      <p class="tiny muted" style="margin:var(--sp-4) 0 0">
+        These decide money — the front-end config is only a copy for quoting. Loss
+        set-off and fee deductibility are deliberately not editable: the law does not
+        permit either, and a toggle for them would produce a wrong tax statement for
+        every user.
+      </p>
+    </section>
+
+    <!-- ========================================================= clear data -->
+    <section class="card" style="margin-top:var(--sp-4);border-color:var(--down)">
+      <h3 style="font-size:1rem;margin:0 0 var(--sp-2)">Clear all data</h3>
+      <p class="small muted" style="margin-top:0">
+        Removes every account, wallet, order, trade and ledger entry — for clearing out a
+        round of testing. <strong>Kept:</strong> all settings, your own operator account,
+        the market history the charts read, and the audit log (so this action stays on
+        record). This cannot be undone.
+      </p>
+      <form class="row-wrap" data-wipe-form style="gap:var(--sp-3)">
+        <div class="field" style="margin:0;flex:1;min-width:220px">
+          <label for="wipeConfirm">Type <strong>CLEAR ALL DATA</strong> to confirm</label>
+          <input id="wipeConfirm" type="text" autocomplete="off" placeholder="CLEAR ALL DATA">
+        </div>
+        <button class="btn btn-sell" type="submit" style="align-self:end">Clear everything</button>
+      </form>
+    </section>
+
+  </div>
 
 </main>
 

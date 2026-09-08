@@ -1655,6 +1655,81 @@ table.data tfoot td {
 
 
 /* ============================================================================
+   Admin — tabbed operations panel
+   ----------------------------------------------------------------------------
+   The operator page groups its sections behind tabs instead of one long scroll,
+   so every control has a fixed home and is one click away. The bar sticks just
+   below the site nav (which is sticky at top:0, height --nav-h) so it stays in
+   reach as a table is scrolled.
+   ============================================================================ */
+
+.admin-tabs {
+  display: flex; flex-wrap: wrap; gap: var(--sp-2);
+  padding: var(--sp-2);
+  margin-bottom: var(--sp-5);
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--sh-2);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+  position: sticky; top: calc(var(--nav-h) + var(--sp-2)); z-index: 40;
+}
+
+.admin-tab {
+  appearance: none; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid transparent; border-radius: var(--r-sm);
+  background: transparent; color: var(--tx-2);
+  font: inherit; font-size: .9rem; font-weight: 600; white-space: nowrap;
+  transition: background .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease);
+}
+.admin-tab:hover { color: var(--tx-0); background: var(--k-3); }
+.admin-tab.is-active {
+  color: var(--k-0); background: var(--brushed-dim);
+  border-color: transparent; box-shadow: var(--sh-1);
+}
+
+.admin-tab-count {
+  min-width: 18px; height: 18px; padding: 0 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  font-size: .7rem; font-weight: 700; line-height: 1;
+  background: var(--warn-dim); color: var(--warn);
+}
+.admin-tab.is-active .admin-tab-count { background: rgba(0, 0, 0, .18); color: var(--k-0); }
+
+.admin-panel { animation: adminPanelIn .2s var(--ease-out); }
+.admin-panel[hidden] { display: none; }
+@keyframes adminPanelIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Settings, grouped into labelled blocks rather than one flat wall of fields. */
+.settings-group-title {
+  margin: 0 0 var(--sp-3);
+  font-size: .82rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--tx-2);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--line);
+}
+
+@media (max-width: 640px) {
+  /* On a phone the bar scrolls sideways instead of stacking into a tall block,
+     and drops its sticky offset so it does not eat the viewport. */
+  .admin-tabs {
+    position: static;
+    flex-wrap: nowrap; overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .admin-tab { flex: 0 0 auto; }
+}
+
+
+/* ============================================================================
    The 3D ARV coin
    ----------------------------------------------------------------------------
    Geometry and motion for js/coin3d.js. Deliberately not a 3D library: the old
