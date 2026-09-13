@@ -793,6 +793,13 @@ table.data tfoot td {
 .empty { padding: var(--sp-7) var(--sp-4); text-align: center; color: var(--tx-3); }
 .empty .icon { font-size: 1.8rem; opacity: .35; margin-bottom: var(--sp-3); }
 
+/* A section whose last refresh failed keeps the rows it already had — they are
+   still the best information available — and says so by fading rather than by
+   going blank. Deliberately subtle: the numbers must stay readable, because an
+   operator acting on slightly old data is far better off than one staring at an
+   error where the table used to be. */
+[data-stale] { opacity: .62; transition: opacity .2s var(--ease); }
+
 /* ------------------------------------------------------------------- tabs -- */
 
 .tabs {

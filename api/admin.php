@@ -53,12 +53,34 @@ switch ($action) {
         json_fail(400, 'Unknown action.');
 }
 
+/* ============================================================== guards ===== */
+
+/**
+ * Operator check for a handler that only reads.
+ *
+ * Identical to require_admin(), then it lets the session lock go. This page asks
+ * for a dozen endpoints at once and PHP holds the session file exclusively for
+ * the length of a request, so without this they queue behind one another instead
+ * of running together: the last few can take long enough to pass the browser's
+ * request timeout, and a timed-out panel looks to the operator like data that
+ * loaded and then broke.
+ *
+ * Only for handlers that will not touch the session again — every read-only GET
+ * below, none of the POSTs, which need it for the CSRF token.
+ */
+function require_admin_read(): array
+{
+    $u = require_admin();
+    session_release();
+    return $u;
+}
+
 /* =========================================================== overview ===== */
 
 function handle_overview(): void
 {
     require_method('GET');
-    require_admin();
+    require_admin_read();
 
     $meta = arv_nav_meta();
 
@@ -159,7 +181,7 @@ function operator_warnings(): array
 function handle_deposits(): void
 {
     require_method('GET');
-    require_admin();
+    require_admin_read();
 
     $status = (string)($_GET['status'] ?? 'submitted');
     $rows = q(
@@ -371,7 +393,7 @@ function handle_reject_deposit(): void
 function handle_withdrawals(): void
 {
     require_method('GET');
-    require_admin();
+    require_admin_read();
 
     $status = (string)($_GET['status'] ?? 'requested');
     $rows = q(
@@ -520,7 +542,7 @@ function handle_reject_withdraw(): void
 function handle_kyc_queue(): void
 {
     require_method('GET');
-    require_admin();
+    require_admin_read();
 
     $rows = q(
         'SELECT k.*, u.email, u.created_at AS joined
@@ -603,7 +625,7 @@ function handle_kyc_review(): void
 function handle_reconcile(): void
 {
     require_method('GET');
-    require_admin();
+    require_admin_read();
 
     $meta = arv_nav_meta();
     $nav  = $meta['nav'];
@@ -672,7 +694,7 @@ function handle_reconcile(): void
 function handle_users(): void
 {
     require_method('GET');
-    require_admin();
+    require_admin_read();
 
     $search = trim((string)($_GET['q'] ?? ''));
     $params = [];
@@ -769,6 +791,10 @@ function handle_set_user_admin(): void
     require_method('POST');
     require_csrf();
     $admin = require_admin();
+    // Handing out operator access is the action that turns one stolen session into
+    // permanent access. A human does this a handful of times ever, so a low ceiling
+    // costs nothing and caps what a script can do with a hijacked cookie.
+    rate_limit('admin_set_admin|' . (int)$admin['id'], 10, 3600);
 
     $userId  = input_int('userId');
     $isAdmin = input_int('isAdmin');
@@ -821,6 +847,9 @@ function handle_delete_user(): void
     require_method('POST');
     require_csrf();
     $me = require_admin();
+    // Deletion is irreversible and done one account at a time by hand. Anything
+    // faster than this is a loop, not an operator.
+    rate_limit('admin_delete_user|' . (int)$me['id'], 20, 3600);
 
     $id = input_int('userId');
     if ($id <= 0) {
@@ -887,7 +916,7 @@ function handle_delete_user(): void
 function handle_treasury_status(): void
 {
     require_method('GET');
-    require_admin();
+    require_admin_read();
 
     $email = trim((string)setting('p2p_treasury_email', ''));
     $meta  = arv_nav_meta();
@@ -941,7 +970,11 @@ function handle_treasury_seed(): void
 {
     require_method('POST');
     require_csrf();
-    require_admin();
+    $me = require_admin();
+    // This one creates supply, so it grows the platform's obligation to unit
+    // holders. Deliberately the tightest limit on the page: a legitimate seed is a
+    // considered decision taken occasionally, never a burst.
+    rate_limit('admin_treasury_seed|' . (int)$me['id'], 5, 3600, 3600);
 
     $units = trim((string)input_str('units'));
     if (!preg_match('/^\d{1,12}(\.\d{1,8})?$/', $units)) {
@@ -992,7 +1025,11 @@ function handle_grant_arv(): void
 {
     require_method('POST');
     require_csrf();
-    require_admin();
+    $me = require_admin();
+    // Moves units out of the treasury into someone's wallet. Higher than the seed
+    // limit because a promo can mean a run of grants, low enough that a script
+    // cannot quietly empty the treasury one grant at a time.
+    rate_limit('admin_grant_arv|' . (int)$me['id'], 60, 3600);
 
     $id = input_int('userId');
     if ($id <= 0) {
@@ -1102,6 +1139,13 @@ function handle_wipe_data(): void
     require_method('POST');
     require_csrf();
     $me = require_admin();
+    // The most destructive action in the product. The typed phrase below is the
+    // real guard; this one exists so a stolen session cannot simply retry.
+    //
+    // Note that a successful wipe truncates rate_limits along with everything
+    // else, so this counts failed attempts rather than successful ones — which is
+    // the case worth counting.
+    rate_limit('admin_wipe|' . (int)$me['id'], 3, 3600, 3600);
 
     $confirm = trim((string)input_str('confirm'));
     if ($confirm !== 'CLEAR ALL DATA') {
@@ -1159,7 +1203,7 @@ function handle_wipe_data(): void
 function handle_ledger(): void
 {
     require_method('GET');
-    require_admin();
+    require_admin_read();
 
     $search = trim((string)($_GET['q'] ?? ''));
     $params = [];
@@ -1211,7 +1255,7 @@ function handle_ledger(): void
 function handle_orders_all(): void
 {
     require_method('GET');
-    require_admin();
+    require_admin_read();
 
     $status = (string)($_GET['status'] ?? 'open');
     $search = trim((string)($_GET['q'] ?? ''));
@@ -1343,7 +1387,7 @@ function handle_cancel_order_admin(): void
 function handle_p2p_trades(): void
 {
     require_method('GET');
-    require_admin();
+    require_admin_read();
 
     $status = (string)($_GET['status'] ?? 'active');
     $search = trim((string)($_GET['q'] ?? ''));
@@ -1517,11 +1561,31 @@ function handle_p2p_cancel(): void
 
 /* =========================================================== settings ===== */
 
+/**
+ * Settings that are credentials rather than configuration.
+ *
+ * These are sent back masked. The panel needs to show whether one is set, not
+ * what it is — and a key rendered into an input is a key that any script running
+ * on this page can read and send somewhere else. Saving the mask is a no-op, so
+ * an operator who edits an unrelated field cannot overwrite a live key with the
+ * placeholder.
+ */
+const SECRET_SETTINGS = ['gemini_api_key'];
+const SECRET_MASK     = '••••••••';
+
 function handle_settings(): void
 {
     require_method('GET');
-    require_admin();
-    json_ok(['settings' => settings(), 'warnings' => operator_warnings()]);
+    require_admin_read();
+
+    $s = settings();
+    foreach (SECRET_SETTINGS as $key) {
+        if (!empty($s[$key])) {
+            $s[$key] = SECRET_MASK;
+        }
+    }
+
+    json_ok(['settings' => $s, 'warnings' => operator_warnings()]);
 }
 
 /**
@@ -1540,6 +1604,12 @@ function handle_save_setting(): void
 
     $key   = input_str('key');
     $value = (string)input('value', '');
+
+    // The masked placeholder means "unchanged" — see SECRET_SETTINGS. Saving it
+    // verbatim would replace a working key with a row of dots.
+    if (in_array($key, SECRET_SETTINGS, true) && $value === SECRET_MASK) {
+        json_ok(['message' => 'Unchanged.', 'key' => $key]);
+    }
 
     $writable = [
         'entry_fee_pct', 'exit_fee_pct', 'gst_pct', 'slippage_pct',

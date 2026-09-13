@@ -35,6 +35,11 @@
 
   <div data-warnings style="margin-bottom:var(--sp-4)"></div>
 
+  <!-- Shown only when a refresh fails. The tables keep their last good rows in
+       that case, and a dimmed table with no explanation reads as a bug — so the
+       page says which it is. -->
+  <div data-refresh-note style="margin-bottom:var(--sp-4)" hidden></div>
+
   <!-- ==================================================== persistent queues -->
   <!-- The at-a-glance status strip stays visible on every tab, so an operator
        always sees what is waiting without having to hunt for it. -->

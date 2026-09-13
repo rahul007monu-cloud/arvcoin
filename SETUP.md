@@ -59,6 +59,22 @@ says so and asks you to delete it by hand; it does not pretend.
 > into every account — if it ever reaches the repo, rotate both the key and the
 > database password.
 
+#### Optional: `trust_proxy`
+
+Rate limits are counted per IP address, and behind Cloudflare or Hostinger's proxy
+the real address arrives in a forwarded header, so those headers are believed by
+default. That is only safe while something upstream rewrites them.
+
+If the site is ever reachable directly — a bare IP, a staging host with no proxy in
+front — add this to `api/config.local.php`:
+
+```php
+'trust_proxy' => false,
+```
+
+Then only the connecting address counts, and nobody can send a made-up header per
+request to walk around the login and OTP limits.
+
 ### 1.4 Add the cron job
 
 hPanel → **Advanced → Cron Jobs**. Every minute:
