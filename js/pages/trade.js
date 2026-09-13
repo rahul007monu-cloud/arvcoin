@@ -702,137 +702,20 @@ async function submit() {
 
 /* -------------------------------------------------------------------- book -- */
 
-async function loadBook() {
-  var host = ui.el('[data-depth]');
-  if (!host) return;
-
-  try {
-    var r = await api.book();
-    var b = r.book;
-    var nav = (r.price && r.price.nav != null)
-      ? r.price.nav
-      : (st.snap && st.snap.price ? st.snap.price.nav : null);
-    if (nav == null) {
-      host.innerHTML = '<div class="empty tiny">The market opens when the price feed is live.</div>';
-      return;
-    }
-
-    var s = st.snap && st.snap.stats;
-
-    // This venue has no bid/ask book: buys fill instantly and everything settles
-    // at the index price. Show the settle price and 24h range instead of an empty
-    // two-sided ladder, and surface resting sells only when some actually exist —
-    // never a permanent "₹0".
-    var html =
-      '<div class="row-between" style="align-items:baseline">'
-        + '<span class="tiny muted">Settles at</span>'
-        + '<span class="num strong" style="font-size:1.15rem">' + ui.fmtPrice(nav) + '</span>'
-      + '</div>';
-
-    if (s) {
-      html +=
-        '<div class="row-between tiny" style="margin-top:11px">'
-          + '<span class="muted">24h high</span><span class="num up">' + ui.fmtPrice(s.high24h) + '</span></div>'
-        + '<div class="row-between tiny" style="margin-top:4px">'
-          + '<span class="muted">24h low</span><span class="num down">' + ui.fmtPrice(s.low24h) + '</span></div>';
-    }
-
-    var sellUnits = b ? parseFloat(b.sellDepthUnits) || 0 : 0;
-    if (sellUnits > 0) {
-      var n = (b.sells || []).length;
-      html +=
-        '<div class="row-between tiny" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">'
-          + '<span class="down strong">Waiting to sell</span>'
-          + '<span class="num">' + ui.fmtUnits(b.sellDepthUnits, 2) + ' ARV</span></div>'
-        // No treasury-buyback line: treasury-as-BUYER is an explicit TODO in
-        // api/_p2p.php, so a sell genuinely waits for a real buyer and saying
-        // otherwise would promise an exit the code cannot deliver.
-        + '<div class="tiny muted" style="margin-top:3px">' + n + (n === 1 ? ' order' : ' orders')
-          + ' waiting for a buyer</div>';
-    } else {
-      html +=
-        '<div class="tiny muted" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">'
-          + 'Nothing resting right now \u2014 an order you place waits here until '
-          + 'someone takes the other side.</div>';
-    }
-
-    host.innerHTML = html;
-  } catch (_) {
-    host.innerHTML = '<div class="empty tiny">Market unavailable.</div>';
-  }
-}
-
-async function loadTape() {
-  var host = ui.el('[data-tape]');
-  if (!host) return;
-
-  try {
-    var r = await api.tape(CFG.FEED.tapeLength || 40);
-    var rows = r.trades || [];
-    ui.setText('[data-tape-count]', rows.length ? rows.length + ' fills' : '');
-
-    if (!rows.length) {
-      host.innerHTML = '<div class="empty tiny">No fills yet. The first trade appears here.</div>';
-      return;
-    }
-
-    host.innerHTML = rows.map(function (t) {
-      // Treasury fills are marked, because whether the other side was a person or
-      // the platform is a genuinely different fact about the market.
-      var mark = t.counterparty === 'treasury'
-        ? '<span class="tiny muted" title="Filled by the treasury">\u25cb</span>' : '';
-      return '<div class="tape-row">'
-        + '<span class="num">' + ui.fmtPrice(t.nav) + ' ' + mark + '</span>'
-        + '<span class="num">' + ui.fmtUnits(t.units, 4) + '</span>'
-        + '<span class="t">' + ui.fmtTime(t.at) + '</span>'
-        + '</div>';
-    }).join('');
-  } catch (_) {
-    host.innerHTML = '<div class="empty tiny">Tape unavailable.</div>';
-  }
-}
-
-async function loadMyOrders() {
-  var host = ui.el('[data-my-orders]');
-  if (!host) return;
-
-  try {
-    var r = await api.myOrders('open');
-    var rows = r.orders || [];
-    if (!rows.length) {
-      host.innerHTML = '<div class="empty tiny">None open</div>';
-      return;
-    }
-
-    host.innerHTML = rows.map(function (o) {
-      var fb = o.fallbackInMinutes != null && o.side === 'sell'
-        ? '<div class="tiny muted">treasury in ' + o.fallbackInMinutes + 'm</div>' : '';
-      return '<div class="asset-row" style="grid-template-columns:1fr auto auto">'
-        + '<div><span class="badge ' + (o.side === 'buy' ? 'ok' : 'warn') + '">' + o.side
-          + '</span> <span class="tiny muted">' + o.type + '</span>'
-          + '<div class="num tiny" style="margin-top:3px">'
-            + ui.fmtUnits(o.remainingUnits, 4) + ' left'
-            + (o.triggerNav ? ' at ' + ui.fmtPrice(o.triggerNav) : '') + '</div>'
-          + fb + '</div>'
-        + '<span></span>'
-        + '<button class="btn btn-sm btn-ghost" data-cancel="' + o.id + '">Cancel</button>'
-        + '</div>';
-    }).join('');
-
-    ui.els('[data-cancel]').forEach(function (b) {
-      b.addEventListener('click', async function () {
-        ui.busy(b, true, '\u2026');
-        try {
-          var res = await api.cancelOrder(Number(b.dataset.cancel));
-          ui.toast(res.message || 'Cancelled.', 'ok');
-          await refresh();
-        } catch (e) { ui.toastError(e); ui.busy(b, false); }
-      });
-    });
-  } catch (_) {
-    host.innerHTML = '<div class="empty tiny">Unavailable</div>';
-  }
-}
+/*
+ * The book, the tape and "your open orders" are rendered by js/pages/p2p.js.
+ *
+ * All three used to live here and all three read the legacy index channel:
+ * api.book() and api.myOrders() are filtered to channel='index', so on a
+ * peer-to-peer venue they returned nothing and the cards sat empty forever. The
+ * tape read the `trades` table, which is only written when a trade fully releases,
+ * so it stayed blank while trades were in flight.
+ *
+ * p2p.js already polls api.p2p.offers() for the form, and that endpoint now carries
+ * the book, the live activity feed and the 24h totals — so it paints [data-depth],
+ * [data-tape] and [data-my-orders] from one request instead of three that were
+ * pointed at the wrong channel.
+ */
 
 /* -------------------------------------------------------------------- boot -- */
 
@@ -841,7 +724,6 @@ async function refresh() {
   st.snap = await api.snapshot().catch(function () { return null; });
   paintTicker();
   sideConfigLight();
-  await Promise.all([loadBook(), loadTape(), loadMyOrders()]);
 }
 
 /** Balance only — a full sideConfig would clear what the user is typing. */
@@ -916,13 +798,9 @@ function sideConfigLight() {
   // The candles only exist now, so any header stat the server left null can be
   // derived at this point (paintTicker above ran before the chart had data).
   paintStatsFallback();
-  loadBook();
-  loadTape();
-  loadMyOrders();
 
-  // The book and the tape change when anyone trades, so they refresh faster than
-  // the price does.
-  api.poll(function () { return Promise.all([loadBook(), loadTape()]); }, 15000);
+  // The book, the tape and this user's orders are p2p.js's — it polls the offers
+  // endpoint that carries all three.
   api.poll(async function () {
     st.snap = await api.snapshot();
     paintTicker();

@@ -124,7 +124,7 @@ function handle_place(): void
             ]);
         }
 
-        $orderId = tx(static function (PDO $pdo) use ($u, $orderRef, $otype, $trigger, $units8) {
+        $orderId = tx_or_fail(static function (PDO $pdo) use ($u, $orderRef, $otype, $trigger, $units8) {
             $pdo->prepare(
                 "INSERT INTO orders (ref, user_id, side, otype, channel, units, trigger_nav, status)
                  VALUES (?, ?, 'buy', ?, 'p2p', ?, ?, 'open')"
@@ -158,7 +158,7 @@ function handle_place(): void
                   ['needs' => 'payment_method']);
     }
 
-    $orderId = tx(static function (PDO $pdo) use ($u, $orderRef, $otype, $trigger, $units8) {
+    $orderId = tx_or_fail(static function (PDO $pdo) use ($u, $orderRef, $otype, $trigger, $units8) {
         $w = wallet_for_update($pdo, (int)$u['id']);
         $free = u8((string)$w['arv_units']);
         if ($units8 > $free) {
@@ -286,7 +286,7 @@ function handle_proof(): void
         json_fail(422, 'That does not look like a UTR. It is the reference in your payment app.');
     }
 
-    tx(static function (PDO $pdo) use ($id, $u, $utr, $image, $t) {
+    tx_or_fail(static function (PDO $pdo) use ($id, $u, $utr, $image, $t) {
         $st = $pdo->prepare('SELECT * FROM p2p_trades WHERE id = ? FOR UPDATE');
         $st->execute([$id]);
         $row = $st->fetch();
@@ -407,7 +407,7 @@ function handle_confirm(): void
             : 'This trade is ' . $t['status'] . ' and cannot be confirmed.');
     }
 
-    $result = tx(static function (PDO $pdo) use ($id, $u) {
+    $result = tx_or_fail(static function (PDO $pdo) use ($id, $u) {
         $st = $pdo->prepare('SELECT * FROM p2p_trades WHERE id = ? FOR UPDATE');
         $st->execute([$id]);
         $row = $st->fetch();
@@ -457,7 +457,7 @@ function handle_cancel(): void
 
     $who = (int)$t['buyer_id'] === (int)$u['id'] ? 'buyer' : 'seller';
 
-    $result = tx(static function (PDO $pdo) use ($id, $u, $reason, $who) {
+    $result = tx_or_fail(static function (PDO $pdo) use ($id, $u, $reason, $who) {
         $st = $pdo->prepare('SELECT * FROM p2p_trades WHERE id = ? FOR UPDATE');
         $st->execute([$id]);
         $row = $st->fetch();
@@ -509,7 +509,7 @@ function handle_cancel_order(): void
         json_fail(409, 'That order is already ' . $o['status'] . '.');
     }
 
-    $result = tx(static function (PDO $pdo) use ($id, $u) {
+    $result = tx_or_fail(static function (PDO $pdo) use ($id, $u) {
         $st = $pdo->prepare('SELECT * FROM orders WHERE id = ? FOR UPDATE');
         $st->execute([$id]);
         $o = $st->fetch();
@@ -567,6 +567,30 @@ function handle_cancel_order(): void
  * There is no bid/ask; every trade settles at the index price. This is a depth
  * readout so a trader can see whether a counterparty is likely to be waiting.
  */
+/**
+ * The market: who is waiting, and what has been trading.
+ *
+ * This used to return two aggregate numbers and nothing else, which is why the
+ * trade page could only say "waiting to sell: 0 ARV" — factually true and
+ * completely useless. Somebody who places an order and sees an empty screen has no
+ * way to tell a quiet market from a broken one, and assumes the second.
+ *
+ * So it now returns three things a real venue shows:
+ *
+ *   - `book`      — every resting order on both sides, anonymised. A seller can see
+ *                   that somebody is waiting to buy and how much; a buyer can see
+ *                   the supply they are about to take. This IS the "let sellers see
+ *                   there is a buyer at this rate" signal.
+ *   - `activity`  — recent trades platform-wide, read from `p2p_trades` rather than
+ *                   `trades`, so a match shows up the moment it happens instead of
+ *                   waiting for the whole pay-and-confirm cycle to finish. This is
+ *                   the running feed that shows the market is alive.
+ *   - `liquidity` — whether a market order placed right now would fill instantly,
+ *                   and from where. Told before they commit, not after.
+ *
+ * Everything is anonymous: units, price, rupees, age and status. No identities, no
+ * order references, nothing that ties a row to a person.
+ */
 function handle_offers(): void
 {
     require_method('GET');
@@ -583,13 +607,27 @@ function handle_offers(): void
                   AND status IN ('open','triggered','partial')
                 ORDER BY created_at ASC LIMIT 200")->fetchAll();
 
+    // The book, built as we total the depth so each row's matchable units are
+    // computed exactly once. FIFO order is preserved because that is genuinely the
+    // queue: p2p_try_match() takes resting orders by created_at ASC, so position in
+    // this list is position in line.
     $sellU8 = 0;
+    $sellBook = [];
     foreach ($sells as $o) {
-        $sellU8 += p2p_sell_matchable_u8($pdo, $o);
+        $m = p2p_sell_matchable_u8($pdo, $o);
+        $sellU8 += $m;
+        if ($m > 0) {
+            $sellBook[] = p2p_book_row($o, $m, $nav);
+        }
     }
     $buyU8 = 0;
+    $buyBook = [];
     foreach ($buys as $o) {
-        $buyU8 += p2p_buy_matchable_u8($pdo, $o);
+        $m = p2p_buy_matchable_u8($pdo, $o);
+        $buyU8 += $m;
+        if ($m > 0) {
+            $buyBook[] = p2p_book_row($o, $m, $nav);
+        }
     }
 
     // Phase 2b transparency: the platform fee + TDS a buyer will pay (in ARV,
@@ -601,14 +639,44 @@ function handle_offers(): void
     $tdsPct   = $feeAcct !== null ? setting_f('p2p_tds_pct', 0) : 0.0;
     $treasury = p2p_treasury_user($pdo);
 
+    // How much the treasury could actually supply right now. p2p_treasury_user()
+    // already applied the strict test (enabled, active, KYC-verified, has a payment
+    // method), so the only thing left to read is its free ARV — the same figure
+    // p2p_treasury_fill_buy() will draw against.
+    $treasuryUnits8 = 0;
+    if ($treasury !== null) {
+        $tw = q1('SELECT arv_units FROM wallets WHERE user_id = ?', [(int)$treasury['id']]);
+        $treasuryUnits8 = $tw ? u8((string)$tw['arv_units']) : 0;
+    }
+
     json_ok([
         'price'          => $meta,
         'sellDepthUnits' => u8str(max(0, $sellU8)),
         'buyDepthUnits'  => u8str(max(0, $buyU8)),
         'sellDepthPaise' => $nav !== null ? u8_to_paise(max(0, $sellU8), (float)$nav) : null,
         'buyDepthPaise'  => $nav !== null ? u8_to_paise(max(0, $buyU8), (float)$nav) : null,
-        'sellOrders'     => count($sells),
-        'buyOrders'      => count($buys),
+        'sellOrders'     => count($sellBook),
+        'buyOrders'      => count($buyBook),
+
+        // The book. Sells are what a buyer can take; buys are the demand a seller
+        // can fill. Capped at 25 a side — beyond that it is noise, and the totals
+        // above already carry the whole depth.
+        'book'           => [
+            'sells' => array_slice($sellBook, 0, 25),
+            'buys'  => array_slice($buyBook, 0, 25),
+        ],
+
+        'activity'  => p2p_recent_activity(),
+        'stats24h'  => p2p_activity_stats(),
+
+        // Said plainly, before they commit: would a market order fill now?
+        'liquidity' => [
+            'buyFillsNow'     => $sellU8 > 0 || $treasuryUnits8 > 0,
+            'sellFillsNow'    => $buyU8 > 0,
+            'treasuryUnits'   => u8str($treasuryUnits8),
+            'instantForBuyer' => u8str(max(0, $sellU8) + $treasuryUnits8),
+        ],
+
         'fee'            => [
             'collected'    => $feeAcct !== null && ($feePct > 0 || $tdsPct > 0),
             'feePct'       => $feePct,
@@ -619,6 +687,87 @@ function handle_offers(): void
         'note'           => 'Every P2P trade settles at the live index price. A limit order acts '
                           . 'when the index reaches its level; there is no spread to negotiate.',
     ]);
+}
+
+/**
+ * One anonymous row of the public book.
+ *
+ * Deliberately carries no identity and no order reference — only size, kind, and
+ * how long it has been waiting. Age is the useful part: it tells a seller that
+ * somebody has been waiting twenty minutes, which is a far stronger reason to fill
+ * them than a bare number.
+ */
+function p2p_book_row(array $o, int $matchable8, ?float $nav): array
+{
+    $created = $o['created_at'] ?? null;
+    return [
+        'units'      => u8str($matchable8),
+        'paise'      => $nav !== null ? u8_to_paise($matchable8, $nav) : null,
+        'type'       => $o['otype'],
+        // A market order takes the index price; a trigger order names its level, so
+        // a viewer can tell "waiting for a counterparty" from "waiting for a price".
+        'triggerNav' => $o['trigger_nav'] !== null ? (float)$o['trigger_nav'] : null,
+        'waitingSeconds' => $created !== null
+            ? max(0, time() - strtotime($created . ' UTC'))
+            : null,
+    ];
+}
+
+/**
+ * Recent trades, platform-wide and anonymous.
+ *
+ * Read from `p2p_trades`, not `trades`. The `trades` row is only written when a
+ * trade RELEASES — after the buyer has paid and the seller has confirmed — so a
+ * tape built on it lags real activity by the whole pay-and-confirm cycle and can
+ * look empty while several trades are in flight. `p2p_trades` has a row from the
+ * instant of the match, which is what "the market is alive" actually means.
+ *
+ * Cancelled and expired trades are excluded: a match nobody paid for is not
+ * activity, and showing it would overstate the venue.
+ */
+function p2p_recent_activity(int $limit = 30): array
+{
+    $rows = q(
+        'SELECT units, price_nav, amount_paise, status,
+                matched_at, paid_at, released_at
+           FROM p2p_trades
+          WHERE status IN ("matched","paid","released","disputed")
+          ORDER BY id DESC LIMIT ' . max(1, min(100, $limit))
+    )->fetchAll();
+
+    return array_map(static function ($t) {
+        // The most recent thing that happened to it, which is what a tape should be
+        // ordered and stamped by.
+        $at = $t['released_at'] ?? ($t['paid_at'] ?? $t['matched_at']);
+        return [
+            'units'  => (string)$t['units'],
+            'nav'    => (float)$t['price_nav'],
+            'paise'  => (int)$t['amount_paise'],
+            // 'released' is a completed trade; 'matched'/'paid' are in flight. Shown
+            // so the feed reads as a live market rather than a settled archive.
+            'status' => $t['status'],
+            'at'     => $at,
+        ];
+    }, $rows);
+}
+
+/** Traded volume over the last 24 hours — the headline that says "this venue works". */
+function p2p_activity_stats(): array
+{
+    $r = q1(
+        'SELECT COUNT(*) AS n,
+                COALESCE(SUM(units),0)        AS units,
+                COALESCE(SUM(amount_paise),0) AS paise
+           FROM p2p_trades
+          WHERE status IN ("paid","released")
+            AND matched_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)'
+    );
+
+    return [
+        'trades' => (int)($r['n'] ?? 0),
+        'units'  => (string)($r['units'] ?? '0'),
+        'paise'  => (int)($r['paise'] ?? 0),
+    ];
 }
 
 /* ============================================================ shaping ===== */

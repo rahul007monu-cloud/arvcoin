@@ -611,7 +611,13 @@ export function toastError(e) {
     var first = Object.keys(e.fields)[0];
     return toast(esc(e.fields[first] || msg), 'bad', 7000);
   }
-  return toast(esc(msg), 'bad', 7000);
+
+  // A refusal that explains itself is usually a long sentence — the operator being
+  // told which account is short of cost basis and what to do about it, for
+  // instance. Seven seconds is not enough to read that, and a message that vanishes
+  // mid-sentence is barely better than no message at all.
+  var ms = msg.length > 120 ? 16000 : 7000;
+  return toast(esc(msg), 'bad', ms);
 }
 
 /* ============================================================= prices ===== */

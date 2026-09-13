@@ -55,6 +55,9 @@ switch ($action) {
 /**
  * Operator check for a handler that only reads.
  *
+ * @see tx_or_fail() in _boot.php — the other half of why this page now reports
+ *      refusals instead of reference numbers.
+ *
  * Identical to require_admin(), then it lets the session lock go. This page asks
  * for a dozen endpoints at once and PHP holds the session file exclusively for
  * the length of a request, so without this they queue behind one another instead
@@ -71,6 +74,8 @@ function require_admin_read(): array
     session_release();
     return $u;
 }
+
+
 
 /* =========================================================== overview ===== */
 
@@ -531,7 +536,7 @@ function handle_delete_user(): void
     // Everything hanging off the account cascades (wallets, lots, orders, kyc,
     // payment_methods, deposits, withdrawals, referrals, p2p_trades). The
     // audit_log entry survives on purpose, so the deletion itself stays on record.
-    tx(static function (PDO $pdo) use ($id) {
+    tx_or_fail(static function (PDO $pdo) use ($id) {
         $pdo->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
     });
 
@@ -631,7 +636,7 @@ function handle_treasury_seed(): void
         json_fail(422, 'No usable treasury account. Set a treasury email in Settings to an active, KYC-verified account first.');
     }
 
-    $res = tx(static function (PDO $pdo) use ($units8, $meta, $note) {
+    $res = tx_or_fail(static function (PDO $pdo) use ($units8, $meta, $note) {
         $t = arv_treasury_inventory_user($pdo);
         if (!$t) {
             throw new RuntimeException('No usable treasury account. Set a treasury email in Settings to an active account first.');
@@ -724,7 +729,7 @@ function handle_grant_arv(): void
         ), ['sellableUnits' => u8str($sellable)]);
     }
 
-    $res = tx(static function (PDO $pdo) use ($id, $units8, $meta, $note) {
+    $res = tx_or_fail(static function (PDO $pdo) use ($id, $units8, $meta, $note) {
         $t = arv_treasury_inventory_user($pdo);
         if (!$t) {
             throw new RuntimeException('No usable treasury account. Set a treasury email in Settings to an active account first.');
@@ -962,7 +967,7 @@ function handle_cancel_order_admin(): void
         json_fail(422, 'Which order?');
     }
 
-    $result = tx(static function (PDO $pdo) use ($id) {
+    $result = tx_or_fail(static function (PDO $pdo) use ($id) {
         $st = $pdo->prepare('SELECT * FROM orders WHERE id = ? FOR UPDATE');
         $st->execute([$id]);
         $o = $st->fetch();
@@ -1104,7 +1109,7 @@ function handle_p2p_release(): void
         json_fail(422, 'Which trade?');
     }
 
-    $result = tx(static function (PDO $pdo) use ($id, $admin) {
+    $result = tx_or_fail(static function (PDO $pdo) use ($id, $admin) {
         $st = $pdo->prepare('SELECT * FROM p2p_trades WHERE id = ? FOR UPDATE');
         $st->execute([$id]);
         $t = $st->fetch();
@@ -1160,7 +1165,7 @@ function handle_p2p_cancel(): void
         json_fail(422, 'Give a reason — this is a manual intervention and it is logged.');
     }
 
-    $result = tx(static function (PDO $pdo) use ($id, $reason, $admin) {
+    $result = tx_or_fail(static function (PDO $pdo) use ($id, $reason, $admin) {
         $st = $pdo->prepare('SELECT * FROM p2p_trades WHERE id = ? FOR UPDATE');
         $st->execute([$id]);
         $t = $st->fetch();

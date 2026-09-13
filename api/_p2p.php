@@ -618,12 +618,32 @@ function p2p_release_core(PDO $pdo, array $t): array
     // FIFO cost basis, inside this transaction. A shortfall means the lots do
     // not account for the escrowed units — refuse rather than invent a basis,
     // exactly as the index fill does.
+    //
+    // The message says who is short and by how much, because the person who reads
+    // it is the one who has to fix it. It used to end "Operations has been
+    // notified", which is a strange thing to tell an operator: it named no account,
+    // no amount and no next step, so a release that failed for a perfectly
+    // understandable reason looked like the button was broken.
+    //
+    // How a holding ends up here: units reached the wallet without a matching
+    // `lots` row. Every code path writes one — seeding, granting, buying, referral
+    // commission — so in practice this means units were inserted by hand, or the
+    // lots were already consumed by an earlier sale.
     $lots = consume_lots($pdo, $sellerId, $units8);
     if ($lots['shortfall8'] > 0) {
-        throw new RuntimeException(
-            'Cost basis is incomplete for this holding — the release was refused rather '
-            . 'than guessing a purchase price. Operations has been notified.'
-        );
+        $who = q1('SELECT email FROM users WHERE id = ?', [$sellerId]);
+        throw new RuntimeException(sprintf(
+            'Release refused: the seller (%s) holds %s ARV in escrow but their purchase '
+            . 'records only account for %s of it — short by %s ARV. Releasing would mean '
+            . 'inventing a purchase price, which would put a wrong figure on their tax '
+            . 'statement. Add the missing cost basis for that account before releasing: '
+            . 'if this is the treasury, seed it (Treasury tab), which writes the matching '
+            . 'record. Nothing has been moved.',
+            $who['email'] ?? ('#' . $sellerId),
+            u8str($units8),
+            u8str($units8 - $lots['shortfall8']),
+            u8str($lots['shortfall8'])
+        ));
     }
     $costBasis = $lots['costPaise'];
     $pnl       = $amount - $costBasis;
@@ -1138,9 +1158,27 @@ function p2p_maintenance(): array
         });
     }
 
-    /* -- Case D: price triggers. A resting limit/stop/target P2P order fires when
-       the live index price reaches its trigger (direction per p2p_order_ready).
-       This is also what lets two resting orders pair on pure price movement. */
+    /* -- Case D: keep every resting order looking for a counterparty.
+
+       Two jobs in one sweep:
+
+       (a) A limit/stop/target order fires when the live index reaches its trigger
+           (direction per p2p_order_ready). This is what lets two resting orders
+           pair on pure price movement.
+
+       (b) A resting MARKET order is retried. This used to be excluded, and the
+           omission was the reason the venue felt dead: a market buy tries to match
+           exactly once, at placement, and if nothing was resting at that instant it
+           sat untouched until it expired 24 hours later. It could only ever be
+           rescued by somebody else happening to place a sell — so liquidity that
+           appeared a minute later (a new sell, a treasury seed, escrow freed by an
+           expiring match, a remainder that grew past the ₹100 minimum) was simply
+           never noticed.
+
+           Retrying is safe and cheap: p2p_try_match() locks the order FOR UPDATE,
+           re-checks status and readiness, and returns immediately when there is
+           nothing to match. Running it once a minute is what turns "no seller
+           available right now" into a promise the platform actually keeps. */
     // Never fire on a missing/stale price — nominate nothing if the feed is down.
     $navNow = null;
     try {
@@ -1150,10 +1188,11 @@ function p2p_maintenance(): array
     }
     $triggersFired = 0;
     if ($navNow !== null && $navNow > 0) {
+        // Oldest first, so the FIFO queue an operator or a customer can see in the
+        // book is the order in which these actually get their chance.
         $candidates = q(
             "SELECT id, side, otype, trigger_nav FROM orders
               WHERE channel = 'p2p'
-                AND otype IN ('limit','stop','target')
                 AND status IN ('open','triggered','partial')
               ORDER BY created_at ASC, id ASC
               LIMIT 500"
