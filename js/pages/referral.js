@@ -1,22 +1,21 @@
 /**
  * Refer and earn.
  *
- * The commission is 5% of a referred user's *first* deposit, paid once. Nothing
- * on this page pays anything — `admin.php` credits it at the moment that deposit
- * is confirmed, and this only reports what happened.
+ * The commission is 5% of a referred user's *first purchase*, paid once, in ARV —
+ * credited by referral_commission_pay() at the instant the referred person's
+ * tokens are released to them. Nothing on this page pays anything; it only reports
+ * what happened.
  *
  * Two things are stated on screen rather than left implied, because both are the
  * kind of thing a referral page usually hides:
  *
- *   - the money comes out of our margin, not out of the referred user's deposit,
- *     so nobody is paying for someone else's bonus;
+ *   - the reward comes out of our margin, not out of what the referred person
+ *     paid, so nobody is funding someone else's bonus;
  *   - tiers reward with lower fees rather than cash, because a cash reward that
- *     scales with other people's deposits is a return funded by deposits.
+ *     scales with other people's money is a return funded by their money.
  *
- * The second one is not decoration. Paying cash on referred volume in a product
- * that pools funds is what the Prize Chits and Money Circulation Schemes
- * (Banning) Act, 1978 describes, and taking deposits against a promised return
- * is an offence under the BUDS Act, 2019.
+ * The second one is not decoration. Paying cash on referred volume is what the
+ * Prize Chits and Money Circulation Schemes (Banning) Act, 1978 describes.
  */
 
 import * as ui from '../ui.js';
@@ -101,8 +100,8 @@ function paintStats() {
 
   var joined = t.joinedNotFunded || 0;
   ui.setText('[data-joined]', joined
-    ? joined + ' more signed up, not yet funded'
-    : 'people whose first deposit landed');
+    ? joined + ' more signed up, not yet bought'
+    : 'people whose first purchase completed');
 }
 
 /* ------------------------------------------------------------------- terms -- */
@@ -115,11 +114,11 @@ function paintTerms() {
   ui.setText('[data-pct]', String(pct));
 
   ui.setHtml('[data-terms]',
-    row('Commission', pct + '% of their first deposit')
-    + row('Paid', 'once per person')
-    + row('Cap', ui.fmtPaise(terms.capPaise != null ? terms.capPaise : CFG.REFERRAL.maxCommissionPaise))
+    row('Commission', pct + '% of their first purchase')
+    + row('Paid', 'once per person, as soon as their tokens land')
+    + row('Worth up to', ui.fmtPaise(terms.capPaise != null ? terms.capPaise : CFG.REFERRAL.maxCommissionPaise))
     + row('Levels', String(terms.levels || 1))
-    + row('Credited to', 'your rupee balance')
+    + row('Credited as', 'ARV, straight into your holding')
     + row('Costs them', 'nothing'));
 
   ui.setText('[data-terms-note]', terms.explanation || '');
@@ -183,7 +182,7 @@ function paintTiers() {
     var earned = earnedIdx >= 0 && i <= earnedIdx;
     var req = t.requirement || (t.metric === 'paise'
       ? ui.fmtCompact(t.threshold / 100) + ' referred'
-      : t.threshold + '\u00d7 your own deposits');
+      : t.threshold + '\u00d7 your own purchases');
 
     return '<div class="tier-row' + (earned ? ' earned' : '') + '">'
       + '<span class="tier-name">' + ui.esc(t.label) + '</span>'
@@ -212,7 +211,7 @@ function paintPeople() {
 
   host.innerHTML =
     '<table class="data"><thead><tr>'
-      + '<th>Who</th><th>Joined</th><th class="right">First deposit</th>'
+      + '<th>Who</th><th>Joined</th><th class="right">First purchase</th>'
       + '<th class="right">Rate</th><th class="right">Commission</th><th>Status</th>'
     + '</tr></thead><tbody>'
     + rows.map(function (r) {
@@ -232,7 +231,7 @@ function paintPeople() {
 function exportCsv() {
   var rows = (st.summary && st.summary.referrals) || [];
   ui.downloadCsv('arv-referrals.csv', [
-    ['Who', 'Joined', 'First deposit (INR)', 'Rate %', 'Commission (INR)', 'Status']
+    ['Who', 'Joined', 'First purchase (INR)', 'Rate %', 'Commission (INR)', 'Status']
   ].concat(rows.map(function (r) {
     return [r.who, r.at, (r.basePaise / 100).toFixed(2), r.commissionPct,
             (r.commissionPaise / 100).toFixed(2), r.status];

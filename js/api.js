@@ -316,54 +316,11 @@ export function tape(limit) {
   return request('orders', 'tape', { method: 'GET', query: { limit: limit } });
 }
 
-/* --------------------------------------------------------------- deposits -- */
-
-export function createDeposit(amountPaise) {
-  return request('deposit', 'create', { data: { amountPaise: amountPaise } });
-}
-
-/**
- * Submit proof of payment.
- *
- * Uses multipart when a screenshot is attached so the file is not base64'd into
- * JSON, which would inflate it by a third for no benefit.
- */
-export function submitDeposit(ref, utr, file) {
-  if (file) {
-    var fd = new FormData();
-    fd.set('ref', ref);
-    fd.set('utr', utr || '');
-    fd.set('screenshot', file);
-    return request('deposit', 'submit', { form: fd, timeoutMs: 60000 });
-  }
-  return request('deposit', 'submit', { data: { ref: ref, utr: utr } });
-}
-
-export function myDeposits() {
-  return request('deposit', 'mine', { method: 'GET' });
-}
-
-export function getDeposit(ref) {
-  return request('deposit', 'get', { method: 'GET', query: { ref: ref } });
-}
-
-export function cancelDeposit(ref) {
-  return request('deposit', 'cancel', { data: { ref: ref } });
-}
-
-/* ------------------------------------------------------------ withdrawals -- */
-
-export function createWithdrawal(amountPaise, upiVpa) {
-  return request('withdraw', 'create', { data: { amountPaise: amountPaise, upiVpa: upiVpa } });
-}
-
-export function myWithdrawals() {
-  return request('withdraw', 'mine', { method: 'GET' });
-}
-
-export function cancelWithdrawal(ref) {
-  return request('withdraw', 'cancel', { data: { ref: ref } });
-}
+/* ------------------------------------------------- deposits, withdrawals -- */
+// Removed. The platform never holds rupees: a P2P buyer pays the seller directly
+// and only ARV moves here, so there was nothing for a deposit to fund and nothing
+// for a withdrawal to pay out. The api/deposit.php and api/withdraw.php endpoints
+// are gone too — this is not a hidden feature, it is an absent one.
 
 /* -------------------------------------------------------------------- kyc -- */
 
@@ -454,13 +411,6 @@ export function financialYears() {
 
 export var admin = {
   overview: function () { return request('admin', 'overview', { method: 'GET' }); },
-  deposits: function (status) { return request('admin', 'deposits', { method: 'GET', query: { status: status } }); },
-  confirmDeposit: function (ref, note) { return request('admin', 'confirm_deposit', { data: { ref: ref, note: note } }); },
-  rejectDeposit: function (ref, reason) { return request('admin', 'reject_deposit', { data: { ref: ref, reason: reason } }); },
-  withdrawals: function (status) { return request('admin', 'withdrawals', { method: 'GET', query: { status: status } }); },
-  approveWithdraw: function (ref) { return request('admin', 'approve_withdraw', { data: { ref: ref } }); },
-  markPaid: function (ref, utr) { return request('admin', 'mark_paid', { data: { ref: ref, utr: utr } }); },
-  rejectWithdraw: function (ref, reason) { return request('admin', 'reject_withdraw', { data: { ref: ref, reason: reason } }); },
   kycQueue: function () { return request('admin', 'kyc_queue', { method: 'GET' }); },
   reviewKyc: function (userId, approve, reason) {
     return request('admin', 'kyc_review', { data: { userId: userId, approve: approve, reason: reason } });

@@ -42,7 +42,7 @@
   "shortcuts": [
     { "name": "Trade", "short_name": "Trade", "url": "trade.html" },
     { "name": "Wallet", "short_name": "Wallet", "url": "dashboard.html" },
-    { "name": "Deposit", "short_name": "Deposit", "url": "deposit.html" },
+    { "name": "Portfolio", "short_name": "Portfolio", "url": "portfolio.html" },
     { "name": "History", "short_name": "History", "url": "transactions.html" }
   ]
 }

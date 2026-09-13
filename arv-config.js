@@ -105,7 +105,7 @@
   // minute history; the deep 2015→ body is daily/weekly. See NAV arithmetic in
   // README/SETUP.
   //
-  // Quoted in rupees because deposits are rupees and the treasury holds Bitcoin.
+  // Quoted in rupees because a trade is priced in rupees and the treasury holds Bitcoin.
   // That makes ARV's printed change equal what the money actually did, currency
   // movement included, and it makes ARV's percentage identical to Bitcoin's
   // rupee percentage — which the trade screen shows side by side.
@@ -187,7 +187,6 @@
     annualMgmtPct: 0,
     minInvestPaise: 10000,
     minRedeemPaise: 10000,
-    minWithdrawPaise: 10000,
     // A real order does not fill at the mid price. Modelling this as zero makes
     // every downstream number optimistic in the user's favour, which is the
     // worst direction for an error to point.
@@ -226,32 +225,23 @@
   // 6. MONEY IN AND OUT
   // ---------------------------------------------------------------------------
   //
-  // A UPI QR carries a request one way and returns nothing — no callback, no
-  // signature. So a deposit is never credited because a QR was shown. The user
-  // submits a UTR or a screenshot, and an operator matches it against the bank
-  // account before the wallet moves.
+  // The platform does not take payments. A buyer pays the seller's own UPI ID
+  // directly, and only the ARV moves here — so there is no deposit to credit and
+  // no payout to send.
+  //
+  // What is left is the company's own collection details, used for the one case
+  // where the seller IS the company: a treasury P2P sell.
   //
   var PAYMENTS = {
     // NOT the payment address. The one that matters is `settings.upi_vpa` in the
-    // database, editable in Operations → Settings and returned by deposit.php with
-    // every request. This stays empty on purpose: a second copy of a payment
-    // address is a second place to forget, and a stale one here would mean money
-    // sent to whatever it used to say.
+    // database, editable in Operations → Settings. This stays empty on purpose: a
+    // second copy of a payment address is a second place to forget, and a stale
+    // one here would mean money sent to whatever it used to say.
     vpa: '',
     payeeName: 'ARV Coin',
     merchantCode: '',
     currency: 'INR',
-    depositNoteTemplate: 'ARV-{ref}',
-    requireUtrOrScreenshot: true,
-    maxScreenshotMb: 4,
-
-    // Windows shown to the user. Honest ranges, not promises of the minimum.
-    depositMinMinutes: 2,
-    depositMaxMinutes: 15,
-    withdrawMinMinutes: 5,
-    withdrawMaxMinutes: 60,
-
-    depositRequestExpiryMinutes: 30
+    noteTemplate: 'ARV-{ref}'
   };
 
   // ---------------------------------------------------------------------------
@@ -284,20 +274,21 @@
   // 8. REFERRAL AND REWARDS
   // ---------------------------------------------------------------------------
   //
-  // 5% of a referred user's first deposit, once, credited to the referrer's INR
-  // wallet.
+  // 5% of a referred user's first PURCHASE, once, paid to the referrer in ARV at
+  // the moment the referred person's tokens reach their account.
   //
   // A word of caution kept next to the switch that turns it on: paying a
-  // commission calculated on money other people put in, in a product that pools
-  // funds, is the shape the Prize Chits and Money Circulation Schemes (Banning)
-  // Act, 1978 describes. Single-level and one-time — as configured — is a long
-  // way from a chain scheme, and `enabled: false` disables the whole thing
-  // instantly if counsel says to. Do not add a second level.
+  // commission calculated on money other people put in is the shape the Prize
+  // Chits and Money Circulation Schemes (Banning) Act, 1978 describes.
+  // Single-level and one-time — as configured — is a long way from a chain
+  // scheme, and `enabled: false` disables the whole thing instantly if counsel
+  // says to. Do not add a second level.
   //
   var REFERRAL = {
     enabled: true,
     commissionPct: 5,
-    onlyFirstDeposit: true,
+    onlyFirstPurchase: true,
+    paidIn: 'ARV',
     levels: 1,                        // must stay 1
     maxCommissionPaise: 5000000,      // ₹50,000 cap per referral
     codeLength: 8,
@@ -308,7 +299,7 @@
   };
 
   // Tiers are earned on total referred volume — the rupees a referrer's
-  // referrals have actually deposited.
+  // referrals have actually spent buying.
   //
   // The reward is a fee discount, not cash. That is deliberate: a cash bonus
   // scaled to volume reads as a promised return, which is both a compliance
@@ -319,7 +310,7 @@
     { id: 'silver',   label: 'Silver',   metric: 'ratio',  threshold: 5,        entryFeePct: 0.25, exitFeePct: null, days: null, perk: 'Buy fee 0.25%, permanently' },
     { id: 'gold',     label: 'Gold',     metric: 'ratio',  threshold: 10,       entryFeePct: 0.25, exitFeePct: 0.25, days: null, perk: 'Buy and sell fee 0.25%' },
     { id: 'platinum', label: 'Platinum', metric: 'ratio',  threshold: 100,      entryFeePct: 0,    exitFeePct: 0.25, days: null, perk: 'No buy fee, sell 0.25%' },
-    { id: 'sterling', label: 'Sterling', metric: 'paise',  threshold: 10000000, entryFeePct: 0,    exitFeePct: 0.25, days: null, perk: 'Priority withdrawal \u2014 the 5 minute band' },
+    { id: 'sterling', label: 'Sterling', metric: 'paise',  threshold: 10000000, entryFeePct: 0,    exitFeePct: 0.25, days: null, perk: 'No buy fee, sell 0.25%, priority support' },
     { id: 'obsidian', label: 'Obsidian', metric: 'paise',  threshold: 100000000, entryFeePct: 0,   exitFeePct: 0,    days: null, perk: 'Zero fees and a dedicated line' }
   ];
 
@@ -521,7 +512,6 @@
         w.push('No launch base price for basket asset ' + a.key);
       }
     });
-    if (!PAYMENTS.vpa) w.push('No UPI VPA configured \u2014 the deposit QR is a placeholder');
     if (TAX.allowLossSetOff) w.push('TAX.allowLossSetOff is true \u2014 s.115BBH does not permit set-off');
     if (TAX.feesDeductible) w.push('TAX.feesDeductible is true \u2014 only cost of acquisition is deductible');
     if (REFERRAL.levels > 1) w.push('REFERRAL.levels is above 1 \u2014 multi-level referral is a money circulation scheme');

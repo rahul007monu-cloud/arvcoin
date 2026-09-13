@@ -130,7 +130,40 @@ function preview_cost_basis(int $userId, int $needU8): array
 
 /* ============================================================== place ===== */
 
+/**
+ * Closed. The index order book no longer accepts orders.
+ *
+ * Trading is peer-to-peer — api/p2p.php — and this path predates that. It had no
+ * button left anywhere in the UI, but the endpoint was still live and callable,
+ * and it was the last thing on the platform that could move rupees:
+ *
+ *   - a buy spends `wallets.inr_paise`, and with deposits removed there is no way
+ *     to put rupees there, so it could only ever fail; and
+ *   - a sell into the treasury fallback CREDITS rupees to a wallet with nobody
+ *     debited — money that, without a withdrawal, nobody could ever take out.
+ *
+ * The second one is why this is closed rather than left alone. An endpoint whose
+ * best case is creating a balance its owner cannot spend or withdraw is not a
+ * feature that is merely unused; it is a way to manufacture a support problem.
+ *
+ * Quote, book, tape and mine stay open: all four are read-only, and portfolio.html
+ * still prices a hypothetical exit with quoteSell().
+ */
 function handle_place(): void
+{
+    require_method('POST');
+    require_csrf();
+    require_user();
+
+    json_fail(410,
+        'The index order book is closed. ARV is traded peer to peer now — you buy from '
+        . 'and sell to other holders, and the rupees are settled directly between you.',
+        ['moved' => 'p2p']
+    );
+}
+
+/** @deprecated Unreachable — kept only so the escrow logic stays readable. */
+function handle_place_legacy(): void
 {
     require_method('POST');
     require_csrf();

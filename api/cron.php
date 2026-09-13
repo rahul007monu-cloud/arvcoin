@@ -174,17 +174,21 @@ function job_p2p_maintenance(): array
  * Recompute referral reward tiers.
  *
  * Tiers are earned on referred volume — the rupees a referrer's referrals have
- * actually deposited — measured against what the referrer put in themselves for
+ * actually spent buying — measured against what the referrer bought themselves for
  * the ratio tiers. Only ever upgrades: a tier already earned is not taken away
- * because someone's own deposits later grew and moved the ratio.
+ * because someone's own volume later grew and moved the ratio.
+ *
+ * "Own volume" used to mean confirmed deposits. Deposits no longer exist, so it is
+ * now the rupee value of what the referrer has bought — read from `trades`, which
+ * carries every fill including P2P, so it is the same measure of skin in the game.
  */
 function job_tiers(): array
 {
     $rows = q(
         'SELECT u.id, u.tier_id,
                 COALESCE(SUM(r.base_paise), 0) AS referred_paise,
-                (SELECT COALESCE(SUM(d.amount_paise),0) FROM deposits d
-                  WHERE d.user_id = u.id AND d.status = "confirmed") AS own_paise
+                (SELECT COALESCE(SUM(t.gross_paise),0) FROM trades t
+                  WHERE t.buyer_id = u.id) AS own_paise
            FROM users u
            JOIN referrals r ON r.referrer_id = u.id AND r.status = "paid"
           GROUP BY u.id'

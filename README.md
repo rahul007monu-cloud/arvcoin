@@ -2,8 +2,10 @@
 
 **One unit, ₹1.78 at the 2015 launch, tracking Bitcoin one for one in rupees.**
 
-Deposit by UPI, buy ARV, watch it move with Bitcoin minute by minute, sell back to
-your bank. Fees, GST, FIFO cost basis and Indian VDA tax are computed and itemised
+Buy ARV from another holder, watch it move with Bitcoin minute by minute, and sell
+it on. Trading is peer to peer: the buyer pays the seller's UPI directly and this
+platform escrows the ARV — it never holds your rupees, so there is no deposit and no
+withdrawal. Fees, GST, FIFO cost basis and Indian VDA tax are computed and itemised
 on every transaction.
 
 Runs on PHP 8 and MySQL — the stack a Hostinger shared plan already includes.
@@ -63,7 +65,7 @@ numbers.
 
 ### Three properties that follow from the formula
 
-**Issuance cannot move the price.** Nothing in the pricing path reads deposits,
+**Issuance cannot move the price.** Nothing in the pricing path reads volume,
 sales or units outstanding. New money issues new units at the current price rather
 than bidding it up, so an early holder gains nothing from a later one arriving.
 That is what separates an index unit from a number an operator can push.
@@ -113,10 +115,13 @@ stuck" is the complaint that ends products.
   accounting requirement and a fixed lock order, so two concurrent sells queue
   instead of deadlocking.
 - **A UPI QR proves nothing.** It carries a request one way and returns no
-  callback and no signature. Deposits are credited when an operator matches a UTR
-  or a screenshot against the bank statement, never because a QR was displayed.
-  Wiring "QR shown, so credit the units" is the most effective way to have a
-  balance drained by someone who never paid.
+  callback and no signature. Escrowed ARV is released when the seller confirms the
+  rupees actually arrived, never because a QR was displayed. Wiring "QR shown, so
+  release the units" is the most effective way to have an escrow drained by someone
+  who never paid.
+- **The platform holds no rupees.** There is no deposit endpoint and no payout
+  endpoint, so there is no float, no custody of customer money, and nothing for a
+  reconciliation to lose track of. Only ARV moves here.
 
 ---
 
@@ -161,13 +166,11 @@ login.html          sign in
 signup.html         open an account, with OTP
 trade.html          order ticket, book, tape, candles
 dashboard.html      wallet, holdings, open orders
-deposit.html        UPI QR, UTR or screenshot, countdown
-withdraw.html       to your own verified VPA
 transactions.html   the ledger, and every fill
 tax.html            FY statement, printable
 referral.html       code, link, QR, tier ladder
 profile.html        KYC, PAN, password
-admin.html          deposits, withdrawals, KYC queue, reconciliation, settings
+admin.html          KYC queue, P2P disputes, reconciliation, treasury, settings
 legal.html          risk, terms, tax, KYC/AML, privacy, regulatory status
 404.html
 
@@ -184,7 +187,7 @@ api/_boot.php       config, PDO, tx() with deadlock retry, CSRF, rate limits, au
 api/_money.php      u8 arithmetic, NAV, fees, TDS, FIFO lots, quotes, wallets
 api/_match.php      the matching engine, escrow, fills, treasury fallback
 api/_schema.php     18 tables, 8 append-only triggers, default settings
-api/auth.php  orders.php  deposit.php  withdraw.php  kyc.php
+api/auth.php  orders.php  p2p.php  kyc.php
 api/account.php     ledger, fills, tax statement
 api/referral.php  market.php  admin.php  cron.php
 install.php         one-page installer — delete it afterwards

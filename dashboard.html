@@ -25,10 +25,10 @@
       <h1 class="serif" style="font-size:1.8rem;margin-bottom:2px">
         <span data-greeting>Welcome</span>
       </h1>
-      <div class="small muted" data-sub>Your rupee balance and ARV holding</div>
+      <div class="small muted" data-sub>Your ARV holding</div>
     </div>
     <div class="row row-wrap">
-      <a href="deposit.html" class="btn btn-ghost">Add funds</a>
+      <a href="portfolio.html" class="btn btn-ghost">Portfolio</a>
       <a href="trade.html" class="btn btn-primary">Trade</a>
     </div>
   </div>
@@ -36,7 +36,7 @@
   <!-- ========================================================= gate notices -->
   <div class="note-box warn hidden" style="margin-bottom:var(--sp-4)" data-kyc-notice>
     <strong>KYC not complete.</strong>
-    You can browse and hold, but a first purchase and any withdrawal need it.
+    You can browse and hold, but selling needs it.
     <a href="profile.html#kyc" class="arrow">Complete KYC</a>
   </div>
   <div class="note-box warn hidden" style="margin-bottom:var(--sp-4)" data-paused-notice>
@@ -44,31 +44,63 @@
     <span data-paused-reason></span> Your balances are unaffected.
   </div>
 
-  <!-- ============================================================== wallet -->
+  <!-- ======================================================== price + act -->
+  <!-- First thing on the page after signing in: what ARV is worth right now, and
+       the two buttons somebody actually came here to press. Everything else on
+       this page is a report; this is the part that does something. -->
   <div class="card" data-reveal="weighty" style="margin-bottom:var(--sp-4)">
-   <div class="wallet-hero" data-coin-scope>
-    <div class="wallet-split">
+    <div class="row-between row-wrap" style="gap:var(--sp-4)">
 
-      <!-- rupees -->
-      <div>
-        <div class="stat-k" style="margin-bottom:var(--sp-2)">Rupee balance</div>
-        <div class="stat-v stat-v-lg" data-inr>—</div>
-        <div class="small muted" style="margin-top:6px">
-          <span class="wallet-locked hidden" data-inr-locked></span>
-        </div>
-        <div class="row" style="margin-top:var(--sp-4)">
-          <a href="deposit.html" class="btn btn-sm">Deposit</a>
-          <a href="withdraw.html" class="btn btn-sm btn-ghost">Withdraw</a>
-        </div>
-        <div class="tiny muted" style="margin-top:var(--sp-3)">
-          Rupees sit here between a deposit and a purchase, and again after a sale.
-          Nothing moves between users' bank accounts.
+      <div class="row" style="gap:var(--sp-3)">
+        <span class="coin arv" style="width:38px;height:38px;font-size:.66rem"><span>ARV</span></span>
+        <div>
+          <div class="row" style="gap:8px">
+            <strong style="font-size:1.02rem">ARV / INR</strong>
+            <span class="badge metal">Bitcoin 1:1</span>
+            <span class="live-dot off" data-dot></span>
+          </div>
+          <div class="price-hero" style="margin-top:2px">
+            <span class="v" style="font-size:2.1rem" data-price>₹—</span>
+            <span class="chip flat" data-change>—</span>
+          </div>
         </div>
       </div>
 
-      <div class="divider"></div>
+      <div class="row row-wrap">
+        <a href="trade.html?side=buy" class="btn btn-buy btn-lg">Buy ARV</a>
+        <a href="trade.html?side=sell" class="btn btn-sell btn-lg">Sell ARV</a>
+      </div>
 
-      <!-- ARV -->
+    </div>
+  </div>
+
+  <!-- ============================================================= orders -->
+  <!-- Orders live here as well as on their own page. Somebody who has just paid a
+       seller and is waiting for their tokens should not have to go looking for
+       that — it is the most urgent thing on their screen, so it is on the first
+       one. Cards rather than a table: each of these needs a decision, and a table
+       row is a bad place to put a button. -->
+  <section class="card card-flush" data-reveal style="margin-bottom:var(--sp-4)">
+    <div class="card-head row-wrap" style="padding:var(--sp-4);margin:0">
+      <div>
+        <h3 style="font-size:1rem;margin:0">Your orders</h3>
+        <div class="tiny muted">Anything live, and anything waiting on you</div>
+      </div>
+      <a href="orders.html" class="btn btn-ghost btn-sm arrow">All orders &amp; history</a>
+    </div>
+    <div class="order-cards" data-order-cards>
+      <div class="empty"><span class="spinner"></span></div>
+    </div>
+  </section>
+
+  <!-- ============================================================== wallet -->
+  <div class="card" data-reveal="weighty" style="margin-bottom:var(--sp-4)">
+   <div class="wallet-hero" data-coin-scope>
+    <!-- One holding, one number. There is no rupee balance to sit beside it: a
+         buyer pays the seller directly, so the platform holds ARV and nothing
+         else. The legacy-balance line below appears only for the few accounts
+         that still have rupees on them from before that changed. -->
+    <div class="wallet-single">
       <div>
         <div class="stat-k" style="margin-bottom:var(--sp-2)">ARV holding</div>
         <div class="stat-v stat-v-lg" data-units>—</div>
@@ -81,11 +113,13 @@
           <a href="trade.html?side=sell" class="btn btn-sm btn-sell">Sell</a>
         </div>
         <div class="tiny muted" style="margin-top:var(--sp-3)">
-          Units track Bitcoin one for one. Selling credits rupees here, which you
-          then withdraw.
+          Units track Bitcoin one for one. You buy and sell with other holders, and
+          the rupees are settled directly between the two of you.
         </div>
-      </div>
 
+        <!-- Shown by js/pages/dashboard.js only when the balance is non-zero. -->
+        <div class="note-box warn hidden" style="margin-top:var(--sp-4)" data-legacy-inr></div>
+      </div>
     </div>
 
     <!-- Decorative only — built and animated by js/coin3d.js, aria-hidden, and
@@ -126,25 +160,9 @@
         </div>
       </div>
 
-      <!-- ===================================================== open orders -->
-      <div class="card card-flush" data-reveal>
-        <div class="card-head" style="padding:var(--sp-4);margin:0">
-          <h3 style="font-size:1rem">Open orders</h3>
-          <a href="trade.html" class="btn btn-ghost btn-sm arrow">Trade</a>
-        </div>
-        <div class="table-wrap">
-          <table class="data">
-            <thead><tr>
-              <th>Reference</th><th>Side</th><th>Type</th>
-              <th class="num">Remaining</th><th class="num">Trigger</th>
-              <th>Status</th><th></th>
-            </tr></thead>
-            <tbody data-orders>
-              <tr><td colspan="7" class="empty">Loading…</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <!-- The open-orders table that used to sit here read the legacy index
+           channel, which is closed — so it was permanently empty. Orders are now
+           cards at the top of the page, where they belong. -->
 
       <!-- ======================================================== activity -->
       <div class="card card-flush" data-reveal>
@@ -184,8 +202,8 @@
           <span class="badge metal" data-tier hidden></span>
         </div>
         <p class="small" style="margin-bottom:var(--sp-3)">
-          <span data-ref-pct>5%</span> of the first deposit anyone you refer makes,
-          credited straight to your rupee balance.
+          <span data-ref-pct>5%</span> of the first purchase anyone you refer makes,
+          paid to you in ARV the moment their tokens land.
         </p>
         <div class="qr-vpa" style="justify-content:space-between">
           <span class="mono" data-ref-code>—</span>

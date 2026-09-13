@@ -136,8 +136,8 @@ function paintFees() {
     + '<div class="ledger-row"><span class="l">Sell fee</span><span class="a">' + exit + '%</span></div>'
     + '<div class="ledger-row"><span class="l">GST on the fee</span><span class="a">'
       + CFG.FEES.gstPct + '%</span></div>'
-    + '<div class="ledger-row"><span class="l">Deposit and withdrawal</span>'
-      + '<span class="a">free</span></div>'
+    + '<div class="ledger-row"><span class="l">Paying the seller</span>'
+      + '<span class="a">direct, no platform cut</span></div>'
     + (entry < CFG.FEES.entryPct || exit < CFG.FEES.exitPct
         ? '<div class="ledger-row k-net"><span class="l">Discount from your tier</span>'
           + '<span class="a">\u2713</span></div>'

@@ -313,7 +313,7 @@ function handle_proof(): void
 /**
  * Store a proof screenshot.
  *
- * The same hardening as deposit.php save_screenshot(): the extension comes from
+ * Hardened the way the old deposit upload was: the extension comes from
  * the detected MIME type (never the filename), the file must be a decodable
  * image, and the uploads directory carries an .htaccess that refuses to execute
  * anything. Files live under uploads/p2p.

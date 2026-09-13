@@ -26,13 +26,10 @@ switch ($action) {
     case 'p2p_trades':        handle_p2p_trades();      break;
     case 'p2p_release':       handle_p2p_release();     break;
     case 'p2p_cancel':        handle_p2p_cancel();      break;
-    case 'deposits':          handle_deposits();        break;
-    case 'confirm_deposit':   handle_confirm_deposit(); break;
-    case 'reject_deposit':    handle_reject_deposit();  break;
-    case 'withdrawals':       handle_withdrawals();     break;
-    case 'approve_withdraw':  handle_approve();         break;
-    case 'mark_paid':         handle_mark_paid();       break;
-    case 'reject_withdraw':   handle_reject_withdraw(); break;
+    // Deposits and withdrawals were removed: the platform never holds rupees,
+    // because a P2P buyer pays the seller directly and only ARV moves here. The
+    // tables and their ledger entries are kept for history; there is deliberately
+    // no endpoint that can create, credit or pay one.
     case 'kyc_queue':         handle_kyc_queue();       break;
     case 'kyc_review':        handle_kyc_review();      break;
     case 'reconcile':         handle_reconcile();       break;
@@ -84,27 +81,14 @@ function handle_overview(): void
 
     $meta = arv_nav_meta();
 
+    // No deposit or withdrawal queues: there are none to work. What is left that
+    // needs a human is KYC and anything disputed in P2P.
     $counts = q1(
         'SELECT
-           (SELECT COUNT(*) FROM deposits WHERE status = "submitted")            AS deposits_pending,
-           (SELECT COUNT(*) FROM withdrawals WHERE status = "requested")         AS withdrawals_pending,
-           (SELECT COUNT(*) FROM withdrawals WHERE status = "approved")          AS withdrawals_approved,
            (SELECT COUNT(*) FROM kyc WHERE status = "pending")                   AS kyc_pending,
-           (SELECT COUNT(*) FROM users WHERE status = "active")                  AS users_active,
+           (SELECT COUNT(*) FROM p2p_trades WHERE status = "disputed")            AS p2p_disputed,
+           (SELECT COUNT(*) FROM users WHERE status = "active")                   AS users_active,
            (SELECT COUNT(*) FROM orders WHERE status IN ("open","triggered","partial")) AS orders_open'
-    );
-
-    // Overdue queues, surfaced separately. A promise of "within an hour" that
-    // quietly slips is worse than not making it.
-    $overdue = q1(
-        'SELECT
-           (SELECT COUNT(*) FROM deposits
-             WHERE status = "submitted"
-               AND submitted_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? MINUTE))  AS deposits,
-           (SELECT COUNT(*) FROM withdrawals
-             WHERE status IN ("requested","approved")
-               AND promised_by < UTC_TIMESTAMP())                                AS withdrawals',
-        [setting_i('deposit_max_minutes', 15)]
     );
 
     $money = q1(
@@ -112,8 +96,6 @@ function handle_overview(): void
            (SELECT COALESCE(SUM(inr_paise + inr_locked_paise),0) FROM wallets)   AS user_inr,
            (SELECT COALESCE(SUM(arv_units + arv_locked_units),0) FROM wallets)   AS units_outstanding,
            (SELECT COALESCE(SUM(invested_paise),0) FROM wallets)                 AS invested,
-           (SELECT COALESCE(SUM(amount_paise),0) FROM deposits WHERE status = "confirmed") AS deposited,
-           (SELECT COALESCE(SUM(amount_paise),0) FROM withdrawals WHERE status = "paid")   AS paid_out,
            (SELECT COALESCE(SUM(buyer_fee_paise + seller_fee_paise),0) FROM trades)        AS fees,
            (SELECT COALESCE(SUM(buyer_gst_paise + seller_gst_paise),0) FROM trades)        AS gst,
            (SELECT COALESCE(SUM(seller_tds_paise),0) FROM trades)                          AS tds,
@@ -125,13 +107,10 @@ function handle_overview(): void
         'feed'    => q1('SELECT * FROM cron_runs WHERE job = "ingest"'),
         'crons'   => q('SELECT * FROM cron_runs ORDER BY job')->fetchAll(),
         'queues'  => array_map('intval', $counts),
-        'overdue' => array_map('intval', $overdue),
         'money'   => [
             'userInrPaise'      => (int)$money['user_inr'],
             'unitsOutstanding'  => (string)$money['units_outstanding'],
             'investedPaise'     => (int)$money['invested'],
-            'depositedPaise'    => (int)$money['deposited'],
-            'paidOutPaise'      => (int)$money['paid_out'],
             'feesPaise'         => (int)$money['fees'],
             // Both of these are liabilities, not revenue — labelled here so a
             // dashboard cannot present them as income.
@@ -150,9 +129,21 @@ function operator_warnings(): array
 {
     $w = [];
 
-    if ((string)setting('upi_vpa', '') === '') {
-        $w[] = 'No UPI ID is configured, so the deposit QR is a placeholder and nobody can pay in.';
+    // Rupees in a wallet used to be spendable on the index order book and
+    // withdrawable through a payout. Neither exists now, so any balance still
+    // sitting there cannot be moved by any code path — it needs settling off
+    // -platform. Silence would leave it stranded and unnoticed.
+    $strandedInr = (int)(qval(
+        'SELECT COALESCE(SUM(inr_paise + inr_locked_paise),0) FROM wallets'
+    ) ?? 0);
+    if ($strandedInr > 0) {
+        $w[] = sprintf(
+            'Wallets still hold %s in rupees. Deposits and withdrawals are gone, so nothing '
+            . 'on the platform can move it — settle it with those holders directly.',
+            money_note($strandedInr)
+        );
     }
+
     $meta = arv_nav_meta();
     if ($meta['nav'] === null) {
         $w[] = 'No price has been recorded. Trading is closed until the price cron runs.';
@@ -168,373 +159,13 @@ function operator_warnings(): array
         $w[] = 'The sell fallback is off. In a falling market holders may be unable to exit at all.';
     }
     if (setting_b('referral_enabled', true) && setting_f('referral_pct', 5) > 10) {
-        $w[] = 'Referral commission is above 10% of a deposit. Have counsel look at that before it runs.';
+        $w[] = 'Referral commission is above 10% of a referred purchase. Have counsel look at that '
+             . 'before it runs.';
     }
     if (setting_b('maintenance_mode')) {
         $w[] = 'Maintenance mode is on — users cannot trade.';
     }
     return $w;
-}
-
-/* =========================================================== deposits ===== */
-
-function handle_deposits(): void
-{
-    require_method('GET');
-    require_admin_read();
-
-    $status = (string)($_GET['status'] ?? 'submitted');
-    $rows = q(
-        'SELECT d.*, u.email, u.full_name, k.pan, k.status AS kyc_status
-           FROM deposits d
-           JOIN users u ON u.id = d.user_id
-           LEFT JOIN kyc k ON k.user_id = d.user_id
-          WHERE d.status = ?
-          ORDER BY d.submitted_at ASC, d.id ASC
-          LIMIT 200', [$status]
-    )->fetchAll();
-
-    json_ok(['deposits' => array_map(static fn($d) => [
-        'ref'           => $d['ref'],
-        'userId'        => (int)$d['user_id'],
-        'email'         => $d['email'],
-        'name'          => $d['full_name'],
-        'kycStatus'     => $d['kyc_status'] ?? 'none',
-        'amountPaise'   => (int)$d['amount_paise'],
-        'utr'           => $d['utr'],
-        'screenshot'    => $d['screenshot_path'] !== '' ? $d['screenshot_path'] : null,
-        'createdAt'     => $d['created_at'],
-        'submittedAt'   => $d['submitted_at'],
-        'waitingMinutes'=> $d['submitted_at'] ? (int)floor((time() - strtotime($d['submitted_at'])) / 60) : null,
-    ], $rows)]);
-}
-
-/**
- * Confirm a bank credit and credit the wallet.
- *
- * The referral commission is paid here, in the same transaction, because it is
- * triggered by the referee's first confirmed deposit and must not be able to
- * happen twice or happen without the deposit.
- */
-function handle_confirm_deposit(): void
-{
-    require_method('POST');
-    require_csrf();
-    $admin = require_admin();
-
-    $ref = input_str('ref');
-    $note = substr(input_str('note'), 0, 255);
-
-    $result = tx(static function (PDO $pdo) use ($ref, $admin, $note) {
-        $st = $pdo->prepare('SELECT * FROM deposits WHERE ref = ? FOR UPDATE');
-        $st->execute([$ref]);
-        $d = $st->fetch();
-
-        if (!$d) {
-            throw new RuntimeException('Deposit not found.');
-        }
-        if ($d['status'] === 'confirmed') {
-            throw new RuntimeException('That deposit is already confirmed. Nothing was credited twice.');
-        }
-        if (in_array($d['status'], ['rejected', 'expired'], true)) {
-            throw new RuntimeException('That deposit is ' . $d['status'] . ' and cannot be confirmed.');
-        }
-
-        $userId = (int)$d['user_id'];
-        $paise  = (int)$d['amount_paise'];
-
-        wallet_apply($pdo, $userId, $paise);
-        ledger_add($pdo, $userId, 'deposit', $paise, 0, [
-            'ref' => $ref, 'relatedId' => (int)$d['id'],
-            'note' => 'Deposit confirmed' . ($note !== '' ? ' — ' . $note : ''),
-        ]);
-
-        $pdo->prepare('UPDATE deposits SET status = "confirmed", confirmed_at = UTC_TIMESTAMP(),
-                              confirmed_by = ? WHERE id = ?')
-            ->execute([(int)$admin['id'], $d['id']]);
-
-        // Referral commission — first confirmed deposit only.
-        $commission = null;
-        if (setting_b('referral_enabled', true)) {
-            $u = $pdo->prepare('SELECT referred_by FROM users WHERE id = ?');
-            $u->execute([$userId]);
-            $referrer = $u->fetchColumn();
-
-            if ($referrer) {
-                // The unique key on referee_id makes "once per referred user"
-                // structural rather than a check that could be raced.
-                $already = $pdo->prepare('SELECT id FROM referrals WHERE referee_id = ?');
-                $already->execute([$userId]);
-
-                if (!$already->fetchColumn()) {
-                    $pct = setting_f('referral_pct', 5);
-                    $cap = setting_i('referral_max_paise', 5000000);
-                    $amount = min($cap, pct_of($paise, $pct));
-
-                    if ($amount > 0) {
-                        // The commission is EARNED in rupees (a percentage of the
-                        // referred deposit) but PAID in ARV, converted at the index
-                        // price at this moment.
-                        //
-                        // It used to be credited to the rupee balance, and that
-                        // balance no longer has a use: trading is peer-to-peer, so
-                        // a buyer pays the seller off-platform and api/p2p.php never
-                        // touches INR. A rupee commission therefore just accumulated
-                        // with no way to spend it. Paying in ARV puts it into the
-                        // one thing the account can actually hold and sell.
-                        //
-                        // NOTE for the operator: these units are ISSUED, not moved
-                        // from another account, so the platform's ARV obligation
-                        // grows by the commission. That is the real cost of the
-                        // referral programme. Funding it from the fee/treasury
-                        // account instead would be units-neutral, but would make
-                        // referrals fail silently whenever that account ran dry.
-                        $navMeta = arv_nav_meta();
-                        $nav     = $navMeta['nav'];
-                        $units8  = ($nav !== null && (float)$nav > 0)
-                            ? paise_to_u8($amount, (float)$nav)
-                            : 0;
-
-                        // Only call it paid once the ARV is actually credited. With
-                        // no usable price (a cold or long-stale feed) the row is
-                        // recorded as 'pending' instead, so the commission is
-                        // preserved and visible rather than silently dropped — and
-                        // the deposit confirmation itself still succeeds.
-                        $didPay = $units8 > 0;
-
-                        $pdo->prepare(
-                            'INSERT INTO referrals (referrer_id, referee_id, trigger_deposit_id,
-                                                    base_paise, commission_paise, commission_pct,
-                                                    status, paid_at)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ' . ($didPay ? 'UTC_TIMESTAMP()' : 'NULL') . ')'
-                        )->execute([
-                            (int)$referrer, $userId, (int)$d['id'], $paise, $amount, $pct,
-                            $didPay ? 'paid' : 'pending',
-                        ]);
-
-                        if ($didPay) {
-                            // Credit the units and carry the rupee value as the cost
-                            // basis, so value == cost at receipt (unrealised P&L
-                            // starts at zero) and a later sale measures the gain from
-                            // there.
-                            wallet_apply($pdo, (int)$referrer, 0, 0, $units8, 0, $amount, 0);
-
-                            // A lot is not optional: consume_lots() is what a sale
-                            // draws from, and units credited without one would make
-                            // the referrer's next sell fail on a shortfall.
-                            $pdo->prepare(
-                                'INSERT INTO lots (user_id, units, units_remaining, cost_paise, nav)
-                                 VALUES (?, ?, ?, ?, ?)'
-                            )->execute([
-                                (int)$referrer, u8str($units8), u8str($units8), $amount, $nav,
-                            ]);
-
-                            // Still its own ledger kind, so the income never reads as
-                            // a capital gain — the delta is now in ARV, and the rupee
-                            // value it was earned at is in the note and on the
-                            // referrals row.
-                            ledger_add($pdo, (int)$referrer, 'referral_commission', 0, $units8, [
-                                'nav' => $nav, 'ref' => $ref, 'relatedId' => $userId,
-                                'note' => sprintf(
-                                    '%s%% referral commission on a referred first deposit — %s paid as ARV at %s',
-                                    $pct, money_note($amount), money_note((int)round((float)$nav * 100))
-                                ),
-                            ]);
-                        }
-
-                        $commission = [
-                            'referrerId' => (int)$referrer,
-                            'paise'      => $amount,
-                            'pct'        => $pct,
-                            'arvUnits'   => u8str($units8),
-                            'nav'        => $nav,
-                            'status'     => $didPay ? 'paid' : 'pending',
-                        ];
-                    }
-                }
-            }
-        }
-
-        return ['creditedPaise' => $paise, 'userId' => $userId, 'commission' => $commission];
-    });
-
-    audit('deposit.confirm', ['entity' => 'deposits', 'entity_id' => $ref, 'detail' => $result]);
-
-    json_ok($result + ['message' => sprintf('Credited ₹%s.', number_format($result['creditedPaise'] / 100, 2))]);
-}
-
-function handle_reject_deposit(): void
-{
-    require_method('POST');
-    require_csrf();
-    require_admin();
-
-    $ref    = input_str('ref');
-    $reason = substr(input_str('reason'), 0, 255);
-    if ($reason === '') {
-        json_fail(422, 'Give a reason — the user sees it.');
-    }
-
-    $d = q1('SELECT * FROM deposits WHERE ref = ?', [$ref]);
-    if (!$d) {
-        json_fail(404, 'Deposit not found.');
-    }
-    if ($d['status'] === 'confirmed') {
-        json_fail(409, 'That deposit is already credited. Post a compensating adjustment instead of rejecting it.');
-    }
-
-    q('UPDATE deposits SET status = "rejected", reject_reason = ? WHERE id = ?', [$reason, $d['id']]);
-    audit('deposit.reject', ['entity' => 'deposits', 'entity_id' => $ref, 'detail' => ['reason' => $reason]]);
-    json_ok(['message' => 'Deposit rejected.']);
-}
-
-/* ======================================================== withdrawals ===== */
-
-function handle_withdrawals(): void
-{
-    require_method('GET');
-    require_admin_read();
-
-    $status = (string)($_GET['status'] ?? 'requested');
-    $rows = q(
-        'SELECT w.*, u.email, u.full_name, k.pan
-           FROM withdrawals w
-           JOIN users u ON u.id = w.user_id
-           LEFT JOIN kyc k ON k.user_id = w.user_id
-          WHERE w.status = ?
-          ORDER BY w.created_at ASC LIMIT 200', [$status]
-    )->fetchAll();
-
-    json_ok(['withdrawals' => array_map(static fn($w) => [
-        'ref'          => $w['ref'],
-        'userId'       => (int)$w['user_id'],
-        'email'        => $w['email'],
-        'name'         => $w['full_name'],
-        'amountPaise'  => (int)$w['amount_paise'],
-        'upiVpa'       => $w['upi_vpa'],
-        'status'       => $w['status'],
-        'createdAt'    => $w['created_at'],
-        'promisedBy'   => $w['promised_by'],
-        'overdue'      => $w['promised_by'] !== null && strtotime($w['promised_by']) < time(),
-        'waitingMinutes' => (int)floor((time() - strtotime($w['created_at'])) / 60),
-    ], $rows)]);
-}
-
-function handle_approve(): void
-{
-    require_method('POST');
-    require_csrf();
-    $admin = require_admin();
-
-    $ref = input_str('ref');
-    $w = q1('SELECT * FROM withdrawals WHERE ref = ?', [$ref]);
-    if (!$w) {
-        json_fail(404, 'Withdrawal not found.');
-    }
-    if ($w['status'] !== 'requested') {
-        json_fail(409, 'That withdrawal is already ' . $w['status'] . '.');
-    }
-
-    q('UPDATE withdrawals SET status = "approved", approved_at = UTC_TIMESTAMP(), handled_by = ?
-       WHERE id = ?', [(int)$admin['id'], $w['id']]);
-
-    audit('withdraw.approve', ['entity' => 'withdrawals', 'entity_id' => $ref]);
-    json_ok(['message' => 'Approved. Send the UPI payment, then mark it paid.']);
-}
-
-/**
- * Mark a payout sent, releasing the hold.
- *
- * This is the point of no return: the rupees leave the ledger because they have
- * left the bank account. Recording the UTR makes that traceable afterwards.
- */
-function handle_mark_paid(): void
-{
-    require_method('POST');
-    require_csrf();
-    $admin = require_admin();
-
-    $ref = input_str('ref');
-    $utr = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', input_str('utr')));
-
-    $result = tx(static function (PDO $pdo) use ($ref, $utr, $admin) {
-        $st = $pdo->prepare('SELECT * FROM withdrawals WHERE ref = ? FOR UPDATE');
-        $st->execute([$ref]);
-        $w = $st->fetch();
-
-        if (!$w) {
-            throw new RuntimeException('Withdrawal not found.');
-        }
-        if ($w['status'] === 'paid') {
-            throw new RuntimeException('That withdrawal is already marked paid.');
-        }
-        if (!in_array($w['status'], ['requested', 'approved'], true)) {
-            throw new RuntimeException('That withdrawal is ' . $w['status'] . '.');
-        }
-
-        $paise  = (int)$w['amount_paise'];
-        $userId = (int)$w['user_id'];
-
-        // The hold created at request time is now spent — reduce locked, and the
-        // money is gone from the platform.
-        wallet_apply($pdo, $userId, 0, -$paise);
-        ledger_add($pdo, $userId, 'withdrawal', 0, 0, [
-            'ref' => $ref, 'relatedId' => (int)$w['id'],
-            'note' => sprintf('Paid ₹%s to %s%s',
-                              number_format($paise / 100, 2), $w['upi_vpa'],
-                              $utr !== '' ? ' (UTR ' . $utr . ')' : ''),
-        ]);
-
-        $pdo->prepare('UPDATE withdrawals SET status = "paid", paid_at = UTC_TIMESTAMP(),
-                              utr = ?, handled_by = ? WHERE id = ?')
-            ->execute([$utr, (int)$admin['id'], $w['id']]);
-
-        return ['paidPaise' => $paise, 'userId' => $userId];
-    });
-
-    audit('withdraw.paid', ['entity' => 'withdrawals', 'entity_id' => $ref, 'detail' => $result]);
-    json_ok($result + ['message' => 'Marked paid.']);
-}
-
-function handle_reject_withdraw(): void
-{
-    require_method('POST');
-    require_csrf();
-    require_admin();
-
-    $ref    = input_str('ref');
-    $reason = substr(input_str('reason'), 0, 255);
-    if ($reason === '') {
-        json_fail(422, 'Give a reason — the user sees it.');
-    }
-
-    $result = tx(static function (PDO $pdo) use ($ref, $reason) {
-        $st = $pdo->prepare('SELECT * FROM withdrawals WHERE ref = ? FOR UPDATE');
-        $st->execute([$ref]);
-        $w = $st->fetch();
-
-        if (!$w) {
-            throw new RuntimeException('Withdrawal not found.');
-        }
-        if ($w['status'] === 'paid') {
-            throw new RuntimeException('That withdrawal is already paid. Post a compensating adjustment instead.');
-        }
-
-        $paise = (int)$w['amount_paise'];
-        // The held amount goes back to available — it never left.
-        wallet_apply($pdo, (int)$w['user_id'], $paise, -$paise);
-        ledger_add($pdo, (int)$w['user_id'], 'adjustment', 0, 0, [
-            'ref' => $ref, 'note' => 'Withdrawal rejected — hold released: ' . $reason,
-        ]);
-
-        $pdo->prepare('UPDATE withdrawals SET status = "rejected", reject_reason = ? WHERE id = ?')
-            ->execute([$reason, $w['id']]);
-
-        return ['returnedPaise' => $paise];
-    });
-
-    audit('withdraw.reject', ['entity' => 'withdrawals', 'entity_id' => $ref]);
-    json_ok($result + ['message' => 'Rejected and the hold released.']);
 }
 
 /* ================================================================ KYC ===== */
@@ -1613,12 +1244,14 @@ function handle_save_setting(): void
 
     $writable = [
         'entry_fee_pct', 'exit_fee_pct', 'gst_pct', 'slippage_pct',
-        'min_order_paise', 'min_withdraw_paise',
+        'min_order_paise',
         'sell_fallback_to_treasury', 'sell_fallback_minutes',
         'buy_fills_from_treasury', 'order_expiry_hours',
-        'deposit_min_minutes', 'deposit_max_minutes',
-        'withdraw_min_minutes', 'withdraw_max_minutes',
         'referral_enabled', 'referral_pct', 'referral_max_paise',
+        // upi_vpa and payee_name are NOT dead with deposits gone: they are the
+        // company's collection details for a treasury P2P sell, and js/qr.js still
+        // renders them. min_withdraw_paise and the deposit/withdraw window timers
+        // are gone with the features that used them.
         'kyc_required', 'upi_vpa', 'payee_name',
         'price_max_age_seconds', 'maintenance_mode',
         'login_otp_always', 'aadhaar_provider', 'google_client_id',

@@ -11,11 +11,12 @@
  * It carries a request in one direction and returns nothing. There is no
  * callback, no signature, no confirmation — scanning it tells the payer's app
  * what to do and tells this app nothing at all. So a scanned QR is never
- * treated as a completed payment. The deposit stays awaiting_payment until it is
- * confirmed against the actual bank credit.
+ * treated as proof of payment. A P2P trade's escrow is released when the seller
+ * confirms the rupees actually arrived in their account, never because a QR was
+ * displayed.
  *
- * Wiring a "the QR was shown, so credit the units" path is the single most
- * effective way to have a balance drained by someone who never paid.
+ * Wiring a "the QR was shown, so release the units" path is the single most
+ * effective way to have an escrow drained by someone who never paid.
  */
 
 var CFG = globalThis.ARV_CONFIG;
@@ -70,7 +71,7 @@ export function upiUri(opts) {
   if (o.ref) p.set('tr', o.ref);
 
   var note = o.note ||
-    (CFG.PAYMENTS.depositNoteTemplate || 'ARV-{ref}').replace('{ref}', o.ref || '');
+    (CFG.PAYMENTS.noteTemplate || 'ARV-{ref}').replace('{ref}', o.ref || '');
   // UPI notes are length-limited and reject most punctuation.
   if (note) p.set('tn', note.replace(/[^\w\s\-]/g, '').slice(0, 50));
 
