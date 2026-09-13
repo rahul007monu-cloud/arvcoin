@@ -521,17 +521,40 @@ export function csrf() {
   return state.csrf;
 }
 
-/** Poll a function on an interval, pausing while the tab is hidden. */
-export function poll(fn, ms) {
+/**
+ * Poll a function on an interval, pausing while the tab is hidden.
+ *
+ * Two guards, both learned the hard way on the operations page:
+ *
+ * `running` stops a slow cycle from being overlapped by the next one. Without it
+ * a page whose refresh takes longer than the interval — or that gets a
+ * visibilitychange while a cycle is in flight — ends up with two sets of requests
+ * racing, and whichever answers last wins regardless of which asked first.
+ *
+ * `immediate: false` is for a caller that has already loaded once itself. The
+ * default fires straight away, which is right for a bare `poll()`, but wrong
+ * after an `await load()` during boot: that fires the whole thing a second time
+ * within a second or two of the page opening.
+ */
+export function poll(fn, ms, opts) {
+  var o = opts || {};
   var timer = null;
+  var running = false;
   var run = async function () {
-    if (document.hidden) return;
-    try { await fn(); } catch (_) { /* a failed poll is not worth a toast */ }
+    if (document.hidden || running) return;
+    running = true;
+    try {
+      await fn();
+    } catch (_) {
+      /* a failed poll is not worth a toast */
+    } finally {
+      running = false;
+    }
   };
   timer = setInterval(run, ms);
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden) run();
   });
-  run();
+  if (o.immediate !== false) run();
   return function () { clearInterval(timer); };
 }

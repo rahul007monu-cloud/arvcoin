@@ -113,9 +113,14 @@ function handle_signup(): void
             }
         }
 
+        // created_at is written explicitly rather than left to the column default.
+        // The default is CURRENT_TIMESTAMP, which is the database server's local
+        // time, while every other timestamp in this schema is UTC and the front end
+        // parses all of them as UTC. On a host set to IST that difference renders a
+        // brand-new account as having joined five and a half hours from now.
         $pdo->prepare(
-            'INSERT INTO users (email, pass_hash, full_name, referral_code, referred_by)
-             VALUES (?, ?, ?, ?, ?)'
+            'INSERT INTO users (email, pass_hash, full_name, referral_code, referred_by, created_at)
+             VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())'
         )->execute([
             $email,
             password_hash($password, PASSWORD_DEFAULT),
@@ -620,17 +625,20 @@ function handle_google(): void
         // pass_hash is NOT NULL, and '' is the right value rather than a random
         // one: password_verify() against an empty hash is false for every input,
         // so the password path stays closed until the person deliberately sets one.
+        // created_at in UTC explicitly, for the same reason as the email signup
+        // above: the column default is the database server's local time and
+        // everything reading it assumes UTC.
         if ($columnPresent) {
             $pdo->prepare(
                 'INSERT INTO users (email, pass_hash, full_name, email_verified,
-                                    google_sub, referral_code, referred_by)
-                 VALUES (?, "", ?, 1, ?, ?, ?)'
+                                    google_sub, referral_code, referred_by, created_at)
+                 VALUES (?, "", ?, 1, ?, ?, ?, UTC_TIMESTAMP())'
             )->execute([$email, $name, $sub, $code, $referrer]);
         } else {
             $pdo->prepare(
                 'INSERT INTO users (email, pass_hash, full_name, email_verified,
-                                    referral_code, referred_by)
-                 VALUES (?, "", ?, 1, ?, ?)'
+                                    referral_code, referred_by, created_at)
+                 VALUES (?, "", ?, 1, ?, ?, UTC_TIMESTAMP())'
             )->execute([$email, $name, $code, $referrer]);
         }
 

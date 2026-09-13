@@ -201,9 +201,13 @@ if (!$alreadyInstalled && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $notices[] = 'An account with that email already existed — it has been promoted to operator and its password reset.';
             } else {
                 $code = strtoupper(substr(bin2hex(random_bytes(8)), 0, 8));
+                // created_at in UTC, matching every other timestamp the app writes
+                // and reads — the column default would use the database server's
+                // local time instead.
                 $pdo->prepare(
-                    'INSERT INTO users (email, pass_hash, full_name, email_verified, referral_code, is_admin)
-                     VALUES (?, ?, ?, 1, ?, 1)'
+                    'INSERT INTO users (email, pass_hash, full_name, email_verified, referral_code,
+                                        is_admin, created_at)
+                     VALUES (?, ?, ?, 1, ?, 1, UTC_TIMESTAMP())'
                 )->execute([$adminEmail, password_hash($adminPass, PASSWORD_DEFAULT), $adminName, $code]);
                 $userId = (int)$pdo->lastInsertId();
             }

@@ -20,6 +20,82 @@ var st = {
   p2pStatus: 'active', p2pQuery: ''
 };
 
+/* ------------------------------------------------------------ paint safety -- */
+
+/**
+ * Per-table request sequencing.
+ *
+ * Every table here can have more than one request in the air at once: the 30s
+ * poll re-runs all of them, a search box fires its own, and a row action reloads
+ * just its section. Without a sequence number the *last response* wins rather
+ * than the *last request* — so a slow unfiltered reply can land after a fast
+ * filtered one and quietly replace it with the wrong rows.
+ *
+ * Each caller takes a ticket before it fetches and checks it after; a caller
+ * holding a stale ticket paints nothing and leaves the newer result alone.
+ */
+var ticket = {};
+
+function sequence(name) {
+  var mine = (ticket[name] = (ticket[name] || 0) + 1);
+  return function () { return ticket[name] === mine; };
+}
+
+/** True when a host already holds real content rather than a placeholder. */
+function hasContent(host) {
+  return !!host && !!host.firstElementChild && !host.querySelector('.empty');
+}
+
+/**
+ * Report a failed load without throwing away what is already on screen.
+ *
+ * This is the bug operators actually noticed: a refresh that fails used to
+ * replace the rows with its error text, so a table that had just painted
+ * correctly went blank a moment later — most visibly right after a page load,
+ * when a second refresh cycle overlapped the first and one of the two lost.
+ *
+ * Rows that are already up are the best information available, so they stay. The
+ * table is marked stale instead (dimmed by CSS, explained by the banner at the
+ * top of the page), and the message only takes the place of rows when there are
+ * no rows to lose.
+ */
+function paintFailure(host, cols, err, fresh) {
+  if (!host) return;
+  // A failure from a request that has already been superseded says nothing about
+  // the rows now on screen, so it is not allowed to mark them stale.
+  if (fresh && !fresh()) return;
+  if (hasContent(host)) {
+    host.setAttribute('data-stale', '1');
+    return;
+  }
+  var msg = (err && err.message) || 'Could not load.';
+  host.innerHTML = cols > 0
+    ? '<tr><td colspan="' + cols + '" class="empty">' + ui.esc(msg) + '</td></tr>'
+    : '<div class="empty">' + ui.esc(msg) + '</div>';
+}
+
+/** Mark a host as carrying fresh data again. */
+function paintFresh(host) {
+  if (host) host.removeAttribute('data-stale');
+}
+
+/**
+ * Tell the operator when the page is showing the last good data rather than
+ * current data. A dimmed table on its own looks like a rendering bug; saying so
+ * is the difference between "stale" and "broken".
+ */
+function setRefreshNote(failed) {
+  var note = ui.el('[data-refresh-note]');
+  if (!note) return;
+  note.hidden = !failed;
+  if (failed) {
+    note.innerHTML = '<div class="note-box warn">Could not reach the server just now — '
+      + 'showing the last data that loaded. Retrying automatically every 30 seconds.</div>';
+  } else {
+    note.innerHTML = '';
+  }
+}
+
 /* ---------------------------------------------------------------- overview -- */
 
 function paintOverview(o) {
@@ -220,8 +296,11 @@ function paintDiff() {
 
 async function loadDeposits() {
   var host = ui.el('[data-deposits]');
+  var fresh = sequence('deposits');
   try {
     var r = await api.admin.deposits('submitted');
+    if (!fresh()) return;
+    paintFresh(host);
     var rows = r.deposits || [];
     if (!rows.length) {
       host.innerHTML = '<tr><td colspan="5" class="empty">Nothing waiting.</td></tr>';
@@ -266,7 +345,7 @@ async function loadDeposits() {
       return true;
     });
   } catch (e) {
-    host.innerHTML = '<tr><td colspan="5" class="empty">' + ui.esc(e.message) + '</td></tr>';
+    paintFailure(host, 5, e, fresh);
   }
 }
 
@@ -274,11 +353,14 @@ async function loadDeposits() {
 
 async function loadWithdrawals() {
   var host = ui.el('[data-withdrawals]');
+  var fresh = sequence('withdrawals');
   try {
     var results = await Promise.all([
       api.admin.withdrawals('requested'),
       api.admin.withdrawals('approved')
     ]);
+    if (!fresh()) return;
+    paintFresh(host);
     var rows = (results[0].withdrawals || []).concat(results[1].withdrawals || []);
 
     if (!rows.length) {
@@ -327,7 +409,7 @@ async function loadWithdrawals() {
       return true;
     });
   } catch (e) {
-    host.innerHTML = '<tr><td colspan="5" class="empty">' + ui.esc(e.message) + '</td></tr>';
+    paintFailure(host, 5, e, fresh);
   }
 }
 
@@ -335,8 +417,11 @@ async function loadWithdrawals() {
 
 async function loadKyc() {
   var host = ui.el('[data-kyc]');
+  var fresh = sequence('kyc');
   try {
     var r = await api.admin.kycQueue();
+    if (!fresh()) return;
+    paintFresh(host);
     var rows = r.queue || [];
     if (!rows.length) {
       host.innerHTML = '<tr><td colspan="7" class="empty">Nothing to review.</td></tr>';
@@ -372,7 +457,7 @@ async function loadKyc() {
       return true;
     });
   } catch (e) {
-    host.innerHTML = '<tr><td colspan="7" class="empty">' + ui.esc(e.message) + '</td></tr>';
+    paintFailure(host, 7, e, fresh);
   }
 }
 
@@ -452,7 +537,7 @@ var SETTINGS_GROUPS = [
     ['assistant_enabled', 'Support assistant on', 'bool',
      'The floating help chat. On by default; it answers from a built-in ARV knowledge base even with no key below.'],
     ['gemini_api_key', 'Gemini API key (optional)', 'text',
-     'Paste a Google Gemini API key to power the assistant with AI answers. Leave blank to use the built-in knowledge base only. Stored server-side, never shown to customers.']
+     'Paste a Google Gemini API key to power the assistant with AI answers. Leave blank to use the built-in knowledge base only. A key already saved shows as dots and is never sent back to the browser — type over them to replace it, or leave them alone to keep it.']
   ]]
 ];
 
@@ -471,8 +556,11 @@ function renderSettingField(row, s) {
 
 async function loadSettings() {
   var host = ui.el('[data-settings]');
+  var fresh = sequence('settings');
   try {
     var r = await api.admin.settings();
+    if (!fresh()) return;
+    paintFresh(host);
     var s = r.settings || {};
 
     host.innerHTML = SETTINGS_GROUPS.map(function (g) {
@@ -493,7 +581,7 @@ async function loadSettings() {
       });
     });
   } catch (e) {
-    host.innerHTML = '<div class="empty">' + ui.esc(e.message) + '</div>';
+    paintFailure(host, 0, e, fresh);
   }
 }
 
@@ -501,8 +589,11 @@ async function loadSettings() {
 
 async function loadCoverage() {
   var host = ui.el('[data-coverage]');
+  var fresh = sequence('coverage');
   try {
     var r = await api.marketStats();
+    if (!fresh()) return;
+    paintFresh(host);
     var rows = r.coverage || [];
     host.innerHTML = rows.length
       ? rows.map(function (c) {
@@ -512,8 +603,8 @@ async function loadCoverage() {
             + '<td class="tiny">' + ui.esc(String(c.last_ts).slice(0, 16)) + '</td></tr>';
         }).join('')
       : '<tr><td colspan="4" class="empty">No candles stored. Run a backfill.</td></tr>';
-  } catch (_) {
-    host.innerHTML = '<tr><td colspan="4" class="empty">Unavailable.</td></tr>';
+  } catch (e) {
+    paintFailure(host, 4, e, fresh);
   }
 }
 
@@ -529,11 +620,23 @@ async function loadCoverage() {
  */
 async function loadUsers(search) {
   var host = ui.el('[data-users]');
+  var fresh = sequence('users');
   try {
     var r = await api.admin.users(search || '');
+    // A newer request for this table has already answered — its rows are the ones
+    // the operator asked for, so leave them alone.
+    if (!fresh()) return;
+    paintFresh(host);
     var rows = r.users || [];
     if (!rows.length) {
-      host.innerHTML = '<tr><td colspan="9" class="empty">No users found.</td></tr>';
+      // Naming the filter matters: a search left in the box is the usual reason a
+      // brand-new signup "has not arrived yet" when it is in fact already there.
+      host.innerHTML = '<tr><td colspan="9" class="empty">'
+        + (search
+            ? 'No users match \u201c' + ui.esc(search) + '\u201d. Clear the search to see everyone, '
+              + 'including new signups.'
+            : 'No users found.')
+        + '</td></tr>';
       return;
     }
     host.innerHTML = rows.map(function (u) {
@@ -640,7 +743,7 @@ async function loadUsers(search) {
       return true;
     }, reloadUsers);
   } catch (e) {
-    host.innerHTML = '<tr><td colspan="9" class="empty">' + ui.esc(e.message) + '</td></tr>';
+    paintFailure(host, 9, e, fresh);
   }
 }
 
@@ -654,8 +757,11 @@ async function loadUsers(search) {
  */
 async function loadLedger(search) {
   var host = ui.el('[data-ledger]');
+  var fresh = sequence('ledger');
   try {
     var r = await api.admin.ledger(search || '');
+    if (!fresh()) return;
+    paintFresh(host);
     var rows = r.ledger || [];
     if (!rows.length) {
       host.innerHTML = '<tr><td colspan="8" class="empty">No ledger entries.</td></tr>';
@@ -684,7 +790,7 @@ async function loadLedger(search) {
         + '</tr>';
     }).join('');
   } catch (e) {
-    host.innerHTML = '<tr><td colspan="8" class="empty">' + ui.esc(e.message) + '</td></tr>';
+    paintFailure(host, 8, e, fresh);
   }
 }
 
@@ -699,8 +805,11 @@ async function loadLedger(search) {
  */
 async function loadOrders(status, search) {
   var host = ui.el('[data-orders]');
+  var fresh = sequence('orders');
   try {
     var r = await api.admin.ordersAll(status || 'open', search || '');
+    if (!fresh()) return;
+    paintFresh(host);
     var rows = r.orders || [];
     if (!rows.length) {
       host.innerHTML = '<tr><td colspan="9" class="empty">No orders.</td></tr>';
@@ -738,7 +847,7 @@ async function loadOrders(status, search) {
       return true;
     }, function () { return loadOrders(st.orderStatus, st.orderQuery); });
   } catch (e) {
-    host.innerHTML = '<tr><td colspan="9" class="empty">' + ui.esc(e.message) + '</td></tr>';
+    paintFailure(host, 9, e, fresh);
   }
 }
 
@@ -769,8 +878,11 @@ function p2pClock(iso) {
 async function loadP2p(status, search) {
   var host = ui.el('[data-p2p-trades]');
   if (!host) return;
+  var fresh = sequence('p2p');
   try {
     var r = await api.admin.p2pTrades(status || 'active', search || '');
+    if (!fresh()) return;
+    paintFresh(host);
     var rows = r.trades || [];
     if (!rows.length) {
       host.innerHTML = '<tr><td colspan="8" class="empty">No P2P trades.</td></tr>';
@@ -836,7 +948,7 @@ async function loadP2p(status, search) {
       return true;
     }, reload);
   } catch (e) {
-    host.innerHTML = '<tr><td colspan="8" class="empty">' + ui.esc(e.message) + '</td></tr>';
+    paintFailure(host, 8, e, fresh);
   }
 }
 
@@ -872,7 +984,10 @@ function bind(sel, handler) {
       ui.busy(b, true, '\u2026');
       try {
         var reload = await handler(b);
-        if (reload) { await load(); return; }
+        // `after` because this refresh has to reflect the change just made — see
+        // load(). Joining a refresh that started before the action would show the
+        // operator the state from before their click.
+        if (reload) { await load({ after: true }); return; }
         ui.busy(b, false);
       } catch (e) {
         ui.toastError(e);
@@ -901,7 +1016,47 @@ function refuse() {
     + 'Back to your wallet</a></p></div>';
 }
 
-async function load() {
+var loading = null;
+var queued = null;
+
+/**
+ * Refresh every panel — one refresh at a time.
+ *
+ * Five things ask for a refresh: boot, the Refresh button, the 30s poll, the tab
+ * regaining focus, and any action that just changed something. Two of them
+ * arriving together used to start two complete sets of requests against the same
+ * tables, and that overlap was the glitch operators saw — the first set painted,
+ * the second lost a request to a timeout or an expired session, and its failure
+ * wiped the rows the first had just put up.
+ *
+ * So a caller arriving mid-refresh joins the one in progress rather than starting
+ * a rival — with one exception. A caller passing `after` has just changed
+ * something and needs to see the result, and the refresh already running may have
+ * read the affected table before that change landed. Those get a fresh pass once
+ * the current one finishes: one pass, however many of them ask.
+ */
+function load(opts) {
+  var o = opts || {};
+
+  if (!loading) {
+    loading = runLoad(o).finally(function () { loading = null; });
+    return loading;
+  }
+
+  if (!o.after) return loading;
+
+  if (!queued) {
+    queued = loading.then(function () {
+      queued = null;
+      return load(o);
+    });
+  }
+  return queued;
+}
+
+async function runLoad(opts) {
+  var failed = false;
+
   try {
     st.overview = await api.admin.overview();
     paintOverview(st.overview);
@@ -910,12 +1065,19 @@ async function load() {
       refuse();
       return false;
     }
-    ui.toastError(e);
+    failed = true;
+    // A background refresh reports itself in the banner. Toasting every 30
+    // seconds turns a network blip into a stream of popups over the panel the
+    // operator is trying to read; an explicit Refresh is a question, so it
+    // still gets a direct answer.
+    if (opts.manual) ui.toastError(e);
   }
 
   try {
     paintRecon(await api.admin.reconcile());
-  } catch (_) {}
+  } catch (_) {
+    failed = true;
+  }
 
   await Promise.all([
     loadDeposits(), loadWithdrawals(), loadKyc(), loadCoverage(),
@@ -924,6 +1086,10 @@ async function load() {
     loadP2p(st.p2pStatus, st.p2pQuery),
     loadTreasury()
   ]);
+
+  // Any table that kept its old rows rather than accept a failure has marked
+  // itself, so the banner covers the whole page without each loader reporting in.
+  setRefreshNote(failed || !!document.querySelector('[data-stale]'));
   return true;
 }
 
@@ -1013,13 +1179,18 @@ function setupTabs() {
   // even while the tables are still fetching.
   setupTabs();
 
-  if (!(await load())) return;
+  // `manual` on the first load: if the very first attempt fails there is nothing
+  // on screen yet, so it is worth saying out loud rather than only in the banner.
+  if (!(await load({ manual: true }))) return;
   loadSettings();
 
   ui.el('#held').addEventListener('input', paintDiff);
   ui.on('[data-refresh]', 'click', function (e) {
-    ui.busy(e.currentTarget, true, 'Refreshing\u2026');
-    load().finally(function () { ui.busy(e.currentTarget, false); });
+    var btn = e.currentTarget;
+    ui.busy(btn, true, 'Refreshing\u2026');
+    // `after` as well as `manual`: a deliberate Refresh should re-read, not quietly
+    // attach itself to a poll that started before the click.
+    load({ manual: true, after: true }).finally(function () { ui.busy(btn, false); });
   });
 
   ui.els('[data-backfill]').forEach(function (b) {
@@ -1090,7 +1261,7 @@ function setupTabs() {
       var r = await api.admin.wipeData(phrase);
       ui.el('#wipeConfirm').value = '';
       ui.toast(r.message || 'Data cleared.', 'ok');
-      await load();
+      await load({ after: true });
     } catch (err) {
       ui.toastError(err);
     } finally {
@@ -1136,6 +1307,9 @@ function setupTabs() {
     loadP2p(st.p2pStatus, st.p2pQuery);
   });
 
-  // Queues change when users act, so this refreshes on its own.
-  api.poll(load, 30000);
+  // Queues change when users act, so this refreshes on its own. `immediate: false`
+  // because boot has already loaded once above — the default would fire a second
+  // full refresh a moment after the first, which is exactly the overlap that used
+  // to make freshly painted tables blank themselves.
+  api.poll(load, 30000, { immediate: false });
 })();

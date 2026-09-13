@@ -276,6 +276,14 @@ function session_start_hardened(): void
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
           || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
 
+    // Refuse an identifier this server never issued. Without strict mode PHP will
+    // happily adopt whatever id arrives in the cookie and create a session under
+    // it, which is session fixation: an attacker plants a known id, waits for the
+    // victim to sign in under it, and is then signed in as them. Set here rather
+    // than left to php.ini, because shared hosting does not always enable it.
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+
     session_name('arvsid');
     session_set_cookie_params([
         'lifetime' => 0,
@@ -290,11 +298,45 @@ function session_start_hardened(): void
     session_start();
 
     // Rotate periodically so a leaked identifier has a short useful life.
+    //
+    // Only on a request that is changing something. session_regenerate_id(true)
+    // deletes the outgoing session immediately, and a page that fetches several
+    // endpoints at once — the operations page asks for a dozen — has the rest of
+    // those requests already in flight carrying the old cookie. Rotating under
+    // them invalidates it mid-flight, so they come back 401 and the page reports
+    // itself signed out while it plainly is not.
+    //
+    // A write is the safe moment: those arrive one at a time, from a click. The
+    // cost is that a session which only ever reads is not rotated, which is
+    // acceptable — the identifier is HttpOnly and SameSite=Lax, login rotates it
+    // regardless, and correctness of the signed-in state matters more here than
+    // shortening an already narrow window.
+    $isWrite = ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET';
     if (!isset($_SESSION['born'])) {
         $_SESSION['born'] = time();
-    } elseif (time() - $_SESSION['born'] > 1800) {
+    } elseif ($isWrite && time() - $_SESSION['born'] > 1800) {
         session_regenerate_id(true);
         $_SESSION['born'] = time();
+    }
+}
+
+/**
+ * Finish with the session so sibling requests are not left queueing.
+ *
+ * PHP holds an exclusive lock on the session file for the whole request. A page
+ * that fires a dozen requests in parallel therefore does not run them in
+ * parallel at all: each waits for the one before it to finish, and on shared
+ * hosting the tail of that queue can pass the browser's own request timeout —
+ * which surfaces as panels that load slowly, then fail, for no visible reason.
+ *
+ * Read-only handlers have no reason to hold the lock past the point where they
+ * have identified the caller, so they call this and let the rest go through
+ * together. Anything that needs the session again may simply reopen it.
+ */
+function session_release(): void
+{
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
     }
 }
 
@@ -430,9 +472,31 @@ function rate_limit(string $bucket, int $max, int $windowSeconds, int $blockSeco
     q('UPDATE rate_limits SET hits = ? WHERE bucket = ?', [$hits, $key]);
 }
 
+/**
+ * The caller's address, as well as it can be known.
+ *
+ * This decides which bucket the rate limiter counts into, so getting it wrong
+ * has a cost either way. Believing a forwarded header that nothing upstream
+ * rewrites lets an attacker send a fresh value per request and never hit a limit
+ * at all. Ignoring one that is genuinely being set collapses every visitor into
+ * the proxy's single address, so one person's failed logins throttle everybody.
+ *
+ * Behind Cloudflare or Hostinger's proxy the headers are set and overwritten
+ * upstream, so they are trusted by default. Anywhere the app is reachable
+ * directly, set `trust_proxy` to false in api/config.local.php and only the
+ * connecting address is used.
+ */
 function client_ip(): string
 {
-    foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'] as $h) {
+    $headers = ['REMOTE_ADDR'];
+    if (cfg()['trust_proxy'] ?? true) {
+        // CF-Connecting-IP first: Cloudflare sets it to the single real client and
+        // rewrites any value the client tried to send. X-Forwarded-For is a list,
+        // appended to hop by hop, so the original client is the first entry.
+        $headers = ['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'];
+    }
+
+    foreach ($headers as $h) {
         if (!empty($_SERVER[$h])) {
             $ip = trim(explode(',', $_SERVER[$h])[0]);
             if (filter_var($ip, FILTER_VALIDATE_IP)) {
