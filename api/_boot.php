@@ -123,6 +123,42 @@ function tx(callable $fn)
     throw new RuntimeException('Transaction failed after retry');
 }
 
+/**
+ * Run a money transaction, and turn a refusal into an answer.
+ *
+ * Every money path in this application does its work inside tx() and refuses by
+ * throwing a RuntimeException carrying a written explanation — "this trade is
+ * cancelled and cannot be released", "the treasury is short by 4.2 ARV", "not
+ * enough units". Nothing caught them, so they reached the global exception
+ * handler, which exists for genuine faults and answers with an opaque 500:
+ *
+ *   "Something went wrong on our side. If you report this, quote reference A3F9C2."
+ *
+ * That is the right answer when a column is missing. It is the wrong answer when
+ * the caller has simply been told no — the reason was written down and then thrown
+ * away, so an operator clicking Release, or a seller clicking Confirm, got a
+ * reference number and no way to learn what would make it work. Every one of those
+ * refusals reads as "the button is broken".
+ *
+ * So a deliberate refusal becomes a 409 carrying its own sentence, and the caller
+ * finds out what to do about it.
+ *
+ * PDOException is re-thrown deliberately. It extends RuntimeException, so catching
+ * only the parent would forward raw SQL errors — table names, column names, query
+ * fragments — straight to the browser. A real database fault stays a faceless 500,
+ * which is exactly what it should be.
+ */
+function tx_or_fail(callable $fn, int $status = 409)
+{
+    try {
+        return tx($fn);
+    } catch (PDOException $e) {
+        throw $e;
+    } catch (RuntimeException $e) {
+        json_fail($status, $e->getMessage());
+    }
+}
+
 /* ========================================================= settings ======== */
 
 /**

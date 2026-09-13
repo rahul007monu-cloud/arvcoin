@@ -874,6 +874,12 @@ table.data tfoot td {
 .tape-row.new { animation: tape-in .4s var(--ease-out); }
 @keyframes tape-in { from { opacity: 0; transform: translateY(-6px); background: rgba(255,255,255,.05); } }
 .tape-row .t { color: var(--tx-3); }
+
+/* A trade that is matched but not yet settled — somebody is paying for it right
+   now. Marked rather than hidden: an in-flight trade is the strongest evidence the
+   market is working, and it used not to appear at all until it fully released. */
+.tape-row.is-live { background: rgba(255,255,255,.022); }
+.tape-row.is-live .live-dot { width: 5px; height: 5px; vertical-align: middle; }
 .tape-head {
   display: grid; grid-template-columns: 1fr auto auto; gap: var(--sp-3);
   padding: 8px var(--sp-4);
@@ -887,6 +893,18 @@ table.data tfoot td {
    the index price. What matters instead is how much wants in and out, so depth
    is drawn as two opposing bars. */
 .depth { display: flex; flex-direction: column; gap: var(--sp-3); }
+
+/* The queue, one row per resting order: size, rupee value, how long it has waited.
+   Anonymous by design — the server sends no identities. Seeing the line is what
+   makes a resting order feel like a position in it. */
+.depth-rows { display: flex; flex-direction: column; margin-top: 6px; }
+.depth-row {
+  display: grid; grid-template-columns: auto 1fr auto;
+  gap: var(--sp-3); padding: 3px 0;
+  font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: .76rem;
+}
+.depth-row > :last-child { text-align: right; }
+
 .depth-bar { height: 8px; border-radius: 4px; background: var(--k-3); overflow: hidden; }
 .depth-bar span { display: block; height: 100%; }
 .depth-bar.buy span { background: linear-gradient(90deg, var(--up), rgba(62,207,142,.4)); }

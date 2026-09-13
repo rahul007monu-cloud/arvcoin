@@ -28,6 +28,12 @@ var st = {
   // offers endpoint, plus whether the treasury can supply liquidity.
   fee: null,
   treasuryAvailable: false,
+  // The whole offers payload — book, live activity and 24h stats — kept so the
+  // side toggle can repaint the "fills now" line without another round trip.
+  offers: null,
+  // This user's own resting P2P orders, so the trade page can show them beside the
+  // book they are sitting in.
+  myOrders: null,
   // Where this seller receives rupees. Loaded lazily the first time the sell
   // side is opened, then kept in sync as methods are added or removed.
   methods: null,
@@ -414,13 +420,27 @@ async function place() {
   ui.busy(btn, true, st.side === 'buy' ? 'Placing…' : 'Listing…');
   try {
     var r = await api.p2p.place(payload);
-    // Placement is only the start: a match has to be paid for or confirmed, and
-    // that all happens on the Orders page, so send them there rather than leaving
-    // them on the chart wondering what happens next.
-    ui.toast(ui.esc(r.message || 'Done.')
-      + ' <a href="orders.html" class="arrow">Track it on Orders</a>', 'ok', 9000);
+
+    // A matched order and a resting one need different things said. A match has to
+    // be paid for or confirmed, and that happens on the Orders page — so send them
+    // there. An order that is resting has nothing to do yet, and telling that
+    // person to "track it" makes them think something is wrong; instead, point them
+    // at the queue they can now see themselves in, right on this page.
+    if (r.matched) {
+      ui.toast(ui.esc(r.message || 'Matched.')
+        + ' <a href="orders.html" class="arrow">Pay and track it on Orders</a>', 'ok', 9000);
+    } else {
+      ui.toast(ui.esc(r.message || 'Order placed.')
+        + ' It is in the queue below and matches automatically \u2014 nothing else for '
+        + 'you to do.', 'ok', 9000);
+    }
+
     ui.el('#p2pUnits').value = '';
     if (ui.el('#p2pTrigger')) ui.el('#p2pTrigger').value = '';
+
+    // Immediately, so the order they just placed is visible in the book and in
+    // "your open orders" rather than appearing up to 12 seconds later. Seeing it
+    // land is the whole difference between a confirmation and a hope.
     await refresh();
   } catch (e) {
     ui.toastError(e);
@@ -444,8 +464,235 @@ async function place() {
 function paintDepth(offers) {
   var host = ui.el('[data-p2p-depth]');
   if (!host || !offers) return;
-  host.innerHTML = 'Waiting to sell: <strong>' + ui.fmtUnits(offers.sellDepthUnits, 2) + ' ARV</strong>'
-    + ' · waiting to buy: <strong>' + ui.fmtUnits(offers.buyDepthUnits, 2) + ' ARV</strong>';
+
+  // Say whether the order about to be placed will fill now, because that is the
+  // question, and it was previously answered only after the fact by a toast.
+  var liq = offers.liquidity || {};
+  var fills = st.side === 'buy' ? liq.buyFillsNow : liq.sellFillsNow;
+  var mine = st.side === 'buy' ? offers.sellDepthUnits : offers.buyDepthUnits;
+
+  host.innerHTML = fills
+    ? '<span class="up strong">Fills now</span> \u00b7 '
+      + ui.fmtUnits(st.side === 'buy' ? liq.instantForBuyer : mine, 2)
+      + ' ARV available on the other side'
+    : '<span class="muted">Nothing on the other side right now.</span> Your order rests '
+      + 'in the queue below and matches the moment someone appears.';
+}
+
+/**
+ * The book: everyone waiting, on both sides.
+ *
+ * This is the answer to the real problem — a customer who places an order into a
+ * blank screen has no way to tell a quiet market from a broken one, and assumes
+ * broken. Seeing the queue, with sizes and how long each has waited, is what makes
+ * a resting order feel like a position in a line rather than a message into a void.
+ *
+ * It also does the job in the other direction: the buy side of this book IS a
+ * seller's signal that somebody is waiting to buy, and how long they have waited.
+ * A seller who can see ₹8,000 of demand that has been waiting twenty minutes has a
+ * reason to sell; a seller who sees nothing does not.
+ *
+ * Anonymous throughout — the server sends size, kind and age, and nothing else.
+ */
+function paintBook(offers) {
+  var host = ui.el('[data-depth]');
+  if (!host || !offers) return;
+
+  var book = offers.book || { sells: [], buys: [] };
+  var nav = offers.price && offers.price.nav;
+
+  if (nav == null) {
+    host.innerHTML = '<div class="empty tiny">The market opens when the price feed is live.</div>';
+    return;
+  }
+
+  var html =
+    '<div class="row-between" style="align-items:baseline">'
+      + '<span class="tiny muted">Everything settles at</span>'
+      + '<span class="num strong" style="font-size:1.15rem">' + ui.fmtPrice(nav) + '</span>'
+    + '</div>';
+
+  // Sells first: it is the supply a buyer takes, so it is what most visitors are
+  // reading the book for.
+  html += bookSide('Waiting to sell', book.sells, offers.sellDepthUnits, 'down',
+                   'to a buyer');
+  html += bookSide('Waiting to buy', book.buys, offers.buyDepthUnits, 'up',
+                   'for a seller');
+
+  var t = parseFloat(offers.liquidity && offers.liquidity.treasuryUnits) || 0;
+  if (t > 0) {
+    html += '<div class="tiny muted" style="margin-top:10px">Plus '
+      + ui.fmtUnits(t, 2) + ' ARV the treasury can sell instantly.</div>';
+  }
+
+  host.innerHTML = html;
+}
+
+/** One side of the book: a total, then the individual orders in queue order. */
+function bookSide(label, rows, totalUnits, cls, waitingFor) {
+  rows = rows || [];
+  var total = parseFloat(totalUnits) || 0;
+
+  var html = '<div class="row-between tiny" style="margin-top:12px;padding-top:12px;'
+    + 'border-top:1px solid var(--line)">'
+    + '<span class="' + cls + ' strong">' + label + '</span>'
+    + '<span class="num">' + ui.fmtUnits(totalUnits || 0, 2) + ' ARV</span></div>';
+
+  if (!rows.length || total <= 0) {
+    return html + '<div class="tiny muted" style="margin-top:3px">Nobody ' + waitingFor
+      + ' \u2014 be the first and you set the queue.</div>';
+  }
+
+  // The queue itself. Capped at five: enough to read as a real market, short
+  // enough that the card stays a card.
+  html += '<div class="depth-rows">' + rows.slice(0, 5).map(function (r) {
+    return '<div class="depth-row">'
+      + '<span class="num">' + ui.fmtUnits(r.units, 4) + '</span>'
+      + '<span class="tiny muted">' + (r.paise != null ? ui.fmtPaise(r.paise) : '\u2014') + '</span>'
+      + '<span class="tiny muted">' + ui.esc(waitedFor(r.waitingSeconds)) + '</span>'
+      + '</div>';
+  }).join('') + '</div>';
+
+  if (rows.length > 5) {
+    html += '<div class="tiny muted" style="margin-top:3px">and '
+      + (rows.length - 5) + ' more in the queue</div>';
+  }
+  return html;
+}
+
+/** "just now" / "12m waiting" / "3h waiting" — how long this order has been in line. */
+function waitedFor(seconds) {
+  if (seconds == null) return '';
+  if (seconds < 60) return 'just now';
+  var mins = Math.floor(seconds / 60);
+  if (mins < 60) return mins + 'm waiting';
+  var hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h waiting';
+  return Math.floor(hrs / 24) + 'd waiting';
+}
+
+/**
+ * This user's own resting orders, beside the book they are sitting in.
+ *
+ * The box was previously fed by api.myOrders(), which reads the legacy index
+ * channel — so on a P2P-only venue it said "None open" permanently, even to
+ * somebody who had just placed an order and was staring at the confirmation. That
+ * is precisely the moment the page needed to show them their order.
+ *
+ * Each row carries its queue position, because "you are 2nd in line" is a real
+ * answer and "waiting" is not.
+ */
+function paintMyOrders() {
+  var host = ui.el('[data-my-orders]');
+  if (!host) return;
+
+  var rows = st.myOrders;
+  if (rows == null) return;            // not loaded yet; leave the placeholder
+
+  if (!rows.length) {
+    host.innerHTML = '<div class="empty tiny">None open</div>';
+    return;
+  }
+
+  host.innerHTML = rows.map(function (o) {
+    var pos = queuePosition(o);
+    return '<div class="asset-row" style="grid-template-columns:1fr auto">'
+      + '<div><span class="badge ' + (o.side === 'buy' ? 'ok' : 'warn') + '">' + ui.esc(o.side)
+        + '</span> <span class="tiny muted">' + ui.esc(o.type) + '</span>'
+        + '<div class="num tiny" style="margin-top:3px">'
+          + ui.fmtUnits(o.matchableUnits, 4) + ' left'
+          + (o.triggerNav ? ' at ' + ui.fmtPrice(o.triggerNav) : '') + '</div>'
+        + (pos ? '<div class="tiny muted">' + ui.esc(pos) + '</div>' : '')
+        + '</div>'
+      + '<button class="btn btn-sm btn-ghost" data-p2p-cancel-order="' + o.id + '">Cancel</button>'
+      + '</div>';
+  }).join('');
+
+  ui.els('[data-p2p-cancel-order]').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      ui.busy(b, true, '\u2026');
+      try {
+        var res = await api.p2p.cancelOrder(Number(b.getAttribute('data-p2p-cancel-order')));
+        ui.toast(res.message || 'Order cancelled.', 'ok');
+        await refresh();
+      } catch (e) {
+        ui.toastError(e);
+        ui.busy(b, false);
+      }
+    });
+  });
+}
+
+/**
+ * Where this order sits in the queue it will be matched from.
+ *
+ * p2p_try_match() takes resting counterparties by created_at ASC, so position in
+ * the book is genuinely position in line — this is not a decorative number. Counted
+ * against the same side of the book, since those are the orders competing for the
+ * same counterparties.
+ */
+function queuePosition(o) {
+  var book = st.offers && st.offers.book;
+  if (!book) return '';
+
+  var sameSide = (o.side === 'buy' ? book.buys : book.sells) || [];
+  if (sameSide.length <= 1) return 'first in the queue';
+
+  // The book is anonymous, so match on age: this order is ahead of everything that
+  // has waited less time than it has.
+  var mine = Date.parse(String(o.createdAt).replace(' ', 'T') + 'Z');
+  if (isNaN(mine)) return '';
+  var myWait = (Date.now() - mine) / 1000;
+
+  var ahead = sameSide.filter(function (r) {
+    return (r.waitingSeconds || 0) > myWait + 1;
+  }).length;
+
+  return ahead === 0
+    ? 'first in the queue'
+    : (ahead + 1) + (ahead + 1 === 2 ? 'nd' : (ahead + 1 === 3 ? 'rd' : 'th'))
+      + ' in the queue of ' + sameSide.length;
+}
+
+/**
+ * The live feed: what has actually been trading.
+ *
+ * Reads offers.activity, which the server builds from `p2p_trades` — so a match
+ * appears the instant it happens. The old tape read the `trades` table, which is
+ * only written when a trade fully releases, so it stayed empty while several
+ * trades were in flight and made a working market look like a dead one.
+ *
+ * In-flight trades are marked rather than hidden. "Somebody is paying for 2 ARV
+ * right now" is the single most reassuring thing this page can show.
+ */
+function paintActivity(offers) {
+  var host = ui.el('[data-tape]');
+  if (!host || !offers) return;
+
+  var rows = offers.activity || [];
+  var s = offers.stats24h || {};
+
+  ui.setText('[data-tape-count]', s.trades
+    ? s.trades + (s.trades === 1 ? ' trade' : ' trades') + ' in 24h'
+    : '');
+
+  if (!rows.length) {
+    host.innerHTML = '<div class="empty tiny">No trades yet. '
+      + 'The first one appears here as it happens.</div>';
+    return;
+  }
+
+  host.innerHTML = rows.map(function (t) {
+    var live = t.status === 'matched' || t.status === 'paid';
+    var mark = live
+      ? '<span class="live-dot" title="In progress \u2014 being paid for now"></span>'
+      : '';
+    return '<div class="tape-row' + (live ? ' is-live' : '') + '">'
+      + '<span class="num">' + ui.fmtPrice(t.nav) + ' ' + mark + '</span>'
+      + '<span class="num">' + ui.fmtUnits(t.units, 4) + '</span>'
+      + '<span class="t">' + ui.fmtTime(t.at) + '</span>'
+      + '</div>';
+  }).join('');
 }
 
 /* --------------------------------------------------------------- refresh -- */
@@ -456,14 +703,23 @@ async function refresh() {
     if (o.price && o.price.nav != null) st.nav = o.price.nav;
     if (o.fee) st.fee = o.fee;
     st.treasuryAvailable = !!o.treasuryAvailable;
+    st.offers = o;
     paintDepth(o);
+    paintBook(o);
+    paintActivity(o);
+    paintMyOrders();
     paintEstimate();
     paintSummary();
   } catch (_) {}
 
-  // No api.p2p.mine() call here any more: nothing on this page renders trades or
-  // orders, and the price it used to carry also comes from the offers endpoint
-  // above. The Orders page polls mine() for the surfaces that need it.
+  // mine() is back, for one thing only: this user's own resting orders, shown
+  // beside the book so somebody who has just placed one can see it in the queue.
+  // The full trades surface still lives on orders.html.
+  try {
+    var m = await api.p2p.mine();
+    st.myOrders = m.orders || [];
+    paintMyOrders();
+  } catch (_) {}
 
   // Re-read the wallet. It changes whenever a trade settles or escrow is
   // returned, and the sell side reads it for both the "ARV available" line and
@@ -494,6 +750,9 @@ async function refresh() {
       b.classList.add('on');
       st.side = b.dataset.side;
       syncFormChrome();
+      // The "fills now" line is side-specific, so repaint it from the payload we
+      // already hold rather than waiting up to 20s for the next poll.
+      if (st.offers) paintDepth(st.offers);
     });
   });
 
@@ -515,6 +774,7 @@ async function refresh() {
   syncFormChrome();
   await refresh();
 
-  // The trades surface changes when a counterparty acts, so keep it fresh.
-  api.poll(refresh, 20000);
+  // Faster than it was: this now carries the book and the live activity feed, and a
+  // "live" feed that updates every 20 seconds does not read as live.
+  api.poll(refresh, 12000);
 })();
