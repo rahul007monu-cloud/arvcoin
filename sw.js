@@ -29,15 +29,13 @@
 
 // Only used to evict superseded caches. Updates no longer depend on this being
 // changed — see the same-origin branch in the fetch handler for why that mattered.
-var CACHE = 'arv-v4.1.0';
+var CACHE = 'arv-v4.2.0';
 
 var ASSETS = [
   'index.html',
   'trade.html',
   'orders.html',
   'dashboard.html',
-  'deposit.html',
-  'withdraw.html',
   'transactions.html',
   'tax.html',
   'referral.html',
@@ -60,8 +58,6 @@ var ASSETS = [
   'js/pages/dashboard.js',
   'js/pages/trade.js',
   'js/pages/orders.js',
-  'js/pages/deposit.js',
-  'js/pages/withdraw.js',
   'js/pages/transactions.js',
   'js/pages/tax.js',
   'js/pages/referral.js',

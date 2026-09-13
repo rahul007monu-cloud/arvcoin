@@ -88,7 +88,6 @@ function assistant_facts(): array
         'tdsPct'        => rtrim(rtrim(number_format(setting_f('tds_pct', 1), 2, '.', ''), '0'), '.'),
         'tdsNoPanPct'   => rtrim(rtrim(number_format(setting_f('tds_pct_no_pan', 20), 2, '.', ''), '0'), '.'),
         'minOrder'      => fmt_paise((int)setting_f('min_order_paise', 10000)),
-        'minWithdraw'   => fmt_paise((int)setting_f('min_withdraw_paise', 10000)),
         // Peer-to-peer is how trading actually happens now, so the numbers the
         // assistant quotes have to be the P2P ones. entry_fee_pct/exit_fee_pct above
         // belong to the legacy index path, which no longer has a form on any page.
@@ -125,7 +124,7 @@ function assistant_kb(array $f): array
             'answer' => "ARV is an index unit whose rupee price tracks Bitcoin one-for-one. "
                 . "It launched on {$f['launchDate']} and since then its price is exactly Bitcoin's "
                 . "percentage move, applied in rupees. If Bitcoin rises 5%, ARV rises 5%; if Bitcoin "
-                . "falls 5%, ARV falls 5%. Nothing else moves the price — not demand, not deposits, "
+                . "falls 5%, ARV falls 5%. Nothing else moves the price — not demand, not volume, "
                 . "not the platform. It is not a blockchain token; it is a contractual claim on the "
                 . "platform for the rupee value of your units.",
         ],
@@ -154,22 +153,21 @@ function assistant_kb(array $f): array
                 . "tax).",
         ],
         [
-            'keys'  => ['deposit', 'add money', 'add funds', 'upi', 'put money', 'fund'],
-            'title' => 'Deposits',
-            'answer' => "You do not need to deposit anything to buy ARV — trading is peer-to-peer, so "
-                . "you pay the seller directly from your own bank and the units come to you from escrow. "
-                . "There is no step where you fund a balance here first. If you already hold a rupee "
-                . "balance on the platform from earlier, it stays yours and you can withdraw it.",
+            'keys'  => ['deposit', 'add money', 'add funds', 'upi', 'put money', 'fund', 'wallet balance'],
+            'title' => 'There is nothing to deposit',
+            'answer' => "There is no deposit on ARV Coin, and you do not need one. Trading is "
+                . "peer-to-peer: you pay the seller directly from your own bank, and the ARV comes to "
+                . "you out of escrow. The platform never holds your rupees, so there is no balance to "
+                . "top up and no wallet to fund first. Place a buy order and pay the seller you are "
+                . "matched with.",
         ],
         [
-            'keys'  => ['withdraw', 'withdrawal', 'take out', 'payout', 'bank', 'redeem'],
-            'title' => 'Withdrawals',
-            'answer' => "Selling ARV does not pay into a platform balance any more — a peer-to-peer "
-                . "buyer pays your own UPI ID or bank account directly, so the money arrives in your bank "
-                . "without a withdrawal step. Withdrawals only apply to a rupee balance you already hold "
-                . "here from earlier: request it from the Withdraw page and it is paid after an operator "
-                . "approves it, with a minimum of {$f['minWithdraw']}. A pending request stays visible "
-                . "until it is paid — that is normal, not an error.",
+            'keys'  => ['withdraw', 'withdrawal', 'take out', 'payout', 'bank', 'redeem', 'cash out'],
+            'title' => 'There is no withdrawal either',
+            'answer' => "You do not withdraw from ARV Coin, because your money is never here to begin "
+                . "with. When you sell, the buyer pays your own UPI ID or bank account directly — the "
+                . "rupees arrive in your bank without any withdrawal step. Keep the payment details on "
+                . "your profile correct, because that is where a buyer will send the money.",
         ],
         [
             'keys'  => ['fee', 'fees', 'charge', 'charges', 'commission', 'gst', 'cost to trade'],
@@ -279,8 +277,9 @@ function assistant_system_prompt(array $f, array $kb): string
         . "- Trading is PEER-TO-PEER and settles at the index price. A buyer is matched with a holder, "
         . "the holder's units go into escrow, the buyer pays that holder DIRECTLY (UPI/bank) from their "
         . "own bank, enters the reference, and the escrow is then released to the buyer.\n"
-        . "- A buyer does NOT need an on-platform rupee balance. Never tell anyone to deposit before "
-        . "buying. Rupees move bank-to-bank between the two people; the platform holds only the units.\n"
+        . "- A buyer does NOT need an on-platform rupee balance, and there is no way to create one. "
+        . "Never tell anyone to deposit or to add funds — no such page exists. Rupees move bank-to-bank "
+        . "between the two people; the platform holds only the units.\n"
         . "- A seller must have a payment method saved (UPI/bank) to receive payment.\n"
         . "- P2P platform fee {$f['p2pFeePct']}%"
         . ((float)$f['p2pTdsPct'] > 0 ? " plus {$f['p2pTdsPct']}% TDS" : "")
@@ -294,9 +293,10 @@ function assistant_system_prompt(array $f, array $kb): string
         . "platform or treasury will buy it back.\n"
         . "- Tax: {$f['vdaGainPct']}% + {$f['cessPct']}% cess on gains (s.115BBH); {$f['tdsPct']}% TDS per sale "
         . "(s.194S), {$f['tdsNoPanPct']}% without PAN; FIFO cost basis; losses not set off.\n"
-        . "- Minimum order {$f['minOrder']}, minimum withdrawal {$f['minWithdraw']}.\n"
-        . "- Deposit/withdraw still exist but only for a rupee balance held from earlier; they are not "
-        . "part of buying or selling. Trusted device ~"
+        . "- Minimum order {$f['minOrder']}.\n"
+        . "- There is NO deposit and NO withdrawal anywhere on this platform. Both were removed: it "
+        . "holds no rupees, so there is nothing to fund and nothing to pay out. If asked, say so "
+        . "plainly and explain that the buyer pays the seller directly. Trusted device ~"
         . round($f['trustHours'] / 24) . " days.\n"
         . "- Not registered with SEBI/RBI; not a blockchain token; no capital protection. Support: {$f['support']}.\n";
 

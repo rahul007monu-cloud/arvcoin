@@ -100,20 +100,13 @@ function setRefreshNote(failed) {
 
 function paintOverview(o) {
   var q = o.queues || {};
-  var late = o.overdue || {};
 
-  ui.setText('[data-q-deposits]', String(q.deposits_pending || 0));
-  ui.setText('[data-q-deposits-late]', String(late.deposits || 0));
-  ui.setText('[data-q-withdrawals]',
-    String((q.withdrawals_pending || 0) + (q.withdrawals_approved || 0)));
-  ui.setText('[data-q-withdrawals-late]', String(late.withdrawals || 0));
   ui.setText('[data-q-kyc]', String(q.kyc_pending || 0));
+  ui.setText('[data-q-disputes]', String(q.p2p_disputed || 0));
 
-  // A count on the Approvals tab so the operator can see there is something to
-  // action without opening it. Hidden at zero rather than showing a "0".
-  var pendingApprovals = (q.deposits_pending || 0)
-    + (q.withdrawals_pending || 0) + (q.withdrawals_approved || 0)
-    + (q.kyc_pending || 0);
+  // A count on the KYC tab so the operator can see there is something to action
+  // without opening it. Hidden at zero rather than showing a "0".
+  var pendingApprovals = q.kyc_pending || 0;
   var approvalsBadge = ui.el('[data-tab-count="approvals"]');
   if (approvalsBadge) {
     approvalsBadge.textContent = String(pendingApprovals);
@@ -167,24 +160,25 @@ function paintOverview(o) {
  * platform-fee line is income.
  */
 function paintOverviewStats(q, m) {
-  var pending = (q.deposits_pending || 0)
-    + (q.withdrawals_pending || 0) + (q.withdrawals_approved || 0)
-    + (q.kyc_pending || 0);
-
   var stats = [
     ['Active users', String(q.users_active || 0), 'currently active'],
-    ['\u20b9 held for users', ui.fmtPaise(m.userInrPaise || 0), 'rupees in user wallets'],
     ['ARV outstanding', ui.fmtUnits(m.unitsOutstanding, 8) + ' ARV', 'units owed to holders'],
     ['Invested', ui.fmtPaise(m.investedPaise || 0), 'cost basis held'],
-    ['Deposited', ui.fmtPaise(m.depositedPaise || 0), 'confirmed in, all time'],
-    ['Paid out', ui.fmtPaise(m.paidOutPaise || 0), 'withdrawals settled'],
     ['Platform fees', ui.fmtPaise(m.feesPaise || 0), 'this is the revenue'],
     ['Referral paid', ui.fmtPaise(m.referralPaidPaise || 0), 'from your own margin'],
     ['GST collected', ui.fmtPaise(m.gstPaise || 0), 'liability, not revenue'],
     ['TDS withheld', ui.fmtPaise(m.tdsPaise || 0), 'liability, not revenue'],
     ['Open orders', String(q.orders_open || 0), 'live on the book'],
-    ['Pending queues', String(pending), 'deposits, withdrawals, KYC']
+    ['KYC to review', String(q.kyc_pending || 0), 'waiting on an operator']
   ];
+
+  // Only shown when it is not zero. The platform is not supposed to hold rupees
+  // at all now, so a non-zero figure here is an exception that needs settling —
+  // and a permanent "₹0.00 held for users" tile is just noise.
+  if ((m.userInrPaise || 0) > 0) {
+    stats.splice(1, 0,
+      ['\u20b9 stranded', ui.fmtPaise(m.userInrPaise), 'no payout path — settle by hand']);
+  }
 
   ui.setHtml('[data-overview-stats]', stats.map(function (s) {
     return '<div class="stat"><span class="stat-k">' + s[0] + '</span>'
@@ -292,127 +286,6 @@ function paintDiff() {
       + '</span></div>';
 }
 
-/* ---------------------------------------------------------------- deposits -- */
-
-async function loadDeposits() {
-  var host = ui.el('[data-deposits]');
-  var fresh = sequence('deposits');
-  try {
-    var r = await api.admin.deposits('submitted');
-    if (!fresh()) return;
-    paintFresh(host);
-    var rows = r.deposits || [];
-    if (!rows.length) {
-      host.innerHTML = '<tr><td colspan="5" class="empty">Nothing waiting.</td></tr>';
-      return;
-    }
-    host.innerHTML = rows.map(function (d) {
-      var kyc = d.kycStatus !== 'verified'
-        ? '<span class="badge warn">KYC ' + ui.esc(d.kycStatus) + '</span>' : '';
-      var shot = d.screenshot
-        ? '<a href="' + ui.esc(d.screenshot) + '" target="_blank" rel="noopener">screenshot</a>' : '';
-      return '<tr>'
-        + '<td><div class="tiny">' + ui.esc(d.email) + '</div>'
-          + '<div class="tiny muted">' + ui.esc(d.name || '') + ' ' + kyc + '</div>'
-          + '<div class="mono tiny muted">' + ui.esc(d.ref) + '</div></td>'
-        + '<td class="num strong">' + ui.fmtPaise(d.amountPaise) + '</td>'
-        + '<td class="mono tiny">' + ui.esc(d.utr || '\u2014') + '<div>' + shot + '</div></td>'
-        + '<td class="tiny' + (d.waitingMinutes > CFG.PAYMENTS.depositMaxMinutes ? ' warn' : '') + '">'
-          + d.waitingMinutes + 'm</td>'
-        + '<td class="right nowrap">'
-          + '<button class="btn btn-sm btn-buy" data-confirm="' + ui.esc(d.ref) + '">Confirm</button> '
-          + '<button class="btn btn-sm btn-ghost" data-reject-dep="' + ui.esc(d.ref) + '">Reject</button>'
-        + '</td></tr>';
-    }).join('');
-
-    bind('[data-confirm]', async function (b) {
-      var ref = b.dataset.confirm;
-      if (!confirm('Confirm ' + ref + '?\n\nOnly do this once the credit is visible in the bank account. '
-                 + 'This credits the wallet and pays any referral commission.')) return false;
-      var r2 = await api.admin.confirmDeposit(ref, '');
-      var extra = r2.commission
-        ? ' Referral commission ' + ui.fmtPaise(r2.commission.paise) + ' paid.'
-        : '';
-      ui.toast((r2.message || 'Credited.') + extra, 'ok', 7000);
-      return true;
-    });
-
-    bind('[data-reject-dep]', async function (b) {
-      var reason = prompt('Why is this being rejected? The user sees this.');
-      if (!reason) return false;
-      await api.admin.rejectDeposit(b.dataset.rejectDep, reason);
-      ui.toast('Rejected.', 'ok');
-      return true;
-    });
-  } catch (e) {
-    paintFailure(host, 5, e, fresh);
-  }
-}
-
-/* ------------------------------------------------------------- withdrawals -- */
-
-async function loadWithdrawals() {
-  var host = ui.el('[data-withdrawals]');
-  var fresh = sequence('withdrawals');
-  try {
-    var results = await Promise.all([
-      api.admin.withdrawals('requested'),
-      api.admin.withdrawals('approved')
-    ]);
-    if (!fresh()) return;
-    paintFresh(host);
-    var rows = (results[0].withdrawals || []).concat(results[1].withdrawals || []);
-
-    if (!rows.length) {
-      host.innerHTML = '<tr><td colspan="5" class="empty">Nothing to pay.</td></tr>';
-      return;
-    }
-
-    host.innerHTML = rows.map(function (w) {
-      var action = w.status === 'requested'
-        ? '<button class="btn btn-sm btn-buy" data-approve="' + ui.esc(w.ref) + '">Approve</button>'
-        : '<button class="btn btn-sm btn-primary" data-paid="' + ui.esc(w.ref) + '">Mark paid</button>';
-      return '<tr>'
-        + '<td><div class="tiny">' + ui.esc(w.email) + '</div>'
-          + '<div class="mono tiny muted">' + ui.esc(w.ref) + '</div>'
-          + '<span class="badge ' + (w.status === 'approved' ? 'info' : 'warn') + '">'
-            + ui.esc(w.status) + '</span></td>'
-        + '<td class="num strong">' + ui.fmtPaise(w.amountPaise) + '</td>'
-        + '<td class="mono tiny">' + ui.esc(w.upiVpa) + '</td>'
-        + '<td class="tiny' + (w.overdue ? ' warn' : '') + '">' + w.waitingMinutes + 'm'
-          + (w.overdue ? '<div class="tiny">overdue</div>' : '') + '</td>'
-        + '<td class="right nowrap">' + action + ' '
-          + '<button class="btn btn-sm btn-ghost" data-reject-wd="' + ui.esc(w.ref) + '">Reject</button>'
-        + '</td></tr>';
-    }).join('');
-
-    bind('[data-approve]', async function (b) {
-      var r = await api.admin.approveWithdraw(b.dataset.approve);
-      ui.toast(r.message || 'Approved.', 'ok');
-      return true;
-    });
-
-    bind('[data-paid]', async function (b) {
-      var utr = prompt('UTR of the payment you sent (optional but recommended):') || '';
-      if (!confirm('Mark ' + b.dataset.paid + ' as paid?\n\nOnly after the money has actually left. '
-                 + 'This releases the hold and cannot be undone.')) return false;
-      var r = await api.admin.markPaid(b.dataset.paid, utr.trim());
-      ui.toast(r.message || 'Marked paid.', 'ok');
-      return true;
-    });
-
-    bind('[data-reject-wd]', async function (b) {
-      var reason = prompt('Why? The user sees this, and the hold is released.');
-      if (!reason) return false;
-      await api.admin.rejectWithdraw(b.dataset.rejectWd, reason);
-      ui.toast('Rejected and hold released.', 'ok');
-      return true;
-    });
-  } catch (e) {
-    paintFailure(host, 5, e, fresh);
-  }
-}
-
 /* --------------------------------------------------------------------- KYC -- */
 
 async function loadKyc() {
@@ -471,10 +344,11 @@ async function loadKyc() {
 // given a field here, so there was no way to turn Google sign-in on at all.
 // Anything editable belongs in both places.
 var SETTINGS_GROUPS = [
-  ['Deposits & withdrawals', [
-    ['upi_vpa', 'UPI ID for deposits', 'text'],
-    ['deposit_max_minutes', 'Deposit window (max min)', 'number'],
-    ['withdraw_max_minutes', 'Withdraw window (max min)', 'number']
+  ['Company collection details', [
+    ['upi_vpa', 'Company UPI ID', 'text',
+     'Where a buyer pays when the seller is the treasury. This is not a deposit address \u2014 the platform never holds rupees; on an ordinary P2P trade the buyer pays the seller\u2019s own UPI ID directly.'],
+    ['payee_name', 'Name shown on the payment', 'text',
+     'What a buyer sees in their UPI app when paying the company. Leave it recognisable, or people abandon the payment.']
   ]],
 
   ['Fees & tax', [
@@ -1080,7 +954,7 @@ async function runLoad(opts) {
   }
 
   await Promise.all([
-    loadDeposits(), loadWithdrawals(), loadKyc(), loadCoverage(),
+    loadKyc(), loadCoverage(),
     loadUsers(st.userQuery), loadLedger(st.ledgerQuery),
     loadOrders(st.orderStatus, st.orderQuery),
     loadP2p(st.p2pStatus, st.p2pQuery),

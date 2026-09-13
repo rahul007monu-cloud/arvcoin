@@ -42,11 +42,18 @@ function paintWallet() {
 
   if (!w) return;
 
-  ui.setText('[data-inr]', ui.fmtPaise(w.inrPaise));
-  if (w.inrLockedPaise > 0) {
-    var l = ui.el('[data-inr-locked]');
-    l.classList.remove('hidden');
-    l.textContent = ui.fmtPaise(w.inrLockedPaise) + ' held in open orders';
+  // Rupees are not part of this product any more — a buyer pays the seller
+  // directly and there is no deposit or withdrawal. A few accounts still carry a
+  // balance from before that changed, and hiding it would be worse than saying so:
+  // it is real money that needs settling with a human, not a number to bury.
+  var legacyInr = (w.inrPaise || 0) + (w.inrLockedPaise || 0);
+  var legacy = ui.el('[data-legacy-inr]');
+  if (legacy && legacyInr > 0) {
+    legacy.classList.remove('hidden');
+    legacy.innerHTML = '<strong>' + ui.esc(ui.fmtPaise(legacyInr)) + ' rupee balance.</strong> '
+      + 'This is left over from before trading became peer-to-peer. There is no longer a '
+      + 'withdrawal to pay it out, so <a href="profile.html" class="arrow">contact support</a> '
+      + 'and it will be settled with you directly.';
   }
 
   ui.setText('[data-units]', ui.fmtUnits(w.arvUnits, 4));
@@ -87,6 +94,34 @@ function paintPaused() {
   box.classList.toggle('hidden', !paused);
   if (paused) {
     ui.setText('[data-paused-reason]', (f && f.note) || 'The price feed is not current.');
+  }
+}
+
+/**
+ * The live price at the top of the page.
+ *
+ * Same treatment as the trade page's header — paintPriceDual gives the tick
+ * flash and the muted $ companion, and the dot says whether what is on screen is
+ * actually current. Someone signing in to check their holding should get the
+ * price without reading a chart axis.
+ */
+function paintPriceHero() {
+  var p = (st.snap && st.snap.price) || {};
+  var s = st.snap && st.snap.stats;
+
+  if (p.nav != null) {
+    ui.setUsdInr(st.snap.index && st.snap.index.fxUsdInr);
+    ui.paintPriceDual('[data-price]', p.nav, 'dash');
+  }
+  if (s) ui.paintChange('[data-change]', s.change24hPct);
+
+  var dot = ui.el('[data-dot]');
+  if (dot) {
+    dot.className = 'live-dot '
+      + (p.nav == null ? 'off' : (p.stale ? 'stale' : ''));
+    dot.title = p.nav == null
+      ? 'The price feed is not running'
+      : (p.stale ? 'The feed is behind, so trading is paused' : 'Live');
   }
 }
 
@@ -309,53 +344,106 @@ function statusBadge(s) {
   return '<span class="badge ' + (map[s] || '') + '">' + ui.esc(s.replace(/_/g, ' ')) + '</span>';
 }
 
-async function loadOrders() {
-  var host = ui.el('[data-orders]');
+/**
+ * Live orders and trades, as cards, on the first page after signing in.
+ *
+ * This used to be a table fed by api.myOrders(), which reads the legacy index
+ * channel — closed, so it was permanently empty and nobody noticed. Trading is
+ * peer-to-peer, so the things that matter are P2P: a resting order waiting for a
+ * counterparty, and a matched trade waiting for somebody to pay, confirm or
+ * cancel.
+ *
+ * Trades come first and resting orders after, because a trade has a countdown and
+ * an order does not. Only live ones appear here — the full history is orders.html,
+ * which this links to rather than duplicating.
+ */
+async function loadOrderCards() {
+  var host = ui.el('[data-order-cards]');
   if (!host) return;
 
   try {
-    var r = await api.myOrders('open');
-    var rows = r.orders || [];
+    var r = await api.p2p.mine();
+    var trades = (r.trades || []).filter(function (t) {
+      return t.status === 'matched' || t.status === 'paid' || t.status === 'disputed';
+    });
+    var orders = r.orders || [];
 
-    if (!rows.length) {
-      host.innerHTML = '<tr><td colspan="7"><div class="empty">'
-        + 'No open orders. <a href="trade.html">Place one</a></div></td></tr>';
+    if (!trades.length && !orders.length) {
+      host.innerHTML = '<div class="empty"><div class="icon">\u25c7</div>'
+        + 'No live orders.<br><a href="trade.html?side=buy">Buy ARV</a> to get started.</div>';
       return;
     }
 
-    host.innerHTML = rows.map(function (o) {
-      var fb = o.fallbackInMinutes != null && o.side === 'sell'
-        ? '<div class="tiny muted">treasury buys in ' + o.fallbackInMinutes + 'm</div>'
-        : '';
-      return '<tr>'
-        + '<td class="mono tiny">' + ui.esc(o.ref) + '</td>'
-        + '<td><span class="badge ' + (o.side === 'buy' ? 'ok' : 'warn') + '">'
-          + o.side + '</span></td>'
-        + '<td class="tiny">' + o.type + (o.triggerNav ? '' : '') + '</td>'
-        + '<td class="num">' + ui.fmtUnits(o.remainingUnits, 4) + fb + '</td>'
-        + '<td class="num">' + (o.triggerNav ? ui.fmtPrice(o.triggerNav) : 'index') + '</td>'
-        + '<td>' + statusBadge(o.status) + '</td>'
-        + '<td class="right"><button class="btn btn-sm btn-ghost" data-cancel="'
-          + o.id + '">Cancel</button></td>'
-        + '</tr>';
-    }).join('');
-
-    ui.els('[data-cancel]').forEach(function (b) {
-      b.addEventListener('click', async function () {
-        ui.busy(b, true, '\u2026');
-        try {
-          var res = await api.cancelOrder(Number(b.dataset.cancel));
-          ui.toast(res.message || 'Cancelled.', 'ok');
-          await refresh();
-        } catch (e) {
-          ui.toastError(e);
-          ui.busy(b, false);
-        }
-      });
-    });
+    var cards = trades.map(tradeCard).concat(orders.map(orderCard));
+    host.innerHTML = cards.join('');
   } catch (e) {
-    host.innerHTML = '<tr><td colspan="7" class="empty">Could not load orders.</td></tr>';
+    // Keep it quiet and keep the page usable: the buttons above still work, and
+    // orders.html is one tap away.
+    host.innerHTML = '<div class="empty">Could not load your orders right now. '
+      + '<a href="orders.html">Open the orders page</a>.</div>';
   }
+}
+
+/** A matched/paid/disputed trade — the ones with a clock on them. */
+function tradeCard(t) {
+  var buying = t.role === 'buyer';
+  var side = buying ? 'buy' : 'sell';
+
+  // What this person has to do next, in the words of the thing they must do.
+  var next = '';
+  if (t.status === 'matched') {
+    next = buying
+      ? 'Pay the seller, then upload your reference'
+      : 'Waiting for the buyer to pay';
+  } else if (t.status === 'paid') {
+    next = buying
+      ? 'Paid \u2014 waiting for the seller to confirm'
+      : 'Confirm you received the money to release the ARV';
+  } else if (t.status === 'disputed') {
+    next = 'With support to settle. The ARV stays in escrow until it is resolved.';
+  }
+
+  var deadline = t.payDeadline || t.confirmDeadline;
+
+  return '<a class="order-card" href="orders.html#' + ui.esc(t.ref) + '">'
+    + '<div class="order-card-top">'
+      + '<span class="badge ' + (side === 'buy' ? 'ok' : 'warn') + '">' + side + '</span>'
+      + statusBadge(t.status)
+      + '<span class="mono tiny muted" style="margin-left:auto">' + ui.esc(t.ref) + '</span>'
+    + '</div>'
+    + '<div class="order-card-figure">' + ui.fmtUnits(t.units, 4) + ' ARV</div>'
+    + '<div class="small muted">' + ui.fmtPaise(t.amountPaise)
+      + ' at ' + ui.fmtPrice(t.priceNav) + '</div>'
+    + '<div class="order-card-next">' + next + '</div>'
+    + (deadline ? '<div class="tiny muted">' + ui.esc(countdown(deadline)) + '</div>' : '')
+    + '</a>';
+}
+
+/** A resting P2P order, waiting for somebody to take the other side. */
+function orderCard(o) {
+  return '<a class="order-card" href="orders.html#' + ui.esc(o.ref) + '">'
+    + '<div class="order-card-top">'
+      + '<span class="badge ' + (o.side === 'buy' ? 'ok' : 'warn') + '">' + o.side + '</span>'
+      + statusBadge(o.status)
+      + '<span class="mono tiny muted" style="margin-left:auto">' + ui.esc(o.ref) + '</span>'
+    + '</div>'
+    + '<div class="order-card-figure">' + ui.fmtUnits(o.units, 4) + ' ARV</div>'
+    + '<div class="small muted">'
+      + (o.triggerNav ? 'triggers at ' + ui.fmtPrice(o.triggerNav) : 'at the index price')
+    + '</div>'
+    + '<div class="order-card-next">Waiting for a counterparty</div>'
+    + (o.expiresAt ? '<div class="tiny muted">' + ui.esc(countdown(o.expiresAt)) + '</div>' : '')
+    + '</a>';
+}
+
+/** "34m left" / "2h 10m left" / "overdue", from an ISO-8601 UTC instant. */
+function countdown(iso) {
+  var ms = Date.parse(iso) - Date.now();
+  if (isNaN(ms)) return '';
+  if (ms <= 0) return 'overdue';
+  var mins = Math.round(ms / 60000);
+  if (mins < 60) return mins + 'm left';
+  return Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm left';
 }
 
 /* ----------------------------------------------------------------- activity -- */
@@ -365,30 +453,26 @@ async function loadActivity() {
   if (!host) return;
 
   try {
-    // Deposits, withdrawals and fills, merged into one readable list.
-    var results = await Promise.all([
-      api.myDeposits().catch(function () { return { deposits: [] }; }),
-      api.myWithdrawals().catch(function () { return { withdrawals: [] }; }),
-      api.myOrders('all').catch(function () { return { orders: [] }; })
-    ]);
+    // Completed P2P trades. This used to read api.myOrders('all') — the legacy
+    // index channel, which is closed, so it would show nothing at all now.
+    // Deposits and withdrawals are gone too, so what is left is what the holder
+    // actually did: bought and sold, with somebody.
+    var r = await api.p2p.mine().catch(function () { return { trades: [] }; });
 
     var items = [];
-    (results[0].deposits || []).forEach(function (d) {
-      items.push({ at: d.createdAt, what: 'Deposit', badge: 'info',
-                   units: null, price: null, amount: d.amountPaise, status: d.status });
-    });
-    (results[1].withdrawals || []).forEach(function (w) {
-      items.push({ at: w.createdAt, what: 'Withdrawal', badge: 'warn',
-                   units: null, price: null, amount: -w.amountPaise, status: w.status });
-    });
-    (results[2].orders || []).filter(function (o) {
-      return parseFloat(o.filledUnits) > 0;
-    }).forEach(function (o) {
-      items.push({ at: o.createdAt, what: o.side === 'buy' ? 'Bought ARV' : 'Sold ARV',
-                   badge: o.side === 'buy' ? 'ok' : 'warn',
-                   units: o.filledUnits, price: null,
-                   amount: o.side === 'buy' ? -o.filledPaise : o.filledPaise,
-                   status: o.status });
+    (r.trades || []).filter(function (t) {
+      return t.status === 'released';
+    }).forEach(function (t) {
+      var buying = t.role === 'buyer';
+      items.push({ at: t.releasedAt || t.createdAt,
+                   what: buying ? 'Bought ARV' : 'Sold ARV',
+                   badge: buying ? 'ok' : 'warn',
+                   // The buyer receives units net of the ARV fee; the seller
+                   // releases the full amount. Show each side what moved for them.
+                   units: buying ? t.netUnits : t.units,
+                   price: t.priceNav,
+                   amount: buying ? -t.amountPaise : t.amountPaise,
+                   status: t.status });
     });
 
     items.sort(function (a, b) {
@@ -398,7 +482,7 @@ async function loadActivity() {
     if (!items.length) {
       host.innerHTML = '<tr><td colspan="5"><div class="empty">'
         + '<div class="icon">\u25c7</div>Nothing yet.<br>'
-        + '<a href="deposit.html">Add funds</a> to get started.</div></td></tr>';
+        + '<a href="trade.html">Make your first trade</a> to get started.</div></td></tr>';
       return;
     }
 
@@ -453,9 +537,10 @@ async function refresh() {
   st.snap = await api.snapshot().catch(function () { return null; });
   paintWallet();
   paintPaused();
+  paintPriceHero();
   ui.paintNavTicker(st.snap);
   ui.paintServerFeed(st.snap);
-  await loadOrders();
+  await loadOrderCards();
 }
 
 (async function () {
@@ -473,11 +558,12 @@ async function refresh() {
   st.snap = await api.snapshot().catch(function () { return null; });
   paintWallet();
   paintPaused();
+  paintPriceHero();
   ui.paintNavTicker(st.snap);
   ui.paintServerFeed(st.snap);
 
   await loadChart();
-  loadOrders();
+  loadOrderCards();
   loadActivity();
   loadWatchlist();
 
@@ -494,6 +580,7 @@ async function refresh() {
     st.user = await api.me(true);
     paintWallet();
     paintPaused();
+  paintPriceHero();
     ui.paintNavTicker(st.snap);
     ui.paintServerFeed(st.snap);
     resyncLiveBar();

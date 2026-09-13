@@ -927,28 +927,43 @@ table.data tfoot td {
 .step .n { font-family: var(--mono); font-size: .68rem; font-weight: 700; letter-spacing: .06em; }
 .step .t { font-weight: 620; }
 
-/* ----------------------------------------------------------------- timer --- */
+/* ------------------------------------------------------------ order cards -- */
 
-/* Deposit and withdrawal both promise a window, so the countdown is real rather
-   than a spinner that means nothing. */
-.timer {
-  display: flex; align-items: center; gap: var(--sp-3);
-  padding: var(--sp-4); background: var(--k-2);
-  border: 1px solid var(--line); border-radius: var(--r-sm);
+/* Live orders and trades on the wallet page. Cards rather than table rows because
+   each one is a thing that needs a decision, and the whole card is the tap target
+   through to the order — a small "view" link in a row is a worse phone control. */
+.order-cards {
+  display: grid; gap: var(--sp-3);
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  padding: 0 var(--sp-4) var(--sp-4);
 }
-.timer-ring {
-  width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%;
-  background: conic-gradient(var(--s-2) var(--pct, 0%), var(--k-4) 0);
-  display: grid; place-items: center; position: relative;
+.order-cards > .empty { grid-column: 1 / -1; }
+
+.order-card {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: var(--sp-4);
+  background: var(--k-1); border: 1px solid var(--line);
+  border-radius: var(--r-sm); text-decoration: none; color: inherit;
+  transition: border-color .14s var(--ease), background .14s var(--ease),
+              transform .14s var(--ease);
 }
-.timer-ring::after {
-  content: ''; position: absolute; inset: 4px; border-radius: 50%; background: var(--k-2);
+.order-card:hover {
+  border-color: var(--s-3); background: var(--k-2); transform: translateY(-1px);
 }
-.timer-ring b {
-  position: relative; z-index: 1;
-  font-family: var(--mono); font-size: .7rem; font-weight: 700; color: var(--tx-0);
+.order-card-top { display: flex; align-items: center; gap: 6px; }
+.order-card-figure {
+  font-family: var(--mono); font-size: 1.15rem; font-weight: 680; color: var(--tx-0);
+  letter-spacing: -.01em;
 }
-.timer.overdue { border-color: rgba(224,176,85,.35); background: var(--warn-dim); }
+/* The instruction. Deliberately the most readable line after the amount: it is
+   what the holder has to do, and burying it would defeat the point of the card. */
+.order-card-next {
+  font-size: .84rem; color: var(--tx-1); line-height: 1.45; margin-top: 2px;
+}
+
+@media (max-width: 560px) {
+  .order-cards { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* ------------------------------------------------------------------ tiers -- */
 
@@ -1350,6 +1365,11 @@ table.data tfoot td {
 /* Two balances, one card. Rupees and ARV are different kinds of thing and the
    split is load-bearing — a user needs to see instantly which one they can spend
    and which one is exposure. */
+/* One holding, full width — what wallet-split became once the rupee side of the
+   wallet stopped existing. Kept as its own class rather than a modifier so the
+   two-column layout is still available if a second balance ever returns. */
+.wallet-single { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+
 .wallet-split {
   display: grid; grid-template-columns: 1fr 1px 1fr; gap: var(--sp-5);
   align-items: stretch;

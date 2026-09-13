@@ -124,7 +124,8 @@
             someone to accept.</div>
 
           <div><strong>What ARV is not.</strong> Not a coin on any blockchain, not
-            transferable off this platform, not a token you can withdraw to a wallet,
+            transferable off this platform, not a token you can move to an external
+            wallet,
             not a share, not a deposit, not a unit of a mutual fund or collective
             investment scheme, and not a stablecoin. It confers no ownership of this
             business, no voting right and no dividend.</div>
@@ -164,12 +165,12 @@
             sections 115BBH and 194S, GST on our fees, and the reporting and
             record-keeping we are required to do as a VDA service provider registered
             with the Financial Intelligence Unit regime as it applies to us.</div>
-          <div><strong>We do not take deposits.</strong> Rupees you send sit in your
-            platform balance as a payable to you. We do not pay interest on them, we do
-            not promise a return on them, and we do not lend them out. Promising a
-            return on money taken from the public is an offence under the Banning of
-            Unregulated Deposit Schemes Act, 2019, and it is a line this platform does
-            not go near.</div>
+          <div><strong>We do not take deposits — and now we cannot.</strong> There is no
+            way to send us rupees and no balance of yours that we hold. A buyer pays the
+            seller directly and we only move the ARV. Promising a return on money taken
+            from the public is an offence under the Banning of Unregulated Deposit
+            Schemes Act, 2019; holding none of your money at all is the simplest possible
+            distance from that line.</div>
           <div><strong>Jurisdiction.</strong> Available to residents of India, subject to
             the laws of India, with exclusive jurisdiction in the courts of India.</div>
         </div>
@@ -193,38 +194,39 @@
             access.</div>
           <div><strong>Accuracy.</strong> The name, date of birth, PAN and address you
             give must be true and must match your documents. A mismatch will hold up
-            verification and withdrawals.</div>
+            verification, and until you are verified you cannot sell.</div>
           <div><strong>What you may not do.</strong> Use the platform for anyone else's
             money, launder proceeds of crime, break sanctions, automate abuse of the
             API, attempt to interfere with pricing or matching, or attack the
             infrastructure. Any of these ends the account.</div>
-          <div><strong>What we may do.</strong> Refuse or reverse a transaction that
-            appears fraudulent or mistaken, hold a withdrawal while we verify it, pause
-            trading when the price feed is unreliable, and change fees or settings with
-            notice on this site. Where we reverse something, it appears as its own
-            ledger entry — never as an edit to the original.</div>
-          <div><strong>Fees.</strong> On a peer-to-peer trade the buyer pays a platform
-            fee taken from the ARV they receive, never from the rupees they send, and the
-            seller pays no platform fee. Buy and sell fees on the legacy index path, and
-            GST on those fees, are stated separately where they apply. Deposits and
-            withdrawals carry no platform fee. The rates that apply to your order are
-            always itemised on the <a href="trade.html">order</a> before you confirm it.</div>
-          <div><strong>Cancellation and refunds.</strong> An unfilled order can be
-            cancelled at any time and the escrow is released in full. A filled order
-            cannot be undone — it is an executed transaction, not a purchase of goods,
-            and there is no cooling-off period. A deposit that was never credited is
-            returned to the account it came from.</div>
+          <div><strong>What we may do.</strong> Refuse a trade that appears fraudulent or
+            mistaken, hold escrowed units while we investigate a dispute, pause trading
+            when the price feed is unreliable, and change fees or settings with notice on
+            this site. Where we reverse something, it appears as its own ledger entry —
+            never as an edit to the original.</div>
+          <div><strong>Fees.</strong> The buyer pays a platform fee taken from the ARV
+            they receive, never from the rupees they send, and the seller pays no platform
+            fee. The rate that applies is always itemised on the
+            <a href="trade.html">order</a> before you confirm it.</div>
+          <div><strong>Cancellation and refunds.</strong> An unmatched order can be
+            cancelled at any time and the escrow is released in full. Once the units have
+            been released to the buyer the trade cannot be undone — it is an executed
+            transaction, not a purchase of goods, and there is no cooling-off period.
+            Because we never hold your rupees, there is nothing for us to refund; a
+            payment dispute is between you and the person you traded with, and we decide
+            only where the escrowed ARV goes.</div>
           <div><strong>Availability.</strong> We aim to be up continuously but we do not
             guarantee it. Maintenance, host failure and feed outages happen, and during
             an outage you may be unable to trade.</div>
           <div><strong>Limits on our liability.</strong> We are liable for our own
-            failure to execute what you instructed, and for money we hold for you. We
-            are not liable for market losses, for the price of Bitcoin, for your tax
-            position, or for consequential loss. Nothing here excludes liability we
-            cannot lawfully exclude — including for fraud.</div>
-          <div><strong>Closing an account.</strong> You can withdraw your rupee balance
-            and stop using the platform whenever you like. We keep the records we are
-            required to keep, for as long as we are required to keep them.</div>
+            failure to execute what you instructed and for the ARV we hold in escrow for
+            you. We hold none of your rupees, so we are not liable for a payment another
+            user did or did not make. We are not liable for market losses, for the price
+            of Bitcoin, for your tax position, or for consequential loss. Nothing here
+            excludes liability we cannot lawfully exclude — including for fraud.</div>
+          <div><strong>Closing an account.</strong> Sell your ARV to another holder and
+            stop using the platform whenever you like. We keep the records we are required
+            to keep, for as long as we are required to keep them.</div>
         </div>
       </section>
 
@@ -236,33 +238,29 @@
         </div>
 
         <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
-          <div><strong>Deposits are credited on confirmation, not on scanning.</strong>
-            A UPI QR sends a request one way and returns nothing to us — no callback and
-            no signature. So we credit a deposit when we can see the money against the
-            bank statement, which is why we ask for a UTR or a screenshot. Usually
-            <strong data-dep-window>2–15 minutes</strong>.</div>
-          <div><strong>Money moves through your rupee balance, never person to
-            person.</strong> You never pay another user and no user ever pays you. That
-            is deliberate: direct transfers between strangers are how disputes,
-            chargebacks, mule accounts and frozen bank accounts happen.</div>
-          <div><strong>Buys fill immediately.</strong> Against resting sell orders where
-            they exist, and against the treasury otherwise.</div>
-          <div><strong>Sells prefer a real buyer.</strong> A sale is matched against
-            genuine demand first. If none arrives within the fallback window
-            (<strong data-fallback>60 minutes</strong>), the treasury takes the other
-            side at the same index price. Without that fallback a holder would be
-            trapped in a falling market, which is exactly when selling matters.</div>
-          <div><strong>Escrow.</strong> While a buy order rests, the rupees it needs —
-            including the fee and the GST on the fee — are held and cannot be spent
-            twice. While a sell order rests, the units are held the same way. Cancel and
-            the hold is released in full.</div>
-          <div><strong>Withdrawals go to your own UPI ID.</strong> To the VPA on your
-            verified profile and nowhere else. Usually
-            <strong data-wd-window>5 minutes to 1 hour</strong>. A withdrawal can be
-            cancelled by you until it is approved.</div>
-          <div><strong>The ledger is the record.</strong> Every rupee and every unit that
-            moves is written once, append-only. Your balance is a running total of it. If
-            the two ever disagree, the ledger is right, and we reconcile to it.</div>
+          <div><strong>We never hold your rupees.</strong> There is no deposit and no
+            withdrawal, because there is no balance of yours for us to keep. A buyer pays
+            the seller directly, from their bank to the seller's, and the only thing that
+            moves on this platform is the ARV itself.</div>
+          <div><strong>The rupees are between the two of you.</strong> You pay the
+            seller's own UPI ID, and you are paid to yours. We are not a party to that
+            payment, we cannot reverse it, and we never see the money — we see that the
+            seller confirmed it.</div>
+          <div><strong>The ARV is escrowed while you pay.</strong> When a trade is
+            matched, the seller's units are locked here and cannot be sold to anybody
+            else. They are released to the buyer when the seller confirms the rupees
+            arrived, and returned to the seller if the trade is cancelled. That escrow is
+            what this platform actually does.</div>
+          <div><strong>If a trade goes wrong, a human decides it.</strong> A buyer who has
+            paid and a seller who says they have not is a dispute, and the escrowed units
+            stay locked until we resolve it. We release to the buyer where the payment is
+            evidenced and return to the seller where it is not.</div>
+          <div><strong>Our fee comes out of the ARV, not the rupees.</strong> The buyer
+            receives slightly fewer units than they paid for, and that difference is the
+            platform fee. Nothing is added to what you send the seller.</div>
+          <div><strong>The ledger is the record.</strong> Every unit that moves is written
+            once, append-only. Your holding is a running total of it. If the two ever
+            disagree, the ledger is right, and we reconcile to it.</div>
         </div>
       </section>
 
@@ -325,7 +323,7 @@
         <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
           <div><strong>What we ask for, and why.</strong> Name, date of birth and address
             to identify you; PAN because it decides your TDS rate and is required for
-            tax reporting; a UPI ID so withdrawals have somewhere to go. That is the
+            tax reporting; a UPI ID so a buyer knows where to pay you. That is the
             list.</div>
           <div><strong>When we ask.</strong> At the point you first buy — not as a wall
             in front of the door. You can look around, read everything and see live
@@ -335,7 +333,7 @@
             correct it, rather than rejecting you without a reason.</div>
           <div><strong>Monitoring.</strong> We watch for patterns that suggest money
             laundering, accounts operated for someone else, and structuring around the
-            TDS threshold. We may ask about the source of funds, hold a withdrawal while
+            TDS threshold. We may ask about the source of funds, hold escrowed units while
             we do, and we are required to report suspicious activity. We will not tell
             you that we have.</div>
           <div><strong>Records.</strong> Identity records and transaction records are
@@ -354,7 +352,7 @@
         <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
           <div><strong>What we hold.</strong> Your email; your KYC details as listed
             above; your PAN; the last four digits of Aadhaar if you gave them; your UPI
-            ID; every transaction and ledger entry; deposit UTRs and any screenshot you
+            ID; every transaction and ledger entry; payment references and any screenshot you
             upload; login and action audit records with IP address and user agent.</div>
           <div><strong>What we do not hold.</strong> No full Aadhaar number. No card
             numbers, no CVV, no UPI PIN and no bank password — payment happens inside
@@ -391,20 +389,21 @@
         </div>
 
         <div class="stack small" style="gap:var(--sp-4);max-width:78ch">
-          <div><strong>5% of a referred person's first deposit, once.</strong> Paid from
-            our own margin into your rupee balance. Nothing is deducted from them, and
-            they pay no more than anyone else.</div>
+          <div><strong>5% of a referred person's first purchase, once.</strong> Paid from
+            our own margin, to you in ARV, at the moment their tokens reach their account.
+            Nothing is deducted from them and they pay no more than anyone else.</div>
           <div><strong>Single level, and it stays that way.</strong> You are not paid on
             the people they invite, and there is no ongoing cut of anyone's trading. A
-            multi-level structure paid out of deposits is a money circulation scheme
-            under the Prize Chits and Money Circulation Schemes (Banning) Act, 1978.</div>
+            multi-level structure paid out of what recruits put in is a money circulation
+            scheme under the Prize Chits and Money Circulation Schemes (Banning) Act,
+            1978.</div>
           <div><strong>Tiers pay in fees, not in cash.</strong> Higher tiers lower what
-            you pay to trade. A cash reward scaled to how much other people deposit is a
-            promised return funded by deposits, which is precisely what the BUDS Act,
+            you pay to trade. A cash reward scaled to how much other people put in is a
+            promised return funded by their money, which is precisely what the BUDS Act,
             2019 prohibits.</div>
           <div><strong>Void where abused.</strong> Self-referral, a duplicate PAN, or a
-            deposit reversed after the commission was paid voids that commission and it
-            is recovered by a compensating ledger entry.</div>
+            trade reversed after the commission was paid voids that commission and it is
+            recovered by a compensating ledger entry.</div>
           <div><strong>Capped, and taxable.</strong> Capped per referral, and it is
             income at your slab rate rather than a capital gain.</div>
         </div>

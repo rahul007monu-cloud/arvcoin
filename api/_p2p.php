@@ -781,9 +781,25 @@ function p2p_release_core(PDO $pdo, array $t): array
         p2p_sync_buy_order($pdo, (int)$t['buyer_order_id']);
     }
 
+    /* -------------------------------------------------------- referral ---- */
+    // A completed purchase is what proves a referred person became a customer,
+    // so this is where the referral commission is earned. It used to hang off the
+    // first confirmed deposit; deposits no longer exist, and this is the closest
+    // equivalent — real money changed hands for real units.
+    //
+    // Deliberately last: it locks the referrer's wallet on top of the seller,
+    // buyer and fee account this function already holds, and it pays at the price
+    // the two sides actually agreed rather than the current index. Returns null
+    // for the overwhelming majority of releases — nobody referred the buyer, or
+    // they have already earned their one commission.
+    $commission = referral_commission_pay(
+        $pdo, $buyerId, $amount, $nav, $tradeRef, (int)$t['id']
+    );
+
     return [
         'ref'            => (string)$t['ref'],
         'tradeRef'       => $tradeRef,
+        'commission'     => $commission,
         'units'          => u8str($units8),
         'buyerUnits'     => u8str($buyerUnits8),
         'feeUnits'       => u8str($feeUnits),

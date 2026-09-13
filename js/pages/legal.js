@@ -5,7 +5,7 @@
  * a risk disclosure that only appears once a module loads is not a disclosure.
  * This file fills in the handful of values that must not be allowed to drift out
  * of step with the running configuration: the launch date and base price, the
- * deposit and withdrawal windows, the fallback window, and the support address.
+ * the launch date, the base price, and the support address.
  *
  * If any of these were typed into the page as literals, a change to a setting
  * would leave the terms quietly stating something the platform no longer does.
@@ -63,14 +63,9 @@ function wireToc() {
   ui.setText('[data-launch]', fmtDate(new Date(CFG.INDEX.launchMs).toISOString()));
   ui.setText('[data-base]', ui.fmtPrice(CFG.INDEX.arvBaseInr, 2));
 
-  var p = CFG.PAYMENTS;
-  ui.setText('[data-dep-window]', p.depositMinMinutes + '\u2013' + p.depositMaxMinutes + ' minutes');
-  ui.setText('[data-wd-window]',
-    p.withdrawMinMinutes + ' minutes to '
-    + (p.withdrawMaxMinutes >= 60
-        ? (p.withdrawMaxMinutes / 60) + ' hour' + (p.withdrawMaxMinutes >= 120 ? 's' : '')
-        : p.withdrawMaxMinutes + ' minutes'));
-  ui.setText('[data-fallback]', CFG.MARKET.sellFallbackMinutes + ' minutes');
+  // The deposit, withdrawal and sell-fallback windows used to be interpolated
+  // here. All three described a rupee balance the platform no longer has, so the
+  // paragraphs quoting them are gone from legal.html and there is nothing to fill.
 
   var email = CFG.UI.supportEmail;
   ui.setText('[data-support]', email);

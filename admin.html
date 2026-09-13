@@ -43,21 +43,16 @@
   <!-- ==================================================== persistent queues -->
   <!-- The at-a-glance status strip stays visible on every tab, so an operator
        always sees what is waiting without having to hunt for it. -->
-  <div class="grid g-4" style="margin-bottom:var(--sp-4)">
-    <div class="card card-tight"><div class="stat">
-      <span class="stat-k">Deposits waiting</span>
-      <span class="stat-v" data-q-deposits>—</span>
-      <span class="stat-sub"><span data-q-deposits-late>—</span> past the window</span>
-    </div></div>
-    <div class="card card-tight"><div class="stat">
-      <span class="stat-k">Withdrawals to send</span>
-      <span class="stat-v" data-q-withdrawals>—</span>
-      <span class="stat-sub"><span data-q-withdrawals-late>—</span> overdue</span>
-    </div></div>
+  <div class="grid g-3" style="margin-bottom:var(--sp-4)">
     <div class="card card-tight"><div class="stat">
       <span class="stat-k">KYC to review</span>
       <span class="stat-v" data-q-kyc>—</span>
       <span class="stat-sub">24 hour target</span>
+    </div></div>
+    <div class="card card-tight"><div class="stat">
+      <span class="stat-k">P2P disputes</span>
+      <span class="stat-v" data-q-disputes>—</span>
+      <span class="stat-sub">escrow held, needs a decision</span>
     </div></div>
     <div class="card card-tight"><div class="stat">
       <span class="stat-k">ARV price</span>
@@ -69,7 +64,7 @@
   <!-- ========================================================= tab switcher -->
   <nav class="admin-tabs" role="tablist" aria-label="Admin sections">
     <button class="admin-tab is-active" type="button" role="tab" data-tab="overview">Overview</button>
-    <button class="admin-tab" type="button" role="tab" data-tab="approvals">Approvals<span class="admin-tab-count" data-tab-count="approvals" hidden>0</span></button>
+    <button class="admin-tab" type="button" role="tab" data-tab="approvals">KYC<span class="admin-tab-count" data-tab-count="approvals" hidden>0</span></button>
     <button class="admin-tab" type="button" role="tab" data-tab="users">Users</button>
     <button class="admin-tab" type="button" role="tab" data-tab="treasury">Treasury</button>
     <button class="admin-tab" type="button" role="tab" data-tab="trades">Ledger &amp; trades</button>
@@ -115,50 +110,10 @@
   <!-- ============================================================ approvals -->
   <div class="admin-panel" data-panel="approvals" hidden>
 
-    <div class="grid g-2" style="gap:var(--sp-4);align-items:start">
-
-      <!-- ======================================================= deposits -->
-      <section class="card card-flush">
-        <div class="card-head" style="padding:var(--sp-4);margin:0">
-          <h3 style="font-size:1rem">Deposits awaiting confirmation</h3>
-        </div>
-        <div class="table-wrap">
-          <table class="data">
-            <thead><tr>
-              <th>Who</th><th class="num">Amount</th><th>UTR</th><th>Waiting</th><th></th>
-            </tr></thead>
-            <tbody data-deposits><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
-          </table>
-        </div>
-        <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
-          Match the UTR against the bank statement before confirming. Units are issued
-          at the price at the moment of confirmation, not when the QR was shown.
-        </div>
-      </section>
-
-      <!-- ==================================================== withdrawals -->
-      <section class="card card-flush">
-        <div class="card-head" style="padding:var(--sp-4);margin:0">
-          <h3 style="font-size:1rem">Withdrawals to pay</h3>
-        </div>
-        <div class="table-wrap">
-          <table class="data">
-            <thead><tr>
-              <th>Who</th><th class="num">Amount</th><th>UPI ID</th><th>Waiting</th><th></th>
-            </tr></thead>
-            <tbody data-withdrawals><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
-          </table>
-        </div>
-        <div class="tiny muted" style="padding:var(--sp-3) var(--sp-4)">
-          Amounts are already net of exit fee, GST and TDS. Send the UPI payment, then
-          mark it paid with the UTR so it is traceable.
-        </div>
-      </section>
-
-    </div>
-
     <!-- ================================================================= KYC -->
-    <section class="card card-flush" style="margin-top:var(--sp-4)">
+    <!-- The only queue left on this tab. Deposits and withdrawals used to sit
+         above it; there are no rupees on the platform to confirm or pay out. -->
+    <section class="card card-flush">
       <div class="card-head" style="padding:var(--sp-4);margin:0">
         <h3 style="font-size:1rem">KYC to review</h3>
       </div>

@@ -2,15 +2,16 @@
 /**
  * Referrals and reward tiers.
  *
- * The commission is 5% of a referred user's first deposit, once, paid into the
- * referrer's rupee wallet by `admin.php` at the moment that deposit is confirmed.
- * Nothing here pays anything — this endpoint only reports.
+ * The commission is 5% of a referred user's first purchase, once, paid to the
+ * referrer in ARV the moment that purchase completes — see
+ * referral_commission_pay() in _money.php, called from p2p_release_core() as the
+ * escrowed tokens reach the buyer. Nothing here pays anything; this endpoint only
+ * reports.
  *
  * Tiers are earned on referred volume and pay out as a fee discount rather than
  * cash. That is deliberate: a cash reward that scales with how much money other
- * people put in reads as a promised return, and it is a promise funded by
- * deposits rather than by revenue. A fee discount comes out of the platform's own
- * margin, which it can actually afford.
+ * people put in reads as a promised return. A fee discount comes out of the
+ * platform's own margin, which it can actually afford.
  */
 
 declare(strict_types=1);
@@ -58,9 +59,9 @@ function handle_summary(): void
         [$u['id']]
     );
 
-    // Signed-up-but-not-yet-deposited. Worth showing separately so the count on
+    // Signed up but has not bought yet. Worth showing separately so the count on
     // screen matches the count of people the referrer actually invited, rather
-    // than only those who happened to fund.
+    // than only those who went on to trade.
     $joinedNotFunded = (int)(qval(
         'SELECT COUNT(*) FROM users x
           WHERE x.referred_by = ?
@@ -68,9 +69,11 @@ function handle_summary(): void
         [$u['id']]
     ) ?? 0);
 
-    $ownDeposits = (int)(qval(
-        'SELECT COALESCE(SUM(amount_paise),0) FROM deposits
-          WHERE user_id = ? AND status = "confirmed"', [$u['id']]
+    // The referrer's own volume, which the ratio tiers measure against. This was
+    // confirmed deposits; with deposits gone it is what they have bought, read from
+    // `trades` so every fill counts.
+    $ownVolume = (int)(qval(
+        'SELECT COALESCE(SUM(gross_paise),0) FROM trades WHERE buyer_id = ?', [$u['id']]
     ) ?? 0);
 
     $site = (string)(cfg()['site_url'] ?? '');
@@ -84,14 +87,15 @@ function handle_summary(): void
         'code'    => $u['referral_code'],
         'link'    => rtrim($site, '/') . '/signup.html?ref=' . $u['referral_code'],
         'terms'   => [
-            'commissionPct'   => setting_f('referral_pct', 5),
-            'onlyFirstDeposit'=> true,
-            'capPaise'        => setting_i('referral_max_paise', 5000000),
-            'levels'          => 1,
-            'explanation'     => sprintf(
-                'You earn %s%% of the first deposit each person you refer makes, once, credited '
-                . 'straight to your rupee balance. There is no second level and no ongoing cut — '
-                . 'one payment per person, capped at ₹%s.',
+            'commissionPct'    => setting_f('referral_pct', 5),
+            'onlyFirstPurchase'=> true,
+            'paidIn'           => 'ARV',
+            'capPaise'         => setting_i('referral_max_paise', 5000000),
+            'levels'           => 1,
+            'explanation'      => sprintf(
+                'You earn %s%% of the first purchase each person you refer makes, once, paid to you '
+                . 'in ARV the moment their tokens land in their account. There is no second level '
+                . 'and no ongoing cut — one payment per person, worth up to ₹%s.',
                 rtrim(rtrim(number_format(setting_f('referral_pct', 5), 2, '.', ''), '0'), '.'),
                 number_format(setting_i('referral_max_paise', 5000000) / 100)
             ),
@@ -102,9 +106,9 @@ function handle_summary(): void
             'volumePaise'     => (int)$totals['volume'],
             'earnedPaise'     => (int)$totals['earned'],
             'pendingPaise'    => (int)$totals['pending'],
-            'ownDepositsPaise'=> $ownDeposits,
+            'ownVolumePaise'  => $ownVolume,
         ],
-        'tier'    => tier_progress((int)$totals['volume'], $ownDeposits, (string)($u['tier_id'] ?? '')),
+        'tier'    => tier_progress((int)$totals['volume'], $ownVolume, (string)($u['tier_id'] ?? '')),
         'referrals' => array_map(static fn($r) => [
             // Only a masked address. A referrer does not need the full email of
             // someone who signed up under them.
@@ -115,8 +119,9 @@ function handle_summary(): void
             'status'          => $r['status'],
             'at'              => $r['created_at'],
         ], $rows),
-        'taxNote' => 'Referral commission is income, not a capital gain. It is recorded separately '
-                   . 'from your ARV holdings and does not affect their cost basis.',
+        'taxNote' => 'Referral commission is income, not a capital gain. It is paid in ARV and '
+                   . 'recorded separately from the ARV you bought, so it does not affect the cost '
+                   . 'basis of your holdings.',
     ]);
 }
 
@@ -133,17 +138,17 @@ function handle_tiers(): void
         'exitFeePct'  => $t['exitFeePct'],
         'days'      => $t['days'],
         'requirement' => $t['metric'] === 'paise'
-            ? sprintf('₹%s in referred deposits', number_format((int)$t['threshold'] / 100))
-            : sprintf('referred deposits worth %s× your own', $t['threshold']),
+            ? sprintf('₹%s in referred purchases', number_format((int)$t['threshold'] / 100))
+            : sprintf('referred purchases worth %s× your own', $t['threshold']),
     ], arv_reward_tiers())]);
 }
 
 /**
  * Where the user stands, and what the next tier needs.
  *
- * Ratio tiers compare referred volume against the referrer's own deposits, so
- * someone who has put nothing in has no ratio yet — said plainly rather than
- * shown as a divide-by-zero or a misleading 0%.
+ * Ratio tiers compare referred volume against the referrer's own purchase volume,
+ * so someone who has not bought anything yet has no ratio — said plainly rather
+ * than shown as a divide-by-zero or a misleading 0%.
  */
 function tier_progress(int $referredPaise, int $ownPaise, string $currentTier): array
 {
@@ -172,8 +177,9 @@ function tier_progress(int $referredPaise, int $ownPaise, string $currentTier): 
             $gap = ['type' => 'paise', 'remainingPaise' => max(0, $needed - $referredPaise)];
         } else {
             $gap = ['type' => 'blocked',
-                    'reason' => 'Ratio tiers compare referred deposits against your own, so make a '
-                              . 'deposit first and this starts counting.'];
+                    'reason' => 'Ratio tiers compare what the people you referred have bought '
+                              . 'against what you have bought, so make your first purchase and '
+                              . 'this starts counting.'];
         }
     }
 

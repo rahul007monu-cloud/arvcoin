@@ -43,7 +43,7 @@ which. Then it asks for:
 | Operator name, email, password | this becomes the admin account; minimum 10 characters |
 | Site URL | used in emails and referral links; changeable later |
 | From address for mail | OTPs are sent from here |
-| UPI VPA | where deposits are paid; leave blank and the QR shows a clearly-marked placeholder |
+| UPI VPA | the company's own collection ID, used only when the treasury is the seller in a P2P trade; leave blank and that QR shows a clearly-marked placeholder |
 
 Pressing install creates 18 tables, 8 append-only triggers and the default
 settings, then writes `api/config.local.php` containing the database password and
@@ -129,9 +129,13 @@ day. **Operations → Backfill history** is still there to run it by hand.
 
 ### 1.6 Set the UPI VPA
 
-Only if you left it blank in the installer. Operations → **Settings** → `upi_vpa`.
-Until it is set the deposit page shows a placeholder saying so, rather than a QR
-code that scans to nothing.
+Only if you left it blank in the installer, and only if you intend to sell from the
+treasury. Operations → **Settings** → `upi_vpa`.
+
+This is **not** a deposit address — the platform never takes payments. On an ordinary
+trade the buyer pays the seller's own UPI ID directly. This one is used for the single
+case where the company itself is the seller, so a buyer has somewhere to pay. Until it
+is set, that QR shows a placeholder saying so rather than scanning to nothing.
 
 ### 1.7 Sign in with Google — optional
 
@@ -176,7 +180,8 @@ that route. KYC is unchanged — Google supplies a name and an email, never a PA
 - `https://yourdomain.com/api/market.php?action=snapshot` returns a price with
   `stale: false`
 - Operations → **Reconcile** reports the ledger and the wallets agreeing exactly
-- Sign up as a normal user, deposit ₹100, confirm it as the operator, buy, sell
+- Sign up two normal users, list ARV for sale from one, buy it from the other, and
+  confirm the escrow releases once the seller marks the payment received
 
 ---
 
@@ -234,9 +239,7 @@ Settings. No deploy needed.
 | `sell_fallback_minutes` | 60 | When the treasury takes an unmatched sell |
 | `order_expiry_hours` | 168 | Resting orders expire after a week |
 | `min_order_paise` | 10000 | ₹100 |
-| `deposit_max_minutes` | 15 | The window quoted to the user |
-| `withdraw_max_minutes` | 60 | Same, for withdrawals |
-| `referral_pct` | 5 | Commission on a referee's first deposit |
+| `referral_pct` | 5 | Commission on a referee's first purchase, paid in ARV |
 | `kyc_required` | 1 | Verification before the first buy |
 | `maintenance_mode` | 0 | Everyone but operators sees a notice |
 | `tds_pct` / `tds_pct_no_pan` | 1 / 20 | s.194S and s.206AA |
@@ -280,9 +283,9 @@ node tools/build-icons.mjs
   the missing entry.
 - **Mail deliverability.** Set SPF and DKIM for the domain, or OTP emails land in
   spam and nobody can finish signing up.
-- **`uploads/` is data, never code.** `deposit.php` writes an `.htaccess` there
-  that switches the PHP engine off. Confirm it exists after the first upload — a
-  file called `shot.png` that is really PHP is otherwise a shell.
+- **`uploads/` is data, never code.** The P2P payment-proof upload writes an
+  `.htaccess` there that switches the PHP engine off. Confirm it exists after the
+  first upload — a file called `shot.png` that is really PHP is otherwise a shell.
 
 ---
 
@@ -312,6 +315,7 @@ Look for a fill that wrote a ledger entry but not its fee, or the reverse. Corre
 it with an `adjustment` entry — never by editing a wallet, and never by editing the
 original row. The triggers will refuse the edit anyway.
 
-**A deposit was credited twice.**
-The same UTR reached two deposits. `deposits.utr` is indexed for exactly this;
-find both rows, and reverse one with a compensating ledger entry.
+**A wallet still shows a rupee balance.**
+Left over from before trading became peer to peer. Nothing on the platform can move
+it — there is no payout path — so settle it with that holder directly. The operator
+dashboard flags the total so it cannot be quietly forgotten.

@@ -645,8 +645,13 @@ function arv_schema(): array
         referrer_id       BIGINT UNSIGNED NOT NULL,
         referee_id        BIGINT UNSIGNED NOT NULL,
 
-        -- The referee's first confirmed deposit, and the commission it earned.
-        trigger_deposit_id BIGINT UNSIGNED NULL,
+        -- What earned the commission. Historically the referee's first confirmed
+        -- deposit; deposits were removed when the product became purely
+        -- peer-to-peer, so new rows record the referee's first completed P2P
+        -- purchase instead. trigger_deposit_id is kept, nullable, so existing
+        -- rows stay readable.
+        trigger_deposit_id   BIGINT UNSIGNED NULL,
+        trigger_p2p_trade_id BIGINT UNSIGNED NULL,
         base_paise        BIGINT       NOT NULL DEFAULT 0,
         commission_paise  BIGINT       NOT NULL DEFAULT 0,
         commission_pct    DECIMAL(6,3) NOT NULL DEFAULT 0,
@@ -822,7 +827,6 @@ function arv_default_settings(): array
         'tds_threshold_specified_paise' => '5000000',
 
         'min_order_paise'       => '10000',
-        'min_withdraw_paise'    => '10000',
         'match_at_index_price'  => '1',
 
         // P2P Phase 2 timers. All three are operator-editable with guardrails in
@@ -872,11 +876,9 @@ function arv_default_settings(): array
         'sell_fallback_minutes' => '5',
         'order_expiry_hours'    => '168',
 
-        'deposit_min_minutes'   => '2',
-        'deposit_max_minutes'   => '15',
-        'withdraw_min_minutes'  => '5',
-        'withdraw_max_minutes'  => '60',
-
+        // No deposit or withdrawal window settings: the platform holds no rupees, so
+        // there is nothing to promise a turnaround time for. Rows left behind on an
+        // existing install are harmless — nothing reads them.
         'referral_enabled'      => '1',
         'referral_pct'          => '5',
         'referral_max_paise'    => '5000000',
@@ -1732,6 +1734,99 @@ function arv_migrations(PDO $pdo): array
         );
         setting_set('p2p_phase3_v15', '1');
         $done[] = 'schema-15: widened orders.otype to include stop/target (P2P triggers)';
+    }
+
+    // schema-16: referral commissions are earned on a P2P purchase, not a deposit.
+    //
+    // Deposits were removed — trading is peer-to-peer and the buyer pays the seller
+    // off-platform — so the commission trigger moved to the referee's first
+    // completed P2P buy. This adds the column that records which trade earned it.
+    // `trigger_deposit_id` is left in place and nullable so historical rows stay
+    // readable; nothing is migrated across, because a past deposit-triggered
+    // commission was genuinely earned on a deposit and should keep saying so.
+    //
+    // Column existence is the guard, so the ADD runs exactly once even though
+    // catch-up is re-entrant. No wallet, lot, ledger or unit writes.
+    if (!$hasColumn('referrals', 'trigger_p2p_trade_id')) {
+        $pdo->exec(
+            'ALTER TABLE referrals
+               ADD COLUMN trigger_p2p_trade_id BIGINT UNSIGNED NULL AFTER trigger_deposit_id'
+        );
+        $done[] = 'referrals: added trigger_p2p_trade_id (commission now earned on a P2P purchase)';
+    }
+
+    // schema-17: settle whatever the removed deposit/withdraw features left behind.
+    //
+    // Both features are gone. What must not be left behind is a HOLD: a withdrawal
+    // sitting in 'requested' or 'approved' has that user's rupees in
+    // inr_locked_paise, and with handle_reject_withdraw deleted along with
+    // everything else there is no longer any code path that can release it. Those
+    // rupees would be locked forever, invisible to the holder and unusable by
+    // anybody.
+    //
+    // So: move each hold back to the free balance and mark the row rejected. Any
+    // deposit still awaiting payment or awaiting confirmation is closed too — it can
+    // never be paid now, and leaving it 'submitted' would show as a queue nobody can
+    // work.
+    //
+    // Net-zero on the wallet total (locked → free), so reconciliation is unaffected.
+    // The zero-delta `adjustment` ledger rows exist to explain the movement, exactly
+    // as the old reject handler wrote them. Guarded by a settings flag AND by there
+    // being anything to do, so it is safe on every re-entrant catch-up run.
+    //
+    // The freed rupees still have no way out of the platform — that is a settlement
+    // conversation with each holder, and admin.php's operator_warnings() reports the
+    // total so it cannot be quietly forgotten. Free and visible beats locked and
+    // invisible.
+    if (!setting_b('deposit_withdraw_removed_v17', false)) {
+        $open = $pdo->query(
+            'SELECT id, user_id, ref, amount_paise FROM withdrawals
+              WHERE status IN ("requested","approved")'
+        )->fetchAll();
+
+        $pdo->beginTransaction();
+        try {
+            foreach ($open as $w) {
+                $paise  = (int)$w['amount_paise'];
+                $userId = (int)$w['user_id'];
+
+                // Same shape as the handler this replaces: free += paise,
+                // locked -= paise. wallet_apply() refuses to make either negative,
+                // so a row whose hold has already gone stops the migration rather
+                // than silently inventing money.
+                wallet_apply($pdo, $userId, $paise, -$paise);
+                ledger_add($pdo, $userId, 'adjustment', 0, 0, [
+                    'ref'  => (string)$w['ref'],
+                    'note' => 'Withdrawals were discontinued — the hold on this request was released '
+                            . 'back to the available balance.',
+                ]);
+                $pdo->prepare(
+                    'UPDATE withdrawals SET status = "rejected", reject_reason = ? WHERE id = ?'
+                )->execute(['Withdrawals discontinued; hold released.', (int)$w['id']]);
+            }
+
+            $closedDeposits = $pdo->exec(
+                'UPDATE deposits SET status = "rejected",
+                        reject_reason = "Deposits discontinued; this request was never paid."
+                  WHERE status IN ("awaiting_payment","submitted")'
+            );
+
+            setting_set('deposit_withdraw_removed_v17', '1');
+            $pdo->commit();
+
+            if ($open || $closedDeposits) {
+                $done[] = sprintf(
+                    'schema-17: released %d withdrawal hold(s) and closed %d unpaid deposit '
+                    . 'request(s) (locked rupees returned to the free balance; no net wallet change)',
+                    count($open), (int)$closedDeposits
+                );
+            }
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     if ($done) {

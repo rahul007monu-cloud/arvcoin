@@ -217,7 +217,10 @@ function arv_reward_tiers(): array
         ['id' => 'silver',   'label' => 'Silver',   'metric' => 'ratio', 'threshold' => 5,         'entryFeePct' => 0.25, 'exitFeePct' => null, 'days' => null, 'perk' => 'Buy fee 0.25%, permanently'],
         ['id' => 'gold',     'label' => 'Gold',     'metric' => 'ratio', 'threshold' => 10,        'entryFeePct' => 0.25, 'exitFeePct' => 0.25, 'days' => null, 'perk' => 'Buy and sell fee 0.25%'],
         ['id' => 'platinum', 'label' => 'Platinum', 'metric' => 'ratio', 'threshold' => 100,       'entryFeePct' => 0,    'exitFeePct' => 0.25, 'days' => null, 'perk' => 'No buy fee, sell 0.25%'],
-        ['id' => 'sterling', 'label' => 'Sterling', 'metric' => 'paise', 'threshold' => 10000000,  'entryFeePct' => 0,    'exitFeePct' => 0.25, 'days' => null, 'perk' => 'Priority withdrawal'],
+        // Was "Priority withdrawal" — there are no withdrawals to prioritise. The
+        // fee numbers on the row are unchanged, so nobody's earned benefit moved;
+        // only the description now matches what they actually get.
+        ['id' => 'sterling', 'label' => 'Sterling', 'metric' => 'paise', 'threshold' => 10000000,  'entryFeePct' => 0,    'exitFeePct' => 0.25, 'days' => null, 'perk' => 'No buy fee, sell 0.25%, priority support'],
         ['id' => 'obsidian', 'label' => 'Obsidian', 'metric' => 'paise', 'threshold' => 100000000, 'entryFeePct' => 0,    'exitFeePct' => 0,    'days' => null, 'perk' => 'Zero fees and a dedicated line'],
     ];
 }
@@ -581,5 +584,161 @@ function wallet_public(array $w, ?float $nav): array
         'realisedPaise'    => (int)$w['realised_pnl_paise'],
         'avgCostNav'       => $totalU8 > 0 ? round(($invested / 100) / ($totalU8 / U8), 8) : 0,
         'firstBuyAt'       => $firstBuyAt,
+    ];
+}
+
+
+/* ========================================================== referrals ===== */
+
+/**
+ * How a referred person is named in the referrer's history.
+ *
+ * Their name if they gave one, otherwise their email address. No masking: the
+ * referrer is the person who invited them and already knows who they are, and a
+ * commission credited "from ra****@gmail.com" is not something anybody can check.
+ */
+function referral_person_label(?array $user): string
+{
+    $name = trim((string)($user['full_name'] ?? ''));
+    if ($name !== '') {
+        return $name;
+    }
+    $email = trim((string)($user['email'] ?? ''));
+    return $email !== '' ? $email : 'a referred account';
+}
+
+/**
+ * Pay a referral commission, once per referred account, in ARV.
+ *
+ * This used to live inside the deposit confirmation, because a confirmed first
+ * deposit was the only thing that proved a referred person had actually become a
+ * customer. Deposits are gone — trading is peer-to-peer and a buyer pays the
+ * seller off-platform — so the equivalent proof is now the referee's first
+ * completed P2P buy, and this is called from p2p_release_core() with that trade's
+ * own rupee amount as the base.
+ *
+ * The economics are deliberately unchanged: `referral_pct` of the base, capped at
+ * `referral_max_paise`, once per referee, ever.
+ *
+ * Paid in ARV rather than rupees because the rupee balance has no use — nothing
+ * on-platform spends it and there is no way to withdraw it. Units are ISSUED, not
+ * moved from the treasury, so the platform's ARV obligation grows by each
+ * commission. That is the real cost of the programme, and it is the deliberate
+ * trade: funding it from the treasury would be units-neutral but would make
+ * referrals fail whenever that account ran dry.
+ *
+ * Must be called inside the caller's transaction, and LAST — it locks a third
+ * wallet (the referrer's) on top of whatever the caller already holds. Two
+ * releases whose buyers refer each other could therefore deadlock; tx() retries
+ * once, and since this fires only on a referee's very first buy the contention is
+ * theoretical rather than real.
+ *
+ * @param int   $basePaise the rupee value the commission is a percentage of
+ * @param float $nav       price used to convert the commission into units
+ * @return array|null      a summary for the response and audit log, or null when
+ *                         no commission was due
+ */
+function referral_commission_pay(
+    PDO $pdo,
+    int $refereeId,
+    int $basePaise,
+    float $nav,
+    string $ref,
+    ?int $p2pTradeId = null
+): ?array {
+    if (!setting_b('referral_enabled', true) || $basePaise <= 0) {
+        return null;
+    }
+
+    // The referee's own details come back with this: the referrer's history has to
+    // name who earned them the commission, otherwise the entry is an unexplained
+    // credit and reads like a mistake.
+    $st = $pdo->prepare('SELECT referred_by, email, full_name FROM users WHERE id = ?');
+    $st->execute([$refereeId]);
+    $referee = $st->fetch();
+    $referrer = (int)($referee['referred_by'] ?? 0);
+    if ($referrer <= 0) {
+        return null;
+    }
+
+    // The unique key on referee_id makes "once per referred person" structural
+    // rather than a check that could be raced. This read is the friendly path;
+    // the constraint is the guarantee.
+    $already = $pdo->prepare('SELECT id FROM referrals WHERE referee_id = ?');
+    $already->execute([$refereeId]);
+    if ($already->fetchColumn()) {
+        return null;
+    }
+
+    $pct    = setting_f('referral_pct', 5);
+    $cap    = setting_i('referral_max_paise', 5000000);
+    $amount = min($cap, pct_of($basePaise, $pct));
+    if ($amount <= 0) {
+        return null;
+    }
+
+    // Only call it paid once the ARV is actually credited. Without a usable price
+    // the row is recorded as 'pending' so the commission is preserved and visible
+    // rather than silently dropped — and the trade that triggered it still
+    // completes. In practice a P2P trade always carries its own agreed price, so
+    // this is a guard rather than a path anybody should hit.
+    $units8 = $nav > 0 ? paise_to_u8($amount, $nav) : 0;
+    $didPay = $units8 > 0;
+
+    $pdo->prepare(
+        'INSERT INTO referrals (referrer_id, referee_id, trigger_p2p_trade_id,
+                                base_paise, commission_paise, commission_pct,
+                                status, paid_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ' . ($didPay ? 'UTC_TIMESTAMP()' : 'NULL') . ')'
+    )->execute([
+        $referrer, $refereeId, $p2pTradeId, $basePaise, $amount, $pct,
+        $didPay ? 'paid' : 'pending',
+    ]);
+
+    if ($didPay) {
+        // Credit the units and carry the rupee value as the cost basis, so value
+        // == cost at receipt (unrealised P&L starts at zero) and a later sale
+        // measures the gain from there.
+        wallet_apply($pdo, $referrer, 0, 0, $units8, 0, $amount, 0);
+
+        // A lot is not optional: consume_lots() is what a sale draws from, and
+        // units credited without one would make the referrer's next sell fail on
+        // a shortfall.
+        $pdo->prepare(
+            'INSERT INTO lots (user_id, units, units_remaining, cost_paise, nav)
+             VALUES (?, ?, ?, ?, ?)'
+        )->execute([$referrer, u8str($units8), u8str($units8), $amount, $nav]);
+
+        // Its own ledger kind, so the income never reads as a capital gain. The
+        // delta is in ARV; the rupee value it was earned at is in the note and on
+        // the referrals row.
+        //
+        // The note names the person and the rate, because this is the one entry a
+        // holder did not cause themselves. "ARV appeared in my account" with no
+        // explanation is indistinguishable from a bug, so the history says who
+        // bought, what percentage it was, and what it was worth when it was paid.
+        ledger_add($pdo, $referrer, 'referral_commission', 0, $units8, [
+            'nav' => $nav, 'ref' => $ref, 'relatedId' => $refereeId,
+            'note' => sprintf(
+                '%s%% referral commission — %s made their first purchase of %s. Paid as %s ARV at %s',
+                rtrim(rtrim(number_format($pct, 2, '.', ''), '0'), '.'),
+                referral_person_label($referee),
+                money_note($basePaise),
+                u8str($units8),
+                money_note((int)round($nav * 100))
+            ),
+        ]);
+    }
+
+    return [
+        'referrerId'   => $referrer,
+        'refereeId'    => $refereeId,
+        'refereeLabel' => referral_person_label($referee),
+        'basePaise'    => $basePaise,
+        'paise'        => $amount,
+        'pct'          => $pct,
+        'arvUnits'     => u8str($units8),
+        'nav'          => $nav,
+        'status'       => $didPay ? 'paid' : 'pending',
     ];
 }

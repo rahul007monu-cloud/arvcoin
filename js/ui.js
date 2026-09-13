@@ -215,17 +215,11 @@ export function busy(btn, yes, label) {
  * optional extra predicate, so an item can depend on the account's state rather
  * than being hard-coded into the render loop.
  *
- * Deposit and Withdraw are deliberately NOT advertised here any more. Trading is
- * peer-to-peer: a buyer pays the seller off-platform (api/p2p.php never touches
- * INR) and the legacy INR-spending buy form is gone from every page, so an
- * on-platform rupee balance cannot buy anything. Both pages and both endpoints
- * still exist and still work — deposit.html, withdraw.html and the admin tooling
- * are untouched, and the Wallet card still links to them — they are simply no
- * longer primary destinations. To advertise Withdraw again only to accounts that
- * hold rupees, add:
- *   { href: 'withdraw.html', label: 'Withdraw', auth: true,
- *     when: function (u) { var w = u && u.wallet;
- *       return !!w && (Number(w.inrPaise) || 0) + (Number(w.inrLockedPaise) || 0) > 0; } }
+ * There is no Deposit or Withdraw here because there is no such thing any more.
+ * Trading is peer-to-peer: a buyer pays the seller directly and only ARV moves on
+ * this platform, so there was never anything for a deposit to fund. The pages and
+ * both endpoints have been deleted rather than hidden — a menu that omits a
+ * feature which still half-works is how you get a support queue.
  */
 var NAV = [
   // Overview is the landing page, so it is a destination only while signed out.
@@ -278,7 +272,7 @@ var SUPPORT_MAILTO = 'mailto:' + SUPPORT_EMAIL + '?subject=' + encodeURIComponen
  * The primary destinations for the mobile bottom tab bar (CoinDCX-style).
  *
  * A curated subset of NAV: the five things a trader reaches for. Secondary
- * items (Deposit/Withdraw/Refer/Profile/Help) live in the overflow "More" menu.
+ * items (Refer/Profile/Help) live in the overflow "More" menu.
  * Each carries an inline monochrome SVG so the bar needs no icon library and
  * stays on the silver-on-black palette (currentColor inherits the tab colour).
  */
@@ -779,35 +773,6 @@ export function downloadCsv(filename, rows) {
   setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
 }
 
-/* ============================================================== timer ===== */
-
-/**
- * A countdown ring against a promised window.
- *
- * Deposits and withdrawals both quote a range, so this shows the real remaining
- * time rather than an indeterminate spinner. Past the window it says so instead
- * of sitting at zero pretending.
- */
-export function paintTimer(node, opts) {
-  if (!node) return;
-  var o = opts || {};
-  var elapsed = Math.max(0, o.elapsedSeconds || 0);
-  var maxSec = (o.maxMinutes || 15) * 60;
-  var pct = Math.min(100, (elapsed / maxSec) * 100);
-  var leftMin = Math.max(0, Math.ceil((maxSec - elapsed) / 60));
-  var over = elapsed > maxSec;
-
-  node.classList.toggle('overdue', over);
-  node.innerHTML =
-    '<div class="timer-ring" style="--pct:' + pct.toFixed(1) + '%">'
-      + '<b>' + (over ? '!' : leftMin) + '</b></div>'
-    + '<div><div class="strong">' + (over ? 'Taking longer than usual' : 'Usually ' + (o.minMinutes || 2)
-      + '\u2013' + (o.maxMinutes || 15) + ' minutes') + '</div>'
-    + '<div class="tiny muted">' + esc(over
-        ? 'Past the window we quoted. Operations has it \u2014 nothing is lost.'
-        : (o.note || 'You can close this page; it carries on without you.')) + '</div></div>';
-}
-
 /* =============================================================== boot ===== */
 
 /**
@@ -1010,8 +975,8 @@ export { reveal };
     // A friendly opener with a few example chips.
     add('assistant',
       'Hi! I can answer questions about ARV \u2014 how it works, buying and selling, '
-      + 'fees, tax, deposits and withdrawals. What would you like to know?');
-    chips(['How does ARV work?', 'What are the fees?', 'How is tax calculated?', 'How do I deposit?']);
+      + 'fees and tax. What would you like to know?');
+    chips(['How does ARV work?', 'How do I buy ARV?', 'What are the fees?', 'How is tax calculated?']);
   }
 
   function toggle(force) {

@@ -1,7 +1,7 @@
 /**
  * History.
  *
- * Reads the ledger, not the orders and deposits tables. The ledger is the book of
+ * Reads the ledger, not the orders table. The ledger is the book of
  * record and the wallet is a cached total of it; a history page assembled from
  * the source tables could disagree with the balance printed next to it, and the
  * user would have no way to know which one to believe.
@@ -28,6 +28,9 @@ var st = {
 /* ------------------------------------------------------------------ labels -- */
 
 // What each ledger kind actually was, in the words a holder would use.
+//
+// `deposit` and `withdrawal` are kept for history: those features are gone, but the
+// entries they wrote are immutable and still have to render for anyone who has one.
 var KIND = {
   deposit:             { label: 'Deposit',            cls: 'up' },
   withdrawal:          { label: 'Withdrawal',         cls: 'down' },
@@ -80,7 +83,7 @@ function paintRows() {
   if (!st.rows.length) {
     host.innerHTML = '<div class="empty"><div class="icon">\u25cb</div>'
       + 'Nothing here yet'
-      + (st.group || st.fy ? ' for this filter.' : '. Once you deposit, it starts filling up.')
+      + (st.group || st.fy ? ' for this filter.' : '. Once you trade, it starts filling up.')
       + '</div>';
     return;
   }
